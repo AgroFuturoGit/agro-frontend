@@ -1,14 +1,14 @@
+import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
-import withPWAInit from "@ducanh2912/next-pwa";
 
-const withPWA = withPWAInit({
-  dest: "public",
+const withSerwist = withSerwistInit({
+  swSrc: "src/app/sw.ts",
+  swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
-  register: true,
 });
 
 const nextConfig: NextConfig = {
   /* config options here */
 };
 
-export default withPWA(nextConfig);
+export default withSerwist(nextConfig);
