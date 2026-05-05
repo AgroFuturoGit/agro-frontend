@@ -24,5 +24,19 @@ Projeto universitário multidisciplinar desenvolvido por alunos de computação 
 
 > Novas funcionalidades devem ser criadas a partir de `develop` seguindo o padrão `feature/nome-da-funcionalidade`
 
+## Padrão de Commits
+Adotar o padrão Conventional Commits.
+
+### Estrutura:
+- tipo: descrição curta
+
+### Tipos mais usados:
+- feat: nova funcionalidade
+- fix: correção de bug
+- refactor: refatoração de código
+- docs: documentação
+- test: testes
+- chore: tarefas gerais/configuração
+
 ## Como rodar
 > A definir
