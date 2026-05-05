@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, staging, main]
+  pull_request:
+    branches: [develop, staging, main]
+
+jobs:
+  validate-branch-flow:
+    name: Validar Fluxo de Branches
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checar PR para Staging
+        if: github.base_ref == 'staging' && github.head_ref != 'develop'
+        run: |
+          echo "ERRO: PRs para a branch 'staging' só podem vir de 'develop'."
+          exit 1
+
+      - name: Checar PR para Main
+        if: github.base_ref == 'main' && github.head_ref != 'staging' && !startsWith(github.head_ref, 'hotfix/')
+        run: |
+          echo "ERRO: PRs para a branch 'main' só podem vir de 'staging' ou 'hotfix/*'."
+          exit 1
+
+  build-and-test:
+    name: Build e Lint
+    needs: validate-branch-flow
+    if: always() && (needs.validate-branch-flow.result == 'success' || needs.validate-branch-flow.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Setup do Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar Dependências
+        run: npm ci
+
+      - name: Checar Estilização e Erros (Lint)
+        run: npm run lint
+
+      - name: Checar Tipagem (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Build (Compilação)
+        run: npm run build
