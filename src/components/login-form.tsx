@@ -1,0 +1,117 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+
+export function LoginForm({ className, ...props }: React.ComponentProps<"form">) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    await new Promise((r) => setTimeout(r, 800));
+    setSubmitting(false);
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className={cn("flex flex-col gap-6", className)}
+      {...props}
+    >
+      <div className="flex flex-col gap-2 text-center md:text-left">
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Acesse sua conta
+        </h1>
+        <p className="text-sm text-muted-foreground text-balance">
+          Entre com seu e-mail e senha para continuar.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email">E-mail</Label>
+          <div className="relative">
+            <Mail
+              aria-hidden
+              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              placeholder="voce@empresa.com.br"
+              required
+              disabled={submitting}
+              className="h-10 pl-8"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Senha</Label>
+          </div>
+          <div className="relative">
+            <Input
+              id="password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              placeholder="••••••••"
+              required
+              minLength={8}
+              disabled={submitting}
+              className="h-10 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+              aria-pressed={showPassword}
+              className="absolute right-1 top-1/2 inline-flex size-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <Button type="submit" size="lg" disabled={submitting} className="h-10 w-full">
+        {submitting ? (
+          <>
+            <Loader2 className="size-4 animate-spin" />
+            Entrando...
+          </>
+        ) : (
+          "Entrar"
+        )}
+      </Button>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Ainda não tem conta?{" "}
+        <Link
+          href="/signup"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          Solicitar acesso
+        </Link>
+      </p>
+    </form>
+  );
+}
