@@ -137,16 +137,6 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
           "Entrar"
         )}
       </Button>
-
-      <p className="text-center text-sm text-muted-foreground">
-        Ainda não tem conta?{" "}
-        <Link
-          href="/signup"
-          className="font-medium text-foreground underline-offset-4 hover:underline"
-        >
-          Solicitar acesso
-        </Link>
-      </p>
     </form>
   );
 }
