@@ -2,23 +2,48 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertCircle, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApiError, apiRequest } from "@/lib/api";
+import { persistSession, type LoginResponse } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"form">) {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError(null);
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setSubmitting(false);
+
+    const formData = new FormData(event.currentTarget);
+    const email = String(formData.get("email") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    try {
+      const data = await apiRequest<LoginResponse>("/auth/login", {
+        method: "POST",
+        body: { email, password },
+        auth: false,
+      });
+      persistSession(data);
+      router.replace("/admin");
+      router.refresh();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError("Não foi possível conectar ao servidor. Tente novamente.");
+      }
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -35,6 +60,16 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
           Entre com seu e-mail e senha para continuar.
         </p>
       </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        >
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
