@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { Leaf, Sprout, TrendingUp, Users } from "lucide-react";
 
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
 export const metadata: Metadata = {
   title: "Painel · Agro",
 };
@@ -25,24 +32,27 @@ export default function AdminDashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {STATS.map(({ label, value, icon: Icon }) => (
-          <div
-            key={label}
-            className="rounded-lg border border-border bg-card p-5 shadow-sm"
-          >
-            <div className="flex items-center justify-between text-muted-foreground">
-              <span className="text-sm font-medium">{label}</span>
-              <Icon className="size-4" aria-hidden />
-            </div>
-            <p className="mt-3 text-3xl font-semibold tracking-tight text-card-foreground">
-              {value}
-            </p>
-          </div>
+          <Card key={label}>
+            <CardHeader>
+              <CardDescription className="flex items-center justify-between">
+                <span>{label}</span>
+                <Icon className="size-4" aria-hidden />
+              </CardDescription>
+              <CardTitle className="text-3xl font-semibold tracking-tight">
+                {value}
+              </CardTitle>
+            </CardHeader>
+          </Card>
         ))}
       </div>
 
-      <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        Selecione um módulo na lateral para começar.
-      </div>
+      <Card className="border-dashed bg-transparent ring-0 shadow-none">
+        <CardHeader className="items-center text-center">
+          <CardDescription>
+            Selecione um módulo na lateral para começar.
+          </CardDescription>
+        </CardHeader>
+      </Card>
     </div>
   );
 }

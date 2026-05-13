@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { clearSession, readUserFromStorage, type AuthUser } from "@/lib/auth";
 
 function initials(fullName: string) {
@@ -29,31 +39,40 @@ export function UserMenu() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="hidden text-right sm:block">
-        <p className="text-sm font-medium leading-none">
-          {user?.fullName ?? "Carregando…"}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {user?.email ?? ""}
-        </p>
-      </div>
-      <div
-        aria-hidden
-        className="grid size-9 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
-      >
-        {user ? initials(user.fullName) : "··"}
-      </div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={handleLogout}
-        className="gap-2"
-      >
-        <LogOut className="size-4" />
-        <span className="hidden sm:inline">Sair</span>
-      </Button>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="lg"
+            className="h-10 gap-2 rounded-full px-1.5"
+          >
+            <Avatar size="sm">
+              <AvatarFallback className="bg-primary text-primary-foreground">
+                {user ? initials(user.fullName) : "··"}
+              </AvatarFallback>
+            </Avatar>
+            <span className="hidden text-sm font-medium sm:inline">
+              {user?.fullName ?? "Carregando…"}
+            </span>
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end" className="min-w-56">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>
+            <p className="text-sm font-medium text-foreground">
+              {user?.fullName ?? "Carregando…"}
+            </p>
+            <p className="text-xs text-muted-foreground">{user?.email ?? ""}</p>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+          <LogOut />
+          Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
