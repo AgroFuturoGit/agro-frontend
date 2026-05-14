@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Sprout,
   Users,
+  UserCog,
   type LucideIcon,
 } from "lucide-react";
 
@@ -25,6 +26,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
+  { href: "/admin/usuarios", label: "Usuários", icon: UserCog },
   { href: "/admin/produtores", label: "Produtores", icon: Users },
   { href: "/admin/safras", label: "Safras", icon: Sprout },
   { href: "/admin/cultivos", label: "Cultivos", icon: Leaf },
