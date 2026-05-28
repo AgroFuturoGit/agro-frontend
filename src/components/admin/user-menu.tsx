@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 
@@ -15,7 +15,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { clearSession, readUserFromStorage, type AuthUser } from "@/lib/auth";
+import {
+  clearSession,
+  getUserSnapshot,
+  subscribeUserStorage,
+} from "@/lib/auth";
+
+function getServerUserSnapshot() {
+  return null;
+}
 
 function initials(fullName: string) {
   const parts = fullName.trim().split(/\s+/);
@@ -26,11 +34,11 @@ function initials(fullName: string) {
 
 export function UserMenu() {
   const router = useRouter();
-  const [user, setUser] = useState<AuthUser | null>(null);
-
-  useEffect(() => {
-    setUser(readUserFromStorage());
-  }, []);
+  const user = useSyncExternalStore(
+    subscribeUserStorage,
+    getUserSnapshot,
+    getServerUserSnapshot,
+  );
 
   function handleLogout() {
     clearSession();

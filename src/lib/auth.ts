@@ -40,6 +40,31 @@ export function readUserFromStorage(): AuthUser | null {
   }
 }
 
+let cachedRawUser: string | null = null;
+let cachedUser: AuthUser | null = null;
+
+export function getUserSnapshot(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+  if (raw === cachedRawUser) return cachedUser;
+  cachedRawUser = raw;
+  if (!raw) {
+    cachedUser = null;
+    return null;
+  }
+  try {
+    cachedUser = JSON.parse(raw) as AuthUser;
+  } catch {
+    cachedUser = null;
+  }
+  return cachedUser;
+}
+
+export function subscribeUserStorage(callback: () => void): () => void {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
 export function readTokenFromCookie(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(
