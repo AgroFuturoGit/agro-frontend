@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Leaf,
   LayoutDashboard,
+  ShieldCheck,
   Sprout,
   Users,
   UserCog,
@@ -17,16 +19,29 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { readUserFromStorage, type Role } from "@/lib/auth";
 
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  roles?: Role[];
 };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
-  { href: "/admin/usuarios", label: "Usuários", icon: UserCog },
+  {
+    href: "/admin/usuarios",
+    label: "Usuários",
+    icon: UserCog,
+    roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    href: "/admin/perfis",
+    label: "Perfis",
+    icon: ShieldCheck,
+    roles: ["ADMIN"],
+  },
   { href: "/admin/produtores", label: "Produtores", icon: Users },
   { href: "/admin/safras", label: "Safras", icon: Sprout },
   { href: "/admin/cultivos", label: "Cultivos", icon: Leaf },
@@ -35,10 +50,20 @@ const NAV_ITEMS: NavItem[] = [
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const [role, setRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRole(readUserFromStorage()?.role ?? null);
+  }, []);
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.roles || (role !== null && item.roles.includes(role)),
+  );
 
   return (
     <SidebarMenu className="gap-1">
-      {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
+      {visibleItems.map(({ href, label, icon: Icon }) => {
         const active =
           href === "/admin" ? pathname === href : pathname.startsWith(href);
         return (
