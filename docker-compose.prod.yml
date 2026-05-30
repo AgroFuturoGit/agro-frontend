@@ -1,0 +1,40 @@
+# Compose para ambiente de PRODUÇÃO do frontend.
+# Sobe apenas o Next.js. O backend precisa estar rodando e acessível
+# no endereço configurado em PUBLIC_API_URL.
+#
+# Uso:
+#   cp .env.example .env.prod   # editar PUBLIC_API_URL com a URL real do backend
+#   docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+
+name: agro-frontend-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    image: agro-frontend:latest
+    container_name: agro-frontend
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    mem_limit: 256m
+    mem_reservation: 128m
+    logging: *default-logging
