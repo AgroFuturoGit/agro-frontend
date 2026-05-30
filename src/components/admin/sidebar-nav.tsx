@@ -1,0 +1,87 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  BarChart3,
+  Leaf,
+  LayoutDashboard,
+  ShieldCheck,
+  Sprout,
+  Users,
+  UserCog,
+  type LucideIcon,
+} from "lucide-react";
+
+import {
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
+import { readUserFromStorage, type Role } from "@/lib/auth";
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  roles?: Role[];
+};
+
+const NAV_ITEMS: NavItem[] = [
+  { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
+  {
+    href: "/admin/usuarios",
+    label: "Usuários",
+    icon: UserCog,
+    roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    href: "/admin/perfis",
+    label: "Perfis",
+    icon: ShieldCheck,
+    roles: ["ADMIN"],
+  },
+  { href: "/admin/produtores", label: "Produtores", icon: Users },
+  { href: "/admin/safras", label: "Safras", icon: Sprout },
+  { href: "/admin/cultivos", label: "Cultivos", icon: Leaf },
+  { href: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },
+];
+
+export function SidebarNav() {
+  const pathname = usePathname();
+  const [role, setRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRole(readUserFromStorage()?.role ?? null);
+  }, []);
+
+  const visibleItems = NAV_ITEMS.filter(
+    (item) => !item.roles || (role !== null && item.roles.includes(role)),
+  );
+
+  return (
+    <SidebarMenu className="gap-1">
+      {visibleItems.map(({ href, label, icon: Icon }) => {
+        const active =
+          href === "/admin" ? pathname === href : pathname.startsWith(href);
+        return (
+          <SidebarMenuItem key={href}>
+            <SidebarMenuButton
+              isActive={active}
+              tooltip={label}
+              className="h-9"
+              render={
+                <Link href={href}>
+                  <Icon />
+                  <span>{label}</span>
+                </Link>
+              }
+            />
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
+  );
+}
