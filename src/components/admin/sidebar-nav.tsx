@@ -11,6 +11,7 @@ import {
   Sprout,
   Users,
   UserCog,
+  Wheat,
   type LucideIcon,
 } from "lucide-react";
 
@@ -42,6 +43,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     roles: ["ADMIN"],
   },
+  { href: "/admin/culturas", label: "Culturas", icon: Wheat },
   { href: "/admin/produtores", label: "Produtores", icon: Users },
   { href: "/admin/safras", label: "Safras", icon: Sprout },
   { href: "/admin/cultivos", label: "Cultivos", icon: Leaf },
