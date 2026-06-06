@@ -214,16 +214,6 @@ export function CropFormDialog({
 
           {!isCreate && crop && (
             <>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="crop-id">Identificador</Label>
-                <Input
-                  id="crop-id"
-                  value={crop.id}
-                  readOnly
-                  disabled
-                  className="font-mono text-xs"
-                />
-              </div>
               <p className="text-xs text-muted-foreground">
                 Última atualização: {formatDateTime(crop.updatedAt)}
               </p>
