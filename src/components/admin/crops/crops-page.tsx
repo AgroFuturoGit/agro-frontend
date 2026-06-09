@@ -25,13 +25,9 @@ import { listCrops, type Crop } from "@/lib/crops";
 import { CropFormDialog } from "./crop-form-dialog";
 import { PriorityBadge } from "./priority-badge";
 
-const PAGE_SIZE = 20;
-
 export function CropsPage() {
   const isMobile = useIsMobile();
   const [crops, setCrops] = useState<Crop[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [onlyPriority, setOnlyPriority] = useState(false);
@@ -50,7 +46,6 @@ export function CropsPage() {
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setSearch(searchInput.trim());
-      setPage(1);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [searchInput]);
@@ -65,11 +60,8 @@ export function CropsPage() {
       const result = await listCrops({
         search: search || undefined,
         isPriority: onlyPriority || undefined,
-        page,
-        limit: PAGE_SIZE,
       });
-      setCrops(result.data);
-      setTotalPages(Math.max(1, result.meta.totalPages));
+      setCrops(result);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -79,7 +71,7 @@ export function CropsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, onlyPriority, page]);
+  }, [search, onlyPriority]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -88,7 +80,6 @@ export function CropsPage() {
 
   function handlePriorityFilterChange(checked: boolean) {
     setOnlyPriority(checked);
-    setPage(1);
   }
 
   return (
@@ -288,33 +279,6 @@ export function CropsPage() {
         </Card>
       )}
 
-      {!loading && crops.length > 0 && (
-        <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
-          >
-            Anterior
-          </Button>
-          <span>
-            Página {page} de {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() =>
-              setPage((current) => Math.min(totalPages, current + 1))
-            }
-          >
-            Próximo
-          </Button>
-        </div>
-      )}
 
       <CropFormDialog
         mode="create"

@@ -5,8 +5,8 @@ export type Crop = {
   name: string;
   variety: string;
   isPriority: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type CropWritePayload = {
@@ -15,21 +15,9 @@ export type CropWritePayload = {
   isPriority: boolean;
 };
 
-export type PaginatedCrops = {
-  data: Crop[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
-};
-
 export type CropListParams = {
   search?: string;
   isPriority?: boolean;
-  page?: number;
-  limit?: number;
 };
 
 type CropApiResponse = {
@@ -41,30 +29,27 @@ type CropApiResponse = {
   updated_at: string;
 };
 
-type PaginatedCropsApiResponse = {
-  data: CropApiResponse[];
-  meta: {
-    page: number;
-    limit: number;
-    total: number;
-    total_pages: number;
-  };
+type CropListApiResponse = {
+  id: string;
+  name: string;
+  variety: string;
+  isPriority: boolean;
 };
 
 type CropWriteApiPayload = {
   name: string;
   variety: string;
-  is_priority: boolean;
+  isPriority: boolean;
 };
 
-function mapCrop(raw: CropApiResponse): Crop {
+function mapCrop(raw: CropApiResponse | CropListApiResponse): Crop {
   return {
     id: raw.id,
     name: raw.name,
     variety: raw.variety,
-    isPriority: raw.is_priority,
-    createdAt: raw.created_at,
-    updatedAt: raw.updated_at,
+    isPriority: "is_priority" in raw ? raw.is_priority : raw.isPriority,
+    createdAt: "created_at" in raw ? raw.created_at : undefined,
+    updatedAt: "updated_at" in raw ? raw.updated_at : undefined,
   };
 }
 
@@ -72,7 +57,7 @@ function mapWritePayload(payload: CropWritePayload): CropWriteApiPayload {
   return {
     name: payload.name,
     variety: payload.variety,
-    is_priority: payload.isPriority,
+    isPriority: payload.isPriority,
   };
 }
 
@@ -84,29 +69,15 @@ function buildListQuery(params?: CropListParams): string {
   if (params?.isPriority === true) {
     searchParams.set("is_priority", "true");
   }
-  if (params?.page !== undefined) {
-    searchParams.set("page", String(params.page));
-  }
-  if (params?.limit !== undefined) {
-    searchParams.set("limit", String(params.limit));
-  }
   const query = searchParams.toString();
   return query ? `?${query}` : "";
 }
 
 export function listCrops(params?: CropListParams) {
-  return apiRequest<PaginatedCropsApiResponse>(
+  return apiRequest<CropListApiResponse[]>(
     `/crops${buildListQuery(params)}`,
     { method: "GET" },
-  ).then((response) => ({
-    data: response.data.map(mapCrop),
-    meta: {
-      page: response.meta.page,
-      limit: response.meta.limit,
-      total: response.meta.total,
-      totalPages: response.meta.total_pages,
-    },
-  }));
+  ).then((response) => response.map(mapCrop));
 }
 
 export function getCrop(id: string) {
