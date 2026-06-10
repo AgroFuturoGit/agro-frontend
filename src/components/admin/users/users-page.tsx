@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
+import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf } from "@/lib/cpf";
 import { listUsers, ROLE_LABELS, type User } from "@/lib/users";
 
@@ -32,10 +33,18 @@ export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<Role | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentRole(readUserFromStorage()?.role ?? null);
+  }, []);
+
+  const canManage = currentRole === "ADMIN";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -73,10 +82,12 @@ export function UsersPage() {
             Gerencie os usuários do sistema.
           </p>
         </div>
-        <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus />
-          Novo usuário
-        </Button>
+        {canManage && (
+          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus />
+            Novo usuário
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -98,14 +109,16 @@ export function UsersPage() {
               <TableHead>CPF</TableHead>
               <TableHead>Papel</TableHead>
               <TableHead>Nascimento</TableHead>
-              <TableHead className="w-[1%] text-right">Ações</TableHead>
+              {canManage && (
+                <TableHead className="w-[1%] text-right">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody className="[&_td]:h-12 [&_td]:px-4">
             {loading ? (
               Array.from({ length: 4 }).map((_, idx) => (
                 <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: 6 }).map((__, cidx) => (
+                  {Array.from({ length: canManage ? 6 : 5 }).map((__, cidx) => (
                     <TableCell key={cidx}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -115,7 +128,7 @@ export function UsersPage() {
             ) : sortedUsers.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={6}
+                  colSpan={canManage ? 6 : 5}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
                   Nenhum usuário cadastrado ainda.
@@ -137,29 +150,31 @@ export function UsersPage() {
                   <TableCell className="text-muted-foreground">
                     {formatDate(user.dateOfBirth)}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Editar usuário"
-                        onClick={() => setEditTarget(user)}
-                      >
-                        <Pencil />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Excluir usuário"
-                        onClick={() => setDeleteTarget(user)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canManage && (
+                    <TableCell className="text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Editar usuário"
+                          onClick={() => setEditTarget(user)}
+                        >
+                          <Pencil />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Excluir usuário"
+                          onClick={() => setDeleteTarget(user)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}

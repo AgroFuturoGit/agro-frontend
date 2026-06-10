@@ -15,17 +15,20 @@ export type LoginResponse = {
 };
 
 export const AUTH_TOKEN_COOKIE = "agro_token";
+export const AUTH_ROLE_COOKIE = "agro_role";
 export const AUTH_USER_STORAGE_KEY = "agro_user";
 
 const FOUR_HOURS_SECONDS = 60 * 60 * 4;
 
 export function persistSession({ token, userResponseDTO }: LoginResponse) {
   document.cookie = `${AUTH_TOKEN_COOKIE}=${token}; Path=/; Max-Age=${FOUR_HOURS_SECONDS}; SameSite=Lax`;
+  document.cookie = `${AUTH_ROLE_COOKIE}=${userResponseDTO.role}; Path=/; Max-Age=${FOUR_HOURS_SECONDS}; SameSite=Lax`;
   localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(userResponseDTO));
 }
 
 export function clearSession() {
   document.cookie = `${AUTH_TOKEN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+  document.cookie = `${AUTH_ROLE_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
   localStorage.removeItem(AUTH_USER_STORAGE_KEY);
 }
 
