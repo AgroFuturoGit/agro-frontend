@@ -46,6 +46,39 @@ npm run dev
 
 O frontend fica disponível em `http://localhost:3000`.
 
+## 🐳 Rodando com Docker
+
+O Docker sobe o frontend em modo de produção. Antes de iniciar, o backend precisa estar rodando e acessível pela URL configurada em `PUBLIC_API_URL`.
+
+### 1. Preparar variáveis de ambiente
+
+```bash
+cp .env.example .env.prod
+```
+
+Edite o arquivo `.env.prod` e configure a URL do backend:
+
+```bash
+PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
+
+### 2. Subir o container
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+O frontend fica disponível em `http://localhost:3000`.
+
+### 3. Comandos úteis
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml ps
+docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f
+docker compose --env-file .env.prod -f docker-compose.prod.yml down
+```
+
 ### Outros comandos úteis
 
 ```bash
