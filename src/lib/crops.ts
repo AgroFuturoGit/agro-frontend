@@ -5,7 +5,6 @@ export type Crop = {
   name: string;
   variety: string;
   isPriority: boolean;
-  createdAt?: string;
   updatedAt?: string;
 };
 
@@ -24,60 +23,39 @@ type CropApiResponse = {
   id: string;
   name: string;
   variety: string;
-  is_priority: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-type CropListApiResponse = {
-  id: string;
-  name: string;
-  variety: string;
   isPriority: boolean;
 };
 
-type CropWriteApiPayload = {
-  name: string;
-  variety: string;
-  isPriority: boolean;
-};
-
-function mapCrop(raw: CropApiResponse | CropListApiResponse): Crop {
+function mapCrop(raw: CropApiResponse): Crop {
   return {
     id: raw.id,
     name: raw.name,
     variety: raw.variety,
-    isPriority: "is_priority" in raw ? raw.is_priority : raw.isPriority,
-    createdAt: "created_at" in raw ? raw.created_at : undefined,
-    updatedAt: "updated_at" in raw ? raw.updated_at : undefined,
+    isPriority: raw.isPriority,
   };
 }
 
-function mapWritePayload(payload: CropWritePayload): CropWriteApiPayload {
-  return {
-    name: payload.name,
-    variety: payload.variety,
-    isPriority: payload.isPriority,
-  };
-}
+export async function listCrops(params?: CropListParams): Promise<Crop[]> {
+  const all = await apiRequest<CropApiResponse[]>("/crops", {
+    method: "GET",
+  }).then((res) => res.map(mapCrop));
 
-function buildListQuery(params?: CropListParams): string {
-  const searchParams = new URLSearchParams();
-  if (params?.search?.trim()) {
-    searchParams.set("search", params.search.trim());
-  }
-  if (params?.isPriority === true) {
-    searchParams.set("is_priority", "true");
-  }
-  const query = searchParams.toString();
-  return query ? `?${query}` : "";
-}
+  let result = all;
 
-export function listCrops(params?: CropListParams) {
-  return apiRequest<CropListApiResponse[]>(
-    `/crops${buildListQuery(params)}`,
-    { method: "GET" },
-  ).then((response) => response.map(mapCrop));
+  if (params?.search) {
+    const q = params.search.toLowerCase();
+    result = result.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.variety.toLowerCase().includes(q),
+    );
+  }
+
+  if (params?.isPriority) {
+    result = result.filter((c) => c.isPriority);
+  }
+
+  return result;
 }
 
 export function getCrop(id: string) {
@@ -87,50 +65,38 @@ export function getCrop(id: string) {
 }
 
 export function createCrop(payload: CropWritePayload) {
-  return apiRequest<CropApiResponse>("/crops", {
+  return apiRequest<CropApiResponse>("/crops/register", {
     method: "POST",
-    body: mapWritePayload(payload),
+    body: payload,
   }).then(mapCrop);
 }
 
 export function updateCrop(id: string, payload: CropWritePayload) {
   return apiRequest<CropApiResponse>(`/crops/${id}`, {
     method: "PATCH",
-    body: mapWritePayload(payload),
+    body: payload,
   }).then(mapCrop);
 }
 
-/**
- * Planned CropSelect props (UC03 — planejamento de safra):
- * value: string; onChange: (id: string) => void; filterPriority?: boolean
- */
+export function deleteCrop(id: string) {
+  return apiRequest<void>(`/crops/${id}`, { method: "DELETE" });
+}
+
+// Backend retorna erros de validação como: "name: msg; variety: msg"
 export function parseCropFieldErrors(payload: unknown): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!payload || typeof payload !== "object") return errors;
 
   const record = payload as Record<string, unknown>;
+  const message = typeof record.message === "string" ? record.message : "";
 
-  if (Array.isArray(record.errors)) {
-    for (const item of record.errors) {
-      if (
-        item &&
-        typeof item === "object" &&
-        "field" in item &&
-        "message" in item
-      ) {
-        const field = String((item as { field: unknown }).field);
-        const message = String((item as { message: unknown }).message);
-        errors[field] = message;
-      }
-    }
-  }
-
-  const message =
-    typeof record.message === "string" ? record.message : undefined;
-
-  if (Array.isArray(record.fields) && message) {
-    for (const field of record.fields) {
-      errors[String(field)] = message;
+  if (message) {
+    for (const part of message.split(";")) {
+      const colonIdx = part.indexOf(":");
+      if (colonIdx === -1) continue;
+      const field = part.slice(0, colonIdx).trim();
+      const msg = part.slice(colonIdx + 1).trim();
+      if (field && msg) errors[field] = msg;
     }
   }
 
