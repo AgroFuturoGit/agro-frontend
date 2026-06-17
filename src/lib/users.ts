@@ -2,7 +2,7 @@ import { apiRequest } from "@/lib/api";
 import type { Role } from "@/lib/auth";
 
 export type User = {
-  id: number;
+  id: string;
   fullName: string;
   email: string;
   cpf: string;
@@ -57,13 +57,13 @@ export function updateCurrentUser(payload: UserUpdatePayload) {
   });
 }
 
-export function adminUpdateUser(id: number, payload: AdminUserUpdatePayload) {
+export function adminUpdateUser(id: string, payload: AdminUserUpdatePayload) {
   return apiRequest<User>(`/users/${id}`, {
     method: "PATCH",
     body: payload,
   });
 }
 
-export function deleteUser(id: number) {
+export function deleteUser(id: string) {
   return apiRequest<void>(`/users/${id}`, { method: "DELETE" });
 }
