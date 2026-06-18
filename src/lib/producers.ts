@@ -51,9 +51,38 @@ function mapProducer(raw: ProducerApiResponse): Producer {
   };
 }
 
+export type ProducerUpdatePayload = {
+  aliasName: string | null;
+  isCompliant: boolean | null;
+};
+
 /** Dados do produtor vinculado ao usuário autenticado. */
 export function getMyProducer() {
   return apiRequest<ProducerApiResponse>("/producers/me", {
     method: "GET",
   }).then(mapProducer);
+}
+
+/**
+ * Lista todos os produtores (ADMIN/MANAGER). Opcionalmente filtra por
+ * comunidade.
+ */
+export function listProducers(communityId?: string) {
+  const query = communityId
+    ? `?communityId=${encodeURIComponent(communityId)}`
+    : "";
+  return apiRequest<ProducerApiResponse[]>(`/producers${query}`, {
+    method: "GET",
+  }).then((list) => list.map(mapProducer));
+}
+
+export function updateProducer(id: string, payload: ProducerUpdatePayload) {
+  return apiRequest<ProducerApiResponse>(`/producers/${id}`, {
+    method: "PUT",
+    body: payload,
+  }).then(mapProducer);
+}
+
+export function deleteProducer(id: string) {
+  return apiRequest<void>(`/producers/${id}`, { method: "DELETE" });
 }
