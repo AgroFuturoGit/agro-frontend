@@ -5,7 +5,8 @@ const AUTH_TOKEN_COOKIE = "agro_token";
 const AUTH_ROLE_COOKIE = "agro_role";
 
 const ADMIN_ONLY_PREFIXES = ["/admin/perfis"];
-const ADMIN_OR_MANAGER_PREFIXES = ["/admin/usuarios"];
+const ADMIN_OR_MANAGER_PREFIXES = ["/admin/usuarios", "/admin/produtores"];
+const PRODUCER_ONLY_PREFIXES = ["/admin/cultivos", "/admin/relatorios"];
 
 function matchesAny(pathname: string, prefixes: string[]) {
   return prefixes.some(
@@ -44,6 +45,17 @@ export function proxy(request: NextRequest) {
     matchesAny(pathname, ADMIN_OR_MANAGER_PREFIXES) &&
     role !== "ADMIN" &&
     role !== "MANAGER"
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  if (
+    token &&
+    matchesAny(pathname, PRODUCER_ONLY_PREFIXES) &&
+    role !== "PRODUCER"
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";
