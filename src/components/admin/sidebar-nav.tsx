@@ -44,10 +44,25 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["ADMIN"],
   },
   { href: "/admin/culturas", label: "Culturas", icon: Wheat },
-  { href: "/admin/produtores", label: "Produtores", icon: Users },
+  {
+    href: "/admin/produtores",
+    label: "Produtores",
+    icon: Users,
+    roles: ["ADMIN", "MANAGER"],
+  },
   { href: "/admin/safras", label: "Safras", icon: Sprout },
-  { href: "/admin/cultivos", label: "Cultivos", icon: Leaf },
-  { href: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },
+  {
+    href: "/admin/cultivos",
+    label: "Cultivos",
+    icon: Leaf,
+    roles: ["PRODUCER"],
+  },
+  {
+    href: "/admin/relatorios",
+    label: "Relatórios",
+    icon: BarChart3,
+    roles: ["PRODUCER"],
+  },
 ];
 
 export function SidebarNav() {

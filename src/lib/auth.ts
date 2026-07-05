@@ -1,7 +1,7 @@
 export type Role = "ADMIN" | "MANAGER" | "TECHNICIAN" | "PRODUCER";
 
 export type AuthUser = {
-  id: number;
+  id: string;
   fullName: string;
   email: string;
   cpf: string;
