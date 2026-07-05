@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   return (
@@ -58,6 +59,26 @@ export default function Home() {
           >
             Documentation
           </a>
+        </div>
+        <div className="flex flex-col gap-4 w-full">
+          <h2 className="text-sm font-medium text-muted-foreground">
+            shadcn Button
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            <Button>Default</Button>
+            <Button variant="secondary">Secondary</Button>
+            <Button variant="outline">Outline</Button>
+            <Button variant="ghost">Ghost</Button>
+            <Button variant="destructive">Destructive</Button>
+            <Button variant="link">Link</Button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="xs">xs</Button>
+            <Button size="sm">sm</Button>
+            <Button size="default">default</Button>
+            <Button size="lg">lg</Button>
+            <Button disabled>Disabled</Button>
+          </div>
         </div>
       </main>
     </div>

@@ -2,20 +2,92 @@
 
 Sistema de Gestão da Informação para Produção Agropecuária Familiar.
 
-## Sobre o projeto
-Interface web do Smart Agro, desenvolvida com foco em Mobile First para atender agricultores familiares em campo.
+Interface web do Smart Agro, com foco em Mobile First para atender agricultores familiares em campo.
 
-## Status
-🚧 Em desenvolvimento
+## Stack Tecnológica
 
-## Equipe
-Projeto universitário multidisciplinar desenvolvido por alunos de computação e agronomia.
+- **Framework:** Next.js 16 (TypeScript)
+- **UI:** React 19 + Tailwind CSS 4
+- **PWA:** Serwist
+- **Gerenciador de pacotes:** npm
 
-## Tecnologias
-- Next.js (TypeScript)
-- Tailwind CSS
+## 🚀 Rodando em Desenvolvimento
 
-## Branches
+A estratégia de desenvolvimento é: **frontend e backend rodam direto na máquina** para ter hot reload e debug rápido; só o banco do backend roda em Docker.
+
+> Para subir o frontend em container (cenário de produção), veja [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### Pré-requisitos
+
+- **Node.js 20+** e **npm**
+- Backend rodando em `http://localhost:8080` (ver [agro-backend](../agro-backend))
+
+### 1. Clonar e preparar
+
+```bash
+git clone <url-do-repositorio>
+cd agro-frontend
+cp .env.example .env.local
+```
+
+O `.env.local` já vem com os valores padrão apontando para `http://localhost:8080`.
+
+### 2. Instalar dependências
+
+```bash
+npm install
+```
+
+### 3. Rodar a aplicação
+
+```bash
+npm run dev
+```
+
+O frontend fica disponível em `http://localhost:3000`.
+
+## 🐳 Rodando com Docker
+
+O Docker sobe o frontend em modo de produção. Antes de iniciar, o backend precisa estar rodando e acessível pela URL configurada em `PUBLIC_API_URL`.
+
+### 1. Preparar variáveis de ambiente
+
+```bash
+cp .env.example .env.prod
+```
+
+Edite o arquivo `.env.prod` e configure a URL do backend:
+
+```bash
+PUBLIC_API_URL=http://localhost:8080
+NEXT_PUBLIC_API_URL=http://localhost:8080
+```
+
+### 2. Subir o container
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
+O frontend fica disponível em `http://localhost:3000`.
+
+### 3. Comandos úteis
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml ps
+docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f
+docker compose --env-file .env.prod -f docker-compose.prod.yml down
+```
+
+### Outros comandos úteis
+
+```bash
+npm run build    # build de produção local
+npm run lint     # verificar estilo de código
+```
+
+## 🌿 Branches
+
 | Branch | Descrição |
 |--------|-----------|
 | `main` | Código em produção, estável e revisado |
@@ -24,5 +96,17 @@ Projeto universitário multidisciplinar desenvolvido por alunos de computação 
 
 > Novas funcionalidades devem ser criadas a partir de `develop` seguindo o padrão `feature/nome-da-funcionalidade`
 
-## Como rodar
-> A definir
+## Padrão de Commits
+
+Adotar o padrão Conventional Commits.
+
+- **feat:** nova funcionalidade
+- **fix:** correção de bug
+- **refactor:** refatoração de código
+- **docs:** documentação
+- **test:** testes
+- **chore:** tarefas gerais/configuração
+
+## 🚢 Deploy
+
+Para subir o frontend em container, ver [DEPLOYMENT.md](DEPLOYMENT.md).
