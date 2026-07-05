@@ -25,6 +25,7 @@ import { ApiError } from "@/lib/api";
 import { persistSession, readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf } from "@/lib/cpf";
 import {
+  CREATABLE_ROLES,
   ROLE_LABELS,
   ROLES,
   adminUpdateUser,
@@ -48,7 +49,7 @@ const EMPTY = {
   password: "",
   cpf: "",
   dateOfBirth: "",
-  role: "PRODUCER" as Role,
+  role: "ADMIN" as Role,
 };
 
 export function UserFormDialog({
@@ -261,13 +262,19 @@ export function UserFormDialog({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {ROLES.map((role) => (
+                {(isCreate ? CREATABLE_ROLES : ROLES).map((role) => (
                   <SelectItem key={role} value={role}>
                     {ROLE_LABELS[role]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {isCreate && (
+              <p className="text-xs text-muted-foreground">
+                Gestores e Produtores não são criados aqui — use os fluxos de
+                Organização e Comunidade.
+              </p>
+            )}
           </div>
 
           <DialogFooter>

@@ -39,6 +39,13 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export const ROLES: Role[] = ["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"];
 
+/**
+ * Perfis que podem ser criados pela rota genérica `POST /users/register`.
+ * MANAGER e PRODUCER nascem pelos fluxos da hierarquia (Organização e
+ * Comunidade) — o backend rejeita a criação genérica desses perfis (400).
+ */
+export const CREATABLE_ROLES: Role[] = ["ADMIN", "TECHNICIAN"];
+
 export function listUsers() {
   return apiRequest<User[]>("/users", { method: "GET" });
 }
