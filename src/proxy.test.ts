@@ -60,6 +60,7 @@ const VALID_ROLE_MATRIX: Record<string, Record<string, Expectation>> = {
 // Variantes de role inválida: todas redirecionam para /login, independente da rota.
 const INVALID_ROLE_VARIANTS: Record<string, string | undefined> = {
   "ausente (undefined)": undefined,
+  'vazia ("")': "",
   'corrompida ("HACKER")': "HACKER",
   'lowercase ("admin")': "admin",
 };
