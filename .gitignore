@@ -39,3 +39,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# pwdev-code framework (local planning state, not project source)
+.claude/
+.planning/
+PRD.md
