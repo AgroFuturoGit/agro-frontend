@@ -153,8 +153,8 @@ export function ReportsPage() {
         <Card className="border-dashed bg-transparent ring-0 shadow-none">
           <CardHeader className="items-center text-center">
             <CardDescription>
-              Nenhum plano de produção para exibir. Cadastre um plano em
-              Cultivos.
+              Nenhum plano de produção para exibir. Cadastre um plano de
+              produção para começar.
             </CardDescription>
           </CardHeader>
         </Card>
