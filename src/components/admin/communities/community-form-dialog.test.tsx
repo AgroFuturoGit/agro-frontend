@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { CommunityFormDialog } from "@/components/admin/communities/community-form-dialog";
-import { createCommunity, updateCommunity } from "@/lib/communities";
+import {
+  createCommunity,
+  parseCommunityFieldErrors,
+  updateCommunity,
+} from "@/lib/communities";
 import type { Community } from "@/lib/communities";
 import { listOrganizations } from "@/lib/organizations";
 import type { Organization } from "@/lib/organizations";
@@ -166,5 +170,37 @@ describe("CommunityFormDialog — submit de sucesso (gaps QA #4)", () => {
       }),
     );
     expect(createCommunity).not.toHaveBeenCalled();
+  });
+});
+
+describe("CommunityFormDialog — erro de servidor com campo específico (gap #5 do QA)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("erro do servidor com campo específico é exibido via parseCommunityFieldErrors", async () => {
+    const { ApiError } = await import("@/lib/api");
+    const errorPayload = {
+      message: "name: já existe uma comunidade com esse nome",
+    };
+    vi.mocked(createCommunity).mockRejectedValue(
+      new ApiError(422, "name: já existe uma comunidade com esse nome", errorPayload),
+    );
+    vi.mocked(parseCommunityFieldErrors).mockReturnValue({
+      name: "já existe uma comunidade com esse nome",
+    });
+
+    renderDialog({ role: "MANAGER", organizationId: "org-1" });
+
+    fireEvent.change(await screen.findByLabelText("Nome da comunidade"), {
+      target: { value: "Duplicada" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    expect(
+      await screen.findByText("já existe uma comunidade com esse nome"),
+    ).toBeTruthy();
+    expect(parseCommunityFieldErrors).toHaveBeenCalledWith(errorPayload);
   });
 });

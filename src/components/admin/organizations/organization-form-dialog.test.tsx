@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 
 import { OrganizationFormDialog } from "@/components/admin/organizations/organization-form-dialog";
-import { createOrganization, updateOrganization } from "@/lib/organizations";
+import {
+  createOrganization,
+  parseOrganizationFieldErrors,
+  updateOrganization,
+} from "@/lib/organizations";
 import type { Organization } from "@/lib/organizations";
 
 // Nenhum acesso de rede real — o cliente de API do domínio é mockado
@@ -158,5 +162,41 @@ describe("OrganizationFormDialog — submit de sucesso (gaps QA #3)", () => {
       }),
     );
     expect(updateOrganization).not.toHaveBeenCalled();
+  });
+});
+
+describe("OrganizationFormDialog — erro de servidor com campo específico (gap #5 do QA)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("erro do servidor com campo específico é exibido via parseOrganizationFieldErrors", async () => {
+    const { ApiError } = await import("@/lib/api");
+    const errorPayload = { message: "taxId: CNPJ já cadastrado" };
+    vi.mocked(createOrganization).mockRejectedValue(
+      new ApiError(422, "taxId: CNPJ já cadastrado", errorPayload),
+    );
+    vi.mocked(parseOrganizationFieldErrors).mockReturnValue({
+      taxId: "CNPJ já cadastrado",
+    });
+
+    renderDialog("create");
+
+    fireEvent.change(await screen.findByLabelText("Nome"), {
+      target: { value: "Coop Nova" },
+    });
+    fireEvent.change(screen.getByLabelText("CNPJ"), {
+      target: { value: "12345678000199" },
+    });
+
+    fireEvent.click(screen.getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "Cooperativa" }));
+
+    const form = document.querySelector("form");
+    fireEvent.submit(form as HTMLFormElement);
+
+    expect(await screen.findByText("CNPJ já cadastrado")).toBeTruthy();
+    expect(parseOrganizationFieldErrors).toHaveBeenCalledWith(errorPayload);
   });
 });

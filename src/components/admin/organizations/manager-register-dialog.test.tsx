@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { ManagerRegisterDialog } from "@/components/admin/organizations/manager-register-dialog";
-import { registerManager } from "@/lib/organizations";
+import {
+  parseManagerRegisterFieldErrors,
+  registerManager,
+} from "@/lib/organizations";
 import type { Manager } from "@/lib/managers";
 
 // Nenhum acesso de rede real — o cliente de API do domínio é mockado
@@ -110,6 +113,39 @@ describe("ManagerRegisterDialog — validação mínima do cadastro de Manager (
         cpf: "123.456.789-01",
         dateOfBirth: "1990-05-20",
       }),
+    );
+  });
+});
+
+describe("ManagerRegisterDialog — erro de servidor com campo específico (gap #5 do QA)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("erro do servidor com campo específico é exibido via parseManagerRegisterFieldErrors", async () => {
+    const { ApiError } = await import("@/lib/api");
+    const errorPayload = { message: "email: já cadastrado" };
+    vi.mocked(registerManager).mockRejectedValue(
+      new ApiError(422, "email: já cadastrado", errorPayload),
+    );
+    vi.mocked(parseManagerRegisterFieldErrors).mockReturnValue({
+      email: "já cadastrado",
+    });
+
+    renderDialog();
+
+    await screen.findByLabelText("Nome completo");
+    fillValidForm();
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: "supersecreta" },
+    });
+
+    submitForm();
+
+    expect(await screen.findByText("já cadastrado")).toBeTruthy();
+    expect(parseManagerRegisterFieldErrors).toHaveBeenCalledWith(
+      errorPayload,
     );
   });
 });
