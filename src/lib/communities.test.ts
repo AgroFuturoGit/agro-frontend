@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiRequest } from "@/lib/api";
 import {
   createCommunity,
+  deleteCommunity,
+  getCommunity,
   listCommunities,
   mapCommunity,
   parseCommunityFieldErrors,
   parseProducerRegisterFieldErrors,
   registerProducer,
+  updateCommunity,
   type CommunityApiResponse,
   type ProducerRegisterPayload,
 } from "@/lib/communities";
@@ -103,6 +106,62 @@ describe("listCommunities", () => {
     await expect(listCommunities("org-1")).resolves.toEqual([
       mapCommunity(RAW_COMMUNITY),
     ]);
+  });
+});
+
+describe("getCommunity", () => {
+  it("chama apiRequest com GET /communities/{id}", async () => {
+    apiRequestMock.mockResolvedValue(RAW_COMMUNITY);
+
+    await getCommunity("com-1");
+
+    expect(apiRequestMock).toHaveBeenCalledWith("/communities/com-1", {
+      method: "GET",
+    });
+  });
+
+  it("retorna a comunidade mapeada", async () => {
+    apiRequestMock.mockResolvedValue(RAW_COMMUNITY);
+
+    await expect(getCommunity("com-1")).resolves.toEqual(
+      mapCommunity(RAW_COMMUNITY),
+    );
+  });
+});
+
+describe("updateCommunity", () => {
+  it("chama apiRequest com PUT /communities/{id} e body só { name }", async () => {
+    apiRequestMock.mockResolvedValue(RAW_COMMUNITY);
+
+    await updateCommunity("com-1", { name: "Novo nome" });
+
+    expect(apiRequestMock).toHaveBeenCalledWith("/communities/com-1", {
+      method: "PUT",
+      body: { name: "Novo nome" },
+    });
+
+    const [, options] = apiRequestMock.mock.calls[0];
+    expect(options?.body).not.toHaveProperty("organizationId");
+  });
+
+  it("retorna a comunidade mapeada", async () => {
+    apiRequestMock.mockResolvedValue(RAW_COMMUNITY);
+
+    await expect(
+      updateCommunity("com-1", { name: "Novo nome" }),
+    ).resolves.toEqual(mapCommunity(RAW_COMMUNITY));
+  });
+});
+
+describe("deleteCommunity", () => {
+  it("chama apiRequest com DELETE /communities/{id}", async () => {
+    apiRequestMock.mockResolvedValue(undefined);
+
+    await deleteCommunity("com-1");
+
+    expect(apiRequestMock).toHaveBeenCalledWith("/communities/com-1", {
+      method: "DELETE",
+    });
   });
 });
 
