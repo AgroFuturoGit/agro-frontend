@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BarChart3,
+  Building2,
+  Home,
   Leaf,
   LayoutDashboard,
   ShieldCheck,
@@ -48,6 +50,18 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/produtores",
     label: "Produtores",
     icon: Users,
+    roles: ["ADMIN", "MANAGER"],
+  },
+  {
+    href: "/admin/organizacoes",
+    label: "Organizações",
+    icon: Building2,
+    roles: ["ADMIN"],
+  },
+  {
+    href: "/admin/comunidades",
+    label: "Comunidades",
+    icon: Home,
     roles: ["ADMIN", "MANAGER"],
   },
   { href: "/admin/safras", label: "Safras", icon: Sprout },

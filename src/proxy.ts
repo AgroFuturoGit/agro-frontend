@@ -7,8 +7,12 @@ const AUTH_ROLE_COOKIE = "agro_role";
 
 const VALID_ROLES: Role[] = ["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"];
 
-const ADMIN_ONLY_PREFIXES = ["/admin/perfis"];
-const ADMIN_OR_MANAGER_PREFIXES = ["/admin/usuarios", "/admin/produtores"];
+const ADMIN_ONLY_PREFIXES = ["/admin/perfis", "/admin/organizacoes"];
+const ADMIN_OR_MANAGER_PREFIXES = [
+  "/admin/usuarios",
+  "/admin/produtores",
+  "/admin/comunidades",
+];
 const PRODUCER_ONLY_PREFIXES = ["/admin/cultivos", "/admin/relatorios"];
 
 // Estas rotas eram exclusivas de PRODUCER. Agora ADMIN, MANAGER e TECHNICIAN
