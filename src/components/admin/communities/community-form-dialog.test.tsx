@@ -124,3 +124,47 @@ describe("CommunityFormDialog — resolução de organização por role (spec.md
     expect(createCommunity).not.toHaveBeenCalled();
   });
 });
+
+describe("CommunityFormDialog — submit de sucesso (gaps QA #4)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("MANAGER com nome válido chama createCommunity(organizationId, { name }) e não vê erro", async () => {
+    vi.mocked(createCommunity).mockResolvedValue(COMMUNITY);
+    renderDialog({ role: "MANAGER", organizationId: "org-1" });
+
+    fireEvent.change(await screen.findByLabelText("Nome da comunidade"), {
+      target: { value: "Comunidade Nova" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    await waitFor(() =>
+      expect(createCommunity).toHaveBeenCalledWith("org-1", {
+        name: "Comunidade Nova",
+      }),
+    );
+    expect(updateCommunity).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("edição com nome válido chama updateCommunity(id, { name })", async () => {
+    vi.mocked(updateCommunity).mockResolvedValue({
+      ...COMMUNITY,
+      name: "Nome Editado",
+    });
+    renderDialog({ mode: "edit", role: "MANAGER", community: COMMUNITY });
+
+    const input = await screen.findByLabelText("Nome da comunidade");
+    fireEvent.change(input, { target: { value: "Nome Editado" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    await waitFor(() =>
+      expect(updateCommunity).toHaveBeenCalledWith("com-1", {
+        name: "Nome Editado",
+      }),
+    );
+    expect(createCommunity).not.toHaveBeenCalled();
+  });
+});

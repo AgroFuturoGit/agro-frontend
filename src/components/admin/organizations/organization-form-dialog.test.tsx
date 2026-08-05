@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 
 import { OrganizationFormDialog } from "@/components/admin/organizations/organization-form-dialog";
 import { createOrganization, updateOrganization } from "@/lib/organizations";
@@ -94,6 +100,63 @@ describe("OrganizationFormDialog — imutabilidade de type/taxId em modo ediçã
     ).toBeTruthy();
     expect(screen.getByText("Informe o CNPJ")).toBeTruthy();
     expect(createOrganization).not.toHaveBeenCalled();
+    expect(updateOrganization).not.toHaveBeenCalled();
+  });
+});
+
+describe("OrganizationFormDialog — submit de sucesso (gaps QA #3)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("em modo edit, submit válido chama updateOrganization com name novo e taxId/type originais preservados", async () => {
+    vi.mocked(updateOrganization).mockResolvedValue({
+      ...ORGANIZATION,
+      name: "Nome Editado",
+    });
+    renderDialog("edit", ORGANIZATION);
+
+    const nameInput = await screen.findByLabelText("Nome");
+    fireEvent.change(nameInput, { target: { value: "Nome Editado" } });
+
+    const form = document.querySelector("form");
+    fireEvent.submit(form as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(updateOrganization).toHaveBeenCalledWith("org-1", {
+        name: "Nome Editado",
+        taxId: ORGANIZATION.taxId,
+        type: ORGANIZATION.type,
+      }),
+    );
+    expect(createOrganization).not.toHaveBeenCalled();
+  });
+
+  it("em modo create, submit válido chama createOrganization com o payload preenchido", async () => {
+    vi.mocked(createOrganization).mockResolvedValue(ORGANIZATION);
+    renderDialog("create");
+
+    fireEvent.change(await screen.findByLabelText("Nome"), {
+      target: { value: "Coop Nova" },
+    });
+    fireEvent.change(screen.getByLabelText("CNPJ"), {
+      target: { value: "12345678000199" },
+    });
+
+    fireEvent.click(screen.getByRole("combobox"));
+    fireEvent.click(await screen.findByRole("option", { name: "Cooperativa" }));
+
+    const form = document.querySelector("form");
+    fireEvent.submit(form as HTMLFormElement);
+
+    await waitFor(() =>
+      expect(createOrganization).toHaveBeenCalledWith({
+        name: "Coop Nova",
+        taxId: "12.345.678/0001-99",
+        type: "COOP",
+      }),
+    );
     expect(updateOrganization).not.toHaveBeenCalled();
   });
 });
