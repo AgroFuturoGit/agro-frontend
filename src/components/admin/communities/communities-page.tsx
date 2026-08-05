@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Pencil, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
 
-const COLUMN_COUNT = 2;
+import { CommunityFormDialog } from "./community-form-dialog";
 
 export function CommunitiesPage() {
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -30,6 +30,12 @@ export function CommunitiesPage() {
   // Organização do MANAGER logado, resolvida via GET /managers/me.
   // Também é o valor que a Task 03-02 passa para o CommunityFormDialog.
   const [myOrgId, setMyOrgId] = useState<string | null>(null);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
+  const [dialogCommunity, setDialogCommunity] = useState<Community | null>(
+    null,
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -106,6 +112,26 @@ export function CommunitiesPage() {
     [communities],
   );
 
+  const canManage = currentRole === "ADMIN" || currentRole === "MANAGER";
+  // MANAGER sem organização resolvida não pode criar: a organização é
+  // path param obrigatório e nunca pode ser escolhida por ele (D3).
+  const canCreate =
+    currentRole === "ADMIN" ||
+    (currentRole === "MANAGER" && myOrgId !== null);
+  const columnCount = canManage ? 3 : 2;
+
+  function openCreateDialog() {
+    setDialogMode("create");
+    setDialogCommunity(null);
+    setDialogOpen(true);
+  }
+
+  function openEditDialog(community: Community) {
+    setDialogMode("edit");
+    setDialogCommunity(community);
+    setDialogOpen(true);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -117,8 +143,12 @@ export function CommunitiesPage() {
               : "Comunidades cadastradas nas organizações."}
           </p>
         </div>
-        {/* Task 03-02: botão "Nova Comunidade" entra aqui, abrindo o
-            CommunityFormDialog (recebendo `myOrgId` quando MANAGER). */}
+        {canCreate && (
+          <Button type="button" size="sm" onClick={openCreateDialog}>
+            <Plus />
+            Nova Comunidade
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -147,14 +177,16 @@ export function CommunitiesPage() {
             <TableRow className="hover:bg-transparent">
               <TableHead>Nome</TableHead>
               <TableHead>Organização</TableHead>
-              {/* Task 03-02: coluna "Ações" (Editar por linha) entra aqui. */}
+              {canManage && (
+                <TableHead className="w-[1%] text-right">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody className="[&_td]:h-12 [&_td]:px-4">
             {loading ? (
               Array.from({ length: 4 }).map((_, idx) => (
                 <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: COLUMN_COUNT }).map((__, cidx) => (
+                  {Array.from({ length: columnCount }).map((__, cidx) => (
                     <TableCell key={cidx}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -164,7 +196,7 @@ export function CommunitiesPage() {
             ) : sortedCommunities.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={COLUMN_COUNT}
+                  colSpan={columnCount}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
                   {currentRole === "MANAGER" && myOrgId
@@ -181,12 +213,41 @@ export function CommunitiesPage() {
                   <TableCell className="text-muted-foreground">
                     {community.organization.name}
                   </TableCell>
+                  {canManage && (
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Editar comunidade"
+                        onClick={() => openEditDialog(community)}
+                      >
+                        <Pencil />
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </Card>
+
+      {canManage && currentRole && (
+        <CommunityFormDialog
+          mode={dialogMode}
+          role={currentRole}
+          // Só o MANAGER usa esta prop; o ADMIN escolhe no seletor.
+          organizationId={currentRole === "MANAGER" ? myOrgId : null}
+          community={dialogCommunity}
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) setDialogCommunity(null);
+          }}
+          onSaved={refresh}
+        />
+      )}
     </div>
   );
 }
