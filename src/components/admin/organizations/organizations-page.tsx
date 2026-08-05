@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Pencil, Plus, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,15 +22,21 @@ import {
   type Organization,
 } from "@/lib/organizations";
 
-const COLUMN_COUNT = 3;
+import { ManagerRegisterDialog } from "./manager-register-dialog";
+import { OrganizationFormDialog } from "./organization-form-dialog";
+
+const COLUMN_COUNT = 4;
 
 export function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // TODO (Task 04-02): estado de diálogo de criação/edição de Organização
-  // e ação "Criar Manager" por linha.
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Organization | null>(null);
+  const [managerTarget, setManagerTarget] = useState<Organization | null>(
+    null,
+  );
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -71,7 +77,10 @@ export function OrganizationsPage() {
             Cooperativas e associações cadastradas na plataforma.
           </p>
         </div>
-        {/* TODO (Task 04-02): botão "Nova Organização" */}
+        <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+          <Plus />
+          Nova Organização
+        </Button>
       </div>
 
       {error && (
@@ -101,7 +110,7 @@ export function OrganizationsPage() {
               <TableHead>Nome</TableHead>
               <TableHead>CNPJ</TableHead>
               <TableHead>Tipo</TableHead>
-              {/* TODO (Task 04-02): coluna de Ações (Editar / Criar Manager) */}
+              <TableHead className="w-[1%] text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody className="[&_td]:h-12 [&_td]:px-4">
@@ -136,12 +145,62 @@ export function OrganizationsPage() {
                   <TableCell className="text-muted-foreground">
                     {ORGANIZATION_TYPE_LABELS[organization.type]}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <div className="inline-flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Editar organização"
+                        onClick={() => setEditTarget(organization)}
+                      >
+                        <Pencil />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Criar Manager"
+                        onClick={() => setManagerTarget(organization)}
+                      >
+                        <UserPlus />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </Card>
+
+      <OrganizationFormDialog
+        mode="create"
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSaved={refresh}
+      />
+
+      <OrganizationFormDialog
+        mode="edit"
+        organization={editTarget}
+        open={editTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+        onSaved={refresh}
+      />
+
+      {managerTarget && (
+        <ManagerRegisterDialog
+          organizationId={managerTarget.id}
+          organizationName={managerTarget.name}
+          open={managerTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setManagerTarget(null);
+          }}
+        />
+      )}
     </div>
   );
 }
