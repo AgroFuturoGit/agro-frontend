@@ -83,4 +83,43 @@ describe("SidebarNav — RBAC de navegação (spec.md §2 Objective #3, CHECKLIS
     await screen.findByText("Planos de Produção");
     expect(screen.queryByText("Perfis")).toBeNull();
   });
+
+  it("exibe 'Organizações' para role=ADMIN", async () => {
+    mockRole("ADMIN");
+    renderSidebarNav();
+
+    expect(await screen.findByText("Organizações")).toBeTruthy();
+  });
+
+  it.each(["MANAGER", "TECHNICIAN", "PRODUCER"] as const)(
+    "esconde 'Organizações' para role=%s",
+    async (role) => {
+      mockRole(role);
+      renderSidebarNav();
+
+      await screen.findByText("Planos de Produção");
+      expect(screen.queryByText("Organizações")).toBeNull();
+    },
+  );
+
+  it.each(["ADMIN", "MANAGER"] as const)(
+    "exibe 'Comunidades' para role=%s",
+    async (role) => {
+      mockRole(role);
+      renderSidebarNav();
+
+      expect(await screen.findByText("Comunidades")).toBeTruthy();
+    },
+  );
+
+  it.each(["TECHNICIAN", "PRODUCER"] as const)(
+    "esconde 'Comunidades' para role=%s",
+    async (role) => {
+      mockRole(role);
+      renderSidebarNav();
+
+      await screen.findByText("Planos de Produção");
+      expect(screen.queryByText("Comunidades")).toBeNull();
+    },
+  );
 });

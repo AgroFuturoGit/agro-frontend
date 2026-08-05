@@ -3,17 +3,17 @@ import { NextRequest } from "next/server";
 import { proxy, resolveAccess } from "@/proxy";
 
 /**
- * Matriz completa de spec.md §5 (F01-rbac-navegacao):
+ * Matriz completa de spec.md §5 (F01-rbac-navegacao + F02-organizacoes-comunidades):
  *
- * | Role / Cookie          | /admin/perfis        | /admin/usuarios, /admin/produtores | /admin/cultivos, /admin/relatorios | /admin, /admin/culturas, /admin/safras |
- * |-------------------------|----------------------|-------------------------------------|-------------------------------------|------------------------------------------|
- * | ADMIN                   | permitido            | permitido                           | permitido (novo)                    | permitido                                |
- * | MANAGER                  | redirect /admin      | permitido                           | permitido (novo)                    | permitido                                |
- * | TECHNICIAN               | redirect /admin      | redirect /admin                     | permitido (novo)                    | permitido                                |
- * | PRODUCER                 | redirect /admin      | redirect /admin                     | permitido (sem regressão)           | permitido                                |
- * | ausente (undefined)      | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          |
- * | corrompida ("HACKER")    | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          |
- * | lowercase ("admin")      | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          |
+ * | Role / Cookie          | /admin/perfis        | /admin/usuarios, /admin/produtores | /admin/cultivos, /admin/relatorios | /admin, /admin/culturas, /admin/safras | /admin/organizacoes | /admin/comunidades |
+ * |-------------------------|----------------------|-------------------------------------|-------------------------------------|------------------------------------------|----------------------|----------------------|
+ * | ADMIN                   | permitido            | permitido                           | permitido (novo)                    | permitido                                | permitido (novo)     | permitido (novo)     |
+ * | MANAGER                  | redirect /admin      | permitido                           | permitido (novo)                    | permitido                                | redirect /admin (novo) | permitido (novo)   |
+ * | TECHNICIAN               | redirect /admin      | redirect /admin                     | permitido (novo)                    | permitido                                | redirect /admin (novo) | redirect /admin (novo) |
+ * | PRODUCER                 | redirect /admin      | redirect /admin                     | permitido (sem regressão)           | permitido                                | redirect /admin (novo) | redirect /admin (novo) |
+ * | ausente (undefined)      | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          | redirect /login (novo) | redirect /login (novo) |
+ * | corrompida ("HACKER")    | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          | redirect /login (novo) | redirect /login (novo) |
+ * | lowercase ("admin")      | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          | redirect /login (novo) | redirect /login (novo) |
  */
 
 const ROUTE_GROUPS: Record<string, string[]> = {
@@ -21,6 +21,8 @@ const ROUTE_GROUPS: Record<string, string[]> = {
   "/admin/usuarios, /admin/produtores": ["/admin/usuarios", "/admin/produtores"],
   "/admin/cultivos, /admin/relatorios": ["/admin/cultivos", "/admin/relatorios"],
   "/admin, /admin/culturas, /admin/safras": ["/admin", "/admin/culturas", "/admin/safras"],
+  "/admin/organizacoes": ["/admin/organizacoes"],
+  "/admin/comunidades": ["/admin/comunidades"],
 };
 
 type Expectation = { action: "next" } | { action: "redirect"; to: string };
@@ -36,24 +38,32 @@ const VALID_ROLE_MATRIX: Record<string, Record<string, Expectation>> = {
     "/admin/usuarios, /admin/produtores": NEXT,
     "/admin/cultivos, /admin/relatorios": NEXT,
     "/admin, /admin/culturas, /admin/safras": NEXT,
+    "/admin/organizacoes": NEXT,
+    "/admin/comunidades": NEXT,
   },
   MANAGER: {
     "/admin/perfis": REDIRECT_ADMIN,
     "/admin/usuarios, /admin/produtores": NEXT,
     "/admin/cultivos, /admin/relatorios": NEXT,
     "/admin, /admin/culturas, /admin/safras": NEXT,
+    "/admin/organizacoes": REDIRECT_ADMIN,
+    "/admin/comunidades": NEXT,
   },
   TECHNICIAN: {
     "/admin/perfis": REDIRECT_ADMIN,
     "/admin/usuarios, /admin/produtores": REDIRECT_ADMIN,
     "/admin/cultivos, /admin/relatorios": NEXT,
     "/admin, /admin/culturas, /admin/safras": NEXT,
+    "/admin/organizacoes": REDIRECT_ADMIN,
+    "/admin/comunidades": REDIRECT_ADMIN,
   },
   PRODUCER: {
     "/admin/perfis": REDIRECT_ADMIN,
     "/admin/usuarios, /admin/produtores": REDIRECT_ADMIN,
     "/admin/cultivos, /admin/relatorios": NEXT,
     "/admin, /admin/culturas, /admin/safras": NEXT,
+    "/admin/organizacoes": REDIRECT_ADMIN,
+    "/admin/comunidades": REDIRECT_ADMIN,
   },
 };
 
