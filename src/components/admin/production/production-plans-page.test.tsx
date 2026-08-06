@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 
 import { ProductionPlansPage } from "@/components/admin/production/production-plans-page";
+import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getMyProducer, listProducers, type Producer } from "@/lib/producers";
 import { listProductionPlans, type ProductionPlan } from "@/lib/production";
@@ -107,6 +108,40 @@ async function openProducerSelect() {
   fireEvent.keyDown(trigger, { key: "ArrowDown" });
   fireEvent.keyUp(trigger, { key: "ArrowDown" });
   return trigger;
+}
+
+/** Item atualmente destacado no popup aberto do `Select`. */
+function highlightedOption(): HTMLElement {
+  const highlighted = screen
+    .getAllByRole("option")
+    .find((option) => option.getAttribute("data-highlighted") !== null);
+  expect(highlighted).toBeTruthy();
+  return highlighted as HTMLElement;
+}
+
+/**
+ * Abre o seletor e escolhe o produtor pelo rótulo. O `Select` do
+ * `@base-ui/react` só confirma o item DESTACADO, então caminhamos do item
+ * destacado até o alvo com ArrowDown/ArrowUp antes do Enter.
+ */
+async function selectProducer(label: string) {
+  await openProducerSelect();
+
+  const target = await screen.findByRole("option", { name: label });
+  const options = screen.getAllByRole("option");
+  const from = options.indexOf(highlightedOption());
+  const to = options.indexOf(target);
+
+  const key = to > from ? "ArrowDown" : "ArrowUp";
+  for (let step = 0; step < Math.abs(to - from); step += 1) {
+    const current = highlightedOption();
+    fireEvent.keyDown(current, { key });
+    fireEvent.keyUp(current, { key });
+  }
+
+  expect(highlightedOption()).toBe(target);
+  fireEvent.keyDown(target, { key: "Enter" });
+  fireEvent.keyUp(target, { key: "Enter" });
 }
 
 /**
@@ -234,5 +269,165 @@ describe("ProductionPlansPage — ramificação por role (spec.md §3.4)", () =>
     expect(
       screen.queryByText("Nenhum plano de produção cadastrado ainda."),
     ).toBeNull();
+  });
+});
+
+/**
+ * Mutante M12 do `qa-report.md` (gap C1): a coluna "Ações" da linha do plano
+ * sobreviveu aos 142 testes da fase E à validação manual — o produtor
+ * escolhido ao vivo não tinha planos, então a linha nunca existiu.
+ *
+ * Por isso TODO caso abaixo só assere depois de `findByText("Milho — BRS
+ * 1010")`: sem uma linha em tela o teste passaria por vazio e repetiria o
+ * mesmo ponto cego. POST/PUT/DELETE de plano continuam `hasRole('PRODUCER')`
+ * no backend (403 medido ao vivo em `verify/backend-validation.md`), logo
+ * qualquer afordância de escrita visível para outra role é erro garantido.
+ */
+describe("ProductionPlansPage — gating das ações de escrita por role", () => {
+  it.each(["MANAGER", "TECHNICIAN", "ADMIN"] as const)(
+    "%s: com plano em tela, NENHUMA ação de escrita renderiza",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+      render(<ProductionPlansPage />);
+      await waitFor(() => expect(listProducers).toHaveBeenCalledTimes(1));
+
+      // Segundo produtor da lista: o rótulo cai no `aliasName`.
+      await selectProducer("Apelido Beta");
+      await waitFor(() =>
+        expect(listProductionPlans).toHaveBeenCalledExactlyOnceWith(
+          "producer-2",
+        ),
+      );
+
+      // A LINHA PRECISA EXISTIR — é a condição que faltou no ponto cego.
+      expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+
+      expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Editar plano" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Excluir plano" })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Novo plano/i })).toBeNull();
+    },
+  );
+
+  it("PRODUCER: com plano em tela, VÊ todas as ações de escrita (não-regressão RN5)", async () => {
+    loginAs("PRODUCER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    render(<ProductionPlansPage />);
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+
+    expect(screen.getByRole("columnheader", { name: "Ações" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Editar plano" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Excluir plano" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Novo plano/i })).toBeTruthy();
+  });
+
+  it("PRODUCER sem planos: vê o estado vazio COM o atalho de criação", async () => {
+    loginAs("PRODUCER");
+    // `listProductionPlans` devolve [] (default do beforeEach).
+
+    render(<ProductionPlansPage />);
+
+    expect(
+      await screen.findByText("Nenhum plano de produção cadastrado ainda."),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Criar primeiro plano" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("MANAGER com produtor selecionado e sem planos: estado vazio SEM atalho de criação", async () => {
+    loginAs("MANAGER");
+
+    render(<ProductionPlansPage />);
+    await waitFor(() => expect(listProducers).toHaveBeenCalledTimes(1));
+
+    await selectProducer("Apelido Beta");
+    await waitFor(() =>
+      expect(listProductionPlans).toHaveBeenCalledExactlyOnceWith("producer-2"),
+    );
+
+    expect(
+      await screen.findByText("Nenhum plano de produção cadastrado ainda."),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Criar primeiro plano" }),
+    ).toBeNull();
+    expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
+  });
+
+  it("role desconhecida: nenhuma afordância de escrita renderiza (RN4, falha fechado)", async () => {
+    // `readUserFromStorage()` devolve null (default do beforeEach).
+    render(<ProductionPlansPage />);
+
+    await settle();
+
+    expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Novo plano/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Criar primeiro plano" }),
+    ).toBeNull();
+  });
+});
+
+/**
+ * Mutante M10 do `qa-report.md` (gap I4): o alerta de erro e o botão
+ * "Tentar novamente" nunca haviam sido exercitados — `handleRetry` não era
+ * executado por teste nenhum.
+ */
+describe("ProductionPlansPage — erro de API e recuperação", () => {
+  it("erro ao carregar os planos exibe o alerta e 'Tentar novamente' refaz a busca", async () => {
+    loginAs("PRODUCER");
+    vi.mocked(listProductionPlans)
+      .mockRejectedValueOnce(new ApiError(503, "Serviço indisponível", {}))
+      .mockResolvedValue(PLANS);
+
+    render(<ProductionPlansPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Serviço indisponível");
+    expect(screen.queryByText("Milho — BRS 1010")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(listProductionPlans).toHaveBeenCalledTimes(2);
+  });
+
+  it("erro não-ApiError cai na mensagem genérica da tela", async () => {
+    loginAs("PRODUCER");
+    vi.mocked(listProductionPlans).mockRejectedValue(new Error("boom"));
+
+    render(<ProductionPlansPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(
+      "Não foi possível carregar os planos de produção.",
+    );
+  });
+
+  it("erro ao carregar a lista de produtores (MANAGER) é exibido e a tela não quebra", async () => {
+    loginAs("MANAGER");
+    vi.mocked(listProducers).mockRejectedValue(
+      new ApiError(500, "Erro interno do servidor", {}),
+    );
+
+    render(<ProductionPlansPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Erro interno do servidor");
+
+    // A listagem continua de pé, pedindo a seleção do produtor, e nenhuma
+    // busca de planos foi disparada às cegas (RN6).
+    expect(
+      screen.getByText("Selecione um produtor para ver os planos de produção"),
+    ).toBeTruthy();
+    expect(listProductionPlans).not.toHaveBeenCalled();
+    expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
   });
 });

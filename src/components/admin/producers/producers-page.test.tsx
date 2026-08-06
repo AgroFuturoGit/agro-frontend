@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 
 import { ProducersPage } from "@/components/admin/producers/producers-page";
+import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager, type Manager } from "@/lib/managers";
@@ -292,29 +293,158 @@ describe("ProducersPage — escopo por organização e filtro (spec.md §3.4)", 
     );
   });
 
-  it("botão 'Novo Produtor': visível para MANAGER, ausente para TECHNICIAN e PRODUCER", async () => {
+  /**
+   * COBERTURA DE TECHNICIAN E PRODUCER REMOVIDA — gap I6 do `qa-report.md`.
+   *
+   * Este teste também afirmava o comportamento de TECHNICIAN e PRODUCER em
+   * `/admin/produtores`. Só que `/admin/produtores` está em
+   * `ADMIN_OR_MANAGER_PREFIXES` (`src/proxy.ts`): o proxy redireciona as duas
+   * roles para `/admin` antes de a página montar, e o item de menu nem
+   * aparece para elas (`sidebar-nav.tsx`). Renderizar o componente direto,
+   * sem proxy, exercitava um ramo INALCANÇÁVEL em produção — o teste passava
+   * sem provar nada e dava falsa sensação de cobertura.
+   *
+   * O que de fato precisa estar travado é o redirecionamento, e ele já tem
+   * teste próprio e exaustivo em `src/proxy.test.ts` (matriz role × rota, com
+   * `/admin/usuarios, /admin/produtores` → REDIRECT para TECHNICIAN e
+   * PRODUCER). Se um dia o proxy liberar a rota para outra role, é lá que a
+   * mudança aparece — e aí este arquivo passa a precisar do caso.
+   *
+   * Sobram aqui as duas roles que realmente chegam à tela: MANAGER e ADMIN.
+   */
+  it.each(["MANAGER", "ADMIN"] as const)(
+    "%s: botão 'Novo Produtor' visível e habilitado com o escopo resolvido",
+    async (role) => {
+      loginAs(role);
+
+      render(<ProducersPage />);
+
+      expect(await screen.findByText("Ana Alves")).toBeTruthy();
+      const button = screen.getByRole("button", { name: "Novo Produtor" });
+      expect(button.hasAttribute("disabled")).toBe(false);
+      expect(screen.getByLabelText("Comunidade")).toBeTruthy();
+    },
+  );
+});
+
+/**
+ * Mutantes M5, M6, M8 e M9 do `qa-report.md` (gaps I1, I2 e I3): erro de API,
+ * estado vazio e estado desabilitado da página sobreviviam à remoção — os 142
+ * testes da fase não olhavam nenhum dos três.
+ */
+describe("ProducersPage — erro de API, estado vazio e escopo indisponível", () => {
+  it("erro de listProducers exibe role=alert com a mensagem do ApiError (M5/M6)", async () => {
     loginAs("MANAGER");
-    const managerView = render(<ProducersPage />);
+    vi.mocked(listProducers).mockRejectedValue(
+      new ApiError(500, "Erro interno do servidor", {}),
+    );
 
-    expect(await screen.findByText("Ana Alves")).toBeTruthy();
-    const button = screen.getByRole("button", { name: "Novo Produtor" });
-    expect(button.hasAttribute("disabled")).toBe(false);
-    managerView.unmount();
-
-    // TECHNICIAN vê todos os produtores, sem escopo (RN3), e não cadastra.
-    loginAs("TECHNICIAN");
-    const technicianView = render(<ProducersPage />);
-    expect(await screen.findByText("Carla Costa")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Novo Produtor" })).toBeNull();
-    expect(screen.queryByLabelText("Comunidade")).toBeNull();
-    // Nem TECHNICIAN nem PRODUCER têm acesso a `GET /communities`.
-    expect(listCommunities).toHaveBeenCalledTimes(1); // apenas a do MANAGER
-    technicianView.unmount();
-
-    loginAs("PRODUCER");
     render(<ProducersPage />);
-    expect(await screen.findByText("Ana Alves")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Novo Produtor" })).toBeNull();
-    expect(getMyManager).toHaveBeenCalledTimes(1); // apenas a do MANAGER
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Erro interno do servidor");
+
+    // A listagem não quebra: sai do skeleton e mostra a tabela vazia.
+    expect(
+      await screen.findByText("Nenhum produtor cadastrado ainda."),
+    ).toBeTruthy();
+    // O escopo continua resolvido, então os controles seguem utilizáveis.
+    expect(
+      screen.getByRole("button", { name: "Novo Produtor" }).hasAttribute(
+        "disabled",
+      ),
+    ).toBe(false);
+  });
+
+  it("erro não-ApiError de listProducers cai na mensagem genérica", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockRejectedValue(new Error("boom"));
+
+    render(<ProducersPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(
+      "Não foi possível carregar os produtores.",
+    );
+  });
+
+  it("listagem vazia mostra o estado vazio, sem skeleton e sem alerta (M8)", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([]);
+
+    render(<ProducersPage />);
+
+    expect(
+      await screen.findByText("Nenhum produtor cadastrado ainda."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(renderedProducerNames()).toEqual([
+      "Nenhum produtor cadastrado ainda.",
+    ]);
+  });
+
+  it("falha de getMyManager: alerta, filtro e cadastro desabilitados e listagem VAZIA (M9, fail-closed)", async () => {
+    loginAs("MANAGER");
+    vi.mocked(getMyManager).mockRejectedValue(new ApiError(500, "Falhou", {}));
+    // O backend devolve todos os produtores mesmo sem escopo resolvido.
+    vi.mocked(listProducers).mockResolvedValue(ALL_PRODUCERS);
+
+    render(<ProducersPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(
+      "Não foi possível carregar as comunidades: Falhou",
+    );
+
+    // INVARIANTE de UX: sem escopo resolvido NENHUM produtor é exibido —
+    // jamais cair na listagem sem filtro como fallback de erro.
+    expect(
+      await screen.findByText("Nenhum produtor cadastrado ainda."),
+    ).toBeTruthy();
+    expect(screen.queryByText("Ana Alves")).toBeNull();
+    expect(screen.queryByText("Bruno Barros")).toBeNull();
+    expect(screen.queryByText("Carla Costa")).toBeNull();
+
+    // `scopeUnavailable`: filtro e cadastro ficam indisponíveis.
+    expect(screen.getByLabelText("Comunidade").hasAttribute("disabled")).toBe(
+      true,
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Novo Produtor" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(listCommunities).not.toHaveBeenCalled();
+  });
+
+  it("falha de listCommunities tem o mesmo efeito de fail-closed (M9)", async () => {
+    loginAs("MANAGER");
+    vi.mocked(listCommunities).mockRejectedValue(
+      new ApiError(503, "Serviço indisponível", {}),
+    );
+    vi.mocked(listProducers).mockResolvedValue(ALL_PRODUCERS);
+
+    render(<ProducersPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(
+      "Não foi possível carregar as comunidades: Serviço indisponível",
+    );
+
+    expect(
+      await screen.findByText("Nenhum produtor cadastrado ainda."),
+    ).toBeTruthy();
+    expect(screen.queryByText("Ana Alves")).toBeNull();
+
+    expect(screen.getByLabelText("Comunidade").hasAttribute("disabled")).toBe(
+      true,
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Novo Produtor" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    // A organização chegou a ser resolvida — o que faltou foram as comunidades.
+    expect(getMyManager).toHaveBeenCalledTimes(1);
   });
 });
