@@ -6,6 +6,14 @@ import { AlertCircle, ArrowRight, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -16,7 +24,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
-import { getMyProducer } from "@/lib/producers";
+import { readUserFromStorage, type Role } from "@/lib/auth";
+import { getMyProducer, listProducers, type Producer } from "@/lib/producers";
 import {
   formatNumber,
   formatPlanDate,
@@ -27,8 +36,16 @@ import {
 import { DeletePlanDialog } from "./delete-plan-dialog";
 import { PlanFormDialog } from "./plan-form-dialog";
 
+function producerLabel(producer: Producer | undefined | null): string {
+  return producer?.user?.fullName ?? producer?.aliasName ?? "—";
+}
+
 export function ProductionPlansPage() {
+  const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [producerId, setProducerId] = useState<string | null>(null);
+  const [producers, setProducers] = useState<Producer[]>([]);
+  const [selectedProducerId, setSelectedProducerId] = useState<string>("");
+  const [loadingProducers, setLoadingProducers] = useState(false);
   const [plans, setPlans] = useState<ProductionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,14 +54,71 @@ export function ProductionPlansPage() {
   const [editTarget, setEditTarget] = useState<ProductionPlan | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProductionPlan | null>(null);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentRole(readUserFromStorage()?.role ?? null);
+  }, []);
+
+  const isProducer = currentRole === "PRODUCER";
+  // O seletor existe para quem não tem um Producer próprio e só lê os planos
+  // de terceiros (MANAGER/TECHNICIAN — e ADMIN, que também acessa a rota).
+  // O PRODUCER nunca vê o seletor.
+  const showProducerSelect =
+    currentRole === "MANAGER" ||
+    currentRole === "TECHNICIAN" ||
+    currentRole === "ADMIN";
+
+  // Produtor cujos planos estão em tela: o próprio, para PRODUCER; o
+  // escolhido no seletor, para as demais roles.
+  const activeProducerId = isProducer ? producerId : selectedProducerId || null;
+
+  const loadProducers = useCallback(async () => {
+    setLoadingProducers(true);
+    try {
+      const list = await listProducers();
+      setProducers(list);
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível carregar os produtores.",
+      );
+    } finally {
+      setLoadingProducers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showProducerSelect) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadProducers();
+  }, [showProducerSelect, loadProducers]);
+
   const refresh = useCallback(async () => {
+    // RN4: enquanto a role for desconhecida, nenhuma requisição é disparada.
+    if (currentRole === null) return;
+
+    // RN6: MANAGER/TECHNICIAN não buscam planos antes de escolher o produtor.
+    if (currentRole !== "PRODUCER" && !selectedProducerId) {
+      setPlans([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
-      const producer = await getMyProducer();
-      setProducerId(producer.id);
-      const data = await listProductionPlans(producer.id);
-      setPlans(data);
+      // RN5: caminho do PRODUCER preservado — /producers/me e, em seguida,
+      // os planos do próprio produtor.
+      if (currentRole === "PRODUCER") {
+        const producer = await getMyProducer();
+        setProducerId(producer.id);
+        const data = await listProductionPlans(producer.id);
+        setPlans(data);
+      } else {
+        const data = await listProductionPlans(selectedProducerId);
+        setPlans(data);
+      }
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -54,12 +128,18 @@ export function ProductionPlansPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentRole, selectedProducerId]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
+
+  const handleRetry = useCallback(() => {
+    setError(null);
+    if (showProducerSelect) loadProducers();
+    refresh();
+  }, [showProducerSelect, loadProducers, refresh]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -72,7 +152,42 @@ export function ProductionPlansPage() {
             Planeje suas safras e acompanhe a evolução de cada cultivo.
           </p>
         </div>
-        {producerId && (
+        {showProducerSelect && (
+          <div className="flex w-full flex-col gap-2 md:w-72">
+            <Label htmlFor="plans-producer">Produtor</Label>
+            <Select
+              value={selectedProducerId}
+              onValueChange={(value) => setSelectedProducerId(value ?? "")}
+              disabled={loadingProducers}
+            >
+              <SelectTrigger id="plans-producer" className="w-full">
+                <SelectValue
+                  placeholder={
+                    loadingProducers ? "Carregando…" : "Escolha um produtor"
+                  }
+                >
+                  {(value) =>
+                    producers.some((producer) => producer.id === value)
+                      ? producerLabel(
+                          producers.find((producer) => producer.id === value),
+                        )
+                      : "Escolha um produtor"
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {producers.map((producer) => (
+                  <SelectItem key={producer.id} value={producer.id}>
+                    {producerLabel(producer)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        {/* Criar plano continua sendo hasRole('PRODUCER') no backend — o botão
+            não pode aparecer para MANAGER/TECHNICIAN/ADMIN. */}
+        {isProducer && producerId && (
           <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
             <Plus />
             Novo plano
@@ -93,7 +208,7 @@ export function ProductionPlansPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => refresh()}
+            onClick={() => handleRetry()}
           >
             Tentar novamente
           </Button>
@@ -123,13 +238,22 @@ export function ProductionPlansPage() {
                   ))}
                 </TableRow>
               ))
+            ) : showProducerSelect && !selectedProducerId ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell
+                  colSpan={6}
+                  className="py-12 text-center text-sm text-muted-foreground"
+                >
+                  Selecione um produtor para ver os planos de produção
+                </TableCell>
+              </TableRow>
             ) : plans.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={6} className="py-12 text-center">
                   <p className="text-sm text-muted-foreground">
                     Nenhum plano de produção cadastrado ainda.
                   </p>
-                  {producerId && (
+                  {isProducer && producerId && (
                     <Button
                       type="button"
                       size="sm"
@@ -197,7 +321,7 @@ export function ProductionPlansPage() {
         </Table>
       </Card>
 
-      {producerId && (
+      {isProducer && producerId && (
         <PlanFormDialog
           mode="create"
           producerId={producerId}
@@ -207,10 +331,10 @@ export function ProductionPlansPage() {
         />
       )}
 
-      {producerId && (
+      {activeProducerId && (
         <PlanFormDialog
           mode="edit"
-          producerId={producerId}
+          producerId={activeProducerId}
           plan={editTarget}
           open={editTarget !== null}
           onOpenChange={(open) => {
