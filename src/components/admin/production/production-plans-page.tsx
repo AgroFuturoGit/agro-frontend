@@ -59,7 +59,15 @@ export function ProductionPlansPage() {
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
+  // RN4: enquanto a role for desconhecida (`currentRole === null` no primeiro
+  // render, antes do useEffect), `isProducer` é falso — nenhuma afordância de
+  // escrita renderiza. Falha fechado, nunca aberto.
   const isProducer = currentRole === "PRODUCER";
+  // Toda a escrita de plano (POST/PUT/DELETE) continua hasRole('PRODUCER') no
+  // backend: para as demais roles o clique seria 403 garantido. Por isso a
+  // coluna "Ações" inteira só existe para o PRODUCER — e o número de colunas
+  // da tabela acompanha, para os colSpan de skeleton e estado vazio.
+  const columnCount = isProducer ? 6 : 5;
   // O seletor existe para quem não tem um Producer próprio e só lê os planos
   // de terceiros (MANAGER/TECHNICIAN — e ADMIN, que também acessa a rota).
   // O PRODUCER nunca vê o seletor.
@@ -67,10 +75,6 @@ export function ProductionPlansPage() {
     currentRole === "MANAGER" ||
     currentRole === "TECHNICIAN" ||
     currentRole === "ADMIN";
-
-  // Produtor cujos planos estão em tela: o próprio, para PRODUCER; o
-  // escolhido no seletor, para as demais roles.
-  const activeProducerId = isProducer ? producerId : selectedProducerId || null;
 
   const loadProducers = useCallback(async () => {
     setLoadingProducers(true);
@@ -224,14 +228,16 @@ export function ProductionPlansPage() {
               <TableHead className="text-right">Área (ha)</TableHead>
               <TableHead className="text-right">Previsto (t)</TableHead>
               <TableHead>Plantio</TableHead>
-              <TableHead className="w-[1%] text-right">Ações</TableHead>
+              {isProducer && (
+                <TableHead className="w-[1%] text-right">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody className="[&_td]:h-12 [&_td]:px-4">
             {loading ? (
               Array.from({ length: 4 }).map((_, idx) => (
                 <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: 6 }).map((__, cidx) => (
+                  {Array.from({ length: columnCount }).map((__, cidx) => (
                     <TableCell key={cidx}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -241,7 +247,7 @@ export function ProductionPlansPage() {
             ) : showProducerSelect && !selectedProducerId ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={6}
+                  colSpan={columnCount}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
                   Selecione um produtor para ver os planos de produção
@@ -249,7 +255,7 @@ export function ProductionPlansPage() {
               </TableRow>
             ) : plans.length === 0 ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="py-12 text-center">
+                <TableCell colSpan={columnCount} className="py-12 text-center">
                   <p className="text-sm text-muted-foreground">
                     Nenhum plano de produção cadastrado ainda.
                   </p>
@@ -291,29 +297,31 @@ export function ProductionPlansPage() {
                   <TableCell className="text-muted-foreground">
                     {formatPlanDate(plan.plannedPlantingDate)}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Editar plano"
-                        onClick={() => setEditTarget(plan)}
-                      >
-                        <Pencil />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Excluir plano"
-                        onClick={() => setDeleteTarget(plan)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {isProducer && (
+                    <TableCell className="text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Editar plano"
+                          onClick={() => setEditTarget(plan)}
+                        >
+                          <Pencil />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Excluir plano"
+                          onClick={() => setDeleteTarget(plan)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -331,10 +339,12 @@ export function ProductionPlansPage() {
         />
       )}
 
-      {activeProducerId && (
+      {/* Editar/excluir plano são PRODUCER-only no backend: os diálogos só são
+          montados para o dono dos planos, junto das ações que os abrem. */}
+      {isProducer && producerId && (
         <PlanFormDialog
           mode="edit"
-          producerId={activeProducerId}
+          producerId={producerId}
           plan={editTarget}
           open={editTarget !== null}
           onOpenChange={(open) => {
@@ -344,14 +354,16 @@ export function ProductionPlansPage() {
         />
       )}
 
-      <DeletePlanDialog
-        plan={deleteTarget}
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-        onDeleted={refresh}
-      />
+      {isProducer && (
+        <DeletePlanDialog
+          plan={deleteTarget}
+          open={deleteTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null);
+          }}
+          onDeleted={refresh}
+        />
+      )}
     </div>
   );
 }

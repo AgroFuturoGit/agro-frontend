@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
+import { readUserFromStorage, type Role } from "@/lib/auth";
 import {
   formatNumber,
   formatPlanDate,
@@ -36,6 +37,7 @@ type Props = {
 };
 
 export function PlanDetail({ planId }: Props) {
+  const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [plan, setPlan] = useState<ProductionPlan | null>(null);
   const [comparison, setComparison] = useState<ProductionComparison | null>(
     null,
@@ -49,6 +51,19 @@ export function PlanDetail({ planId }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<ProductionExecution | null>(
     null,
   );
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentRole(readUserFromStorage()?.role ?? null);
+  }, []);
+
+  // Os 3 GET desta tela (plano, comparativo e execuções) estão liberados para
+  // ADMIN/MANAGER/TECHNICIAN/PRODUCER, mas POST/PUT/DELETE de apontamento
+  // continuam hasRole('PRODUCER') no backend — 403 garantido para as demais.
+  // RN4: no primeiro render a role ainda é null, então nada de escrita
+  // renderiza (falha fechado).
+  const isProducer = currentRole === "PRODUCER";
+  const columnCount = isProducer ? 3 : 2;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -153,7 +168,7 @@ export function PlanDetail({ planId }: Props) {
               Histórico diário do que foi colhido em campo.
             </p>
           </div>
-          {plan && (
+          {isProducer && plan && (
             <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
               <Plus />
               Novo apontamento
@@ -167,14 +182,16 @@ export function PlanDetail({ planId }: Props) {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Data da colheita</TableHead>
                 <TableHead className="text-right">Quantidade (t)</TableHead>
-                <TableHead className="w-[1%] text-right">Ações</TableHead>
+                {isProducer && (
+                  <TableHead className="w-[1%] text-right">Ações</TableHead>
+                )}
               </TableRow>
             </TableHeader>
             <TableBody className="[&_td]:h-12 [&_td]:px-4">
               {loading ? (
                 Array.from({ length: 3 }).map((_, idx) => (
                   <TableRow key={`skeleton-${idx}`}>
-                    {Array.from({ length: 3 }).map((__, cidx) => (
+                    {Array.from({ length: columnCount }).map((__, cidx) => (
                       <TableCell key={cidx}>
                         <Skeleton className="h-4 w-full" />
                       </TableCell>
@@ -183,11 +200,11 @@ export function PlanDetail({ planId }: Props) {
                 ))
               ) : sortedExecutions.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={3} className="py-12 text-center">
+                  <TableCell colSpan={columnCount} className="py-12 text-center">
                     <p className="text-sm text-muted-foreground">
                       Nenhum apontamento registrado ainda.
                     </p>
-                    {plan && (
+                    {isProducer && plan && (
                       <Button
                         type="button"
                         size="sm"
@@ -208,29 +225,31 @@ export function PlanDetail({ planId }: Props) {
                     <TableCell className="text-right tabular-nums">
                       {formatNumber(execution.actualYield)}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Editar apontamento"
-                          onClick={() => setEditTarget(execution)}
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Excluir apontamento"
-                          onClick={() => setDeleteTarget(execution)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    {isProducer && (
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Editar apontamento"
+                            onClick={() => setEditTarget(execution)}
+                          >
+                            <Pencil />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Excluir apontamento"
+                            onClick={() => setDeleteTarget(execution)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}
@@ -239,33 +258,39 @@ export function PlanDetail({ planId }: Props) {
         </Card>
       </div>
 
-      <ExecutionFormDialog
-        mode="create"
-        planId={planId}
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onSaved={refresh}
-      />
+      {/* Os 3 diálogos de escrita só são montados para o PRODUCER, junto das
+          ações que os abrem. */}
+      {isProducer && (
+        <>
+          <ExecutionFormDialog
+            mode="create"
+            planId={planId}
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onSaved={refresh}
+          />
 
-      <ExecutionFormDialog
-        mode="edit"
-        planId={planId}
-        execution={editTarget}
-        open={editTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditTarget(null);
-        }}
-        onSaved={refresh}
-      />
+          <ExecutionFormDialog
+            mode="edit"
+            planId={planId}
+            execution={editTarget}
+            open={editTarget !== null}
+            onOpenChange={(open) => {
+              if (!open) setEditTarget(null);
+            }}
+            onSaved={refresh}
+          />
 
-      <DeleteExecutionDialog
-        execution={deleteTarget}
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-        onDeleted={refresh}
-      />
+          <DeleteExecutionDialog
+            execution={deleteTarget}
+            open={deleteTarget !== null}
+            onOpenChange={(open) => {
+              if (!open) setDeleteTarget(null);
+            }}
+            onDeleted={refresh}
+          />
+        </>
+      )}
     </div>
   );
 }
