@@ -24,14 +24,14 @@ async function loginAs(page: Page, role: string) {
   ]);
 }
 
-test("MANAGER acessa /admin/cultivos sem redirecionamento", async ({
+test("MANAGER acessa /admin/organizacoes sem redirecionamento", async ({
   page,
 }) => {
   await loginAs(page, "MANAGER");
 
-  await page.goto("/admin/cultivos");
+  await page.goto("/admin/organizacoes");
 
-  await expect(page).toHaveURL(/\/admin\/cultivos/);
+  await expect(page).toHaveURL(/\/admin\/organizacoes/);
 });
 
 test("PRODUCER é redirecionado de /admin/perfis para /admin", async ({
