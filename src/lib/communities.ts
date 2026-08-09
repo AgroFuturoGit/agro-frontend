@@ -136,7 +136,15 @@ export function registerProducer(
         }
       : null,
     community: raw.community
-      ? { id: raw.community.id, name: raw.community.name }
+      ? {
+          id: raw.community.id,
+          name: raw.community.name,
+          // O DTO de resposta do registro não é usado como fonte da
+          // organização em nenhum fluxo (só a confirmação de cadastro exibe
+          // o nome da comunidade) — evita depender de um shape que este
+          // endpoint pode não devolver de forma estável.
+          organization: null,
+        }
       : null,
   }));
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertCircle, Pencil, Plus, UserPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -15,19 +17,44 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
+import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCnpj } from "@/lib/cnpj";
+import { getMyManager } from "@/lib/managers";
 import {
   listOrganizations,
   ORGANIZATION_TYPE_LABELS,
   type Organization,
 } from "@/lib/organizations";
+import { getMyProducer } from "@/lib/producers";
 
 import { ManagerRegisterDialog } from "./manager-register-dialog";
 import { OrganizationFormDialog } from "./organization-form-dialog";
 
-const COLUMN_COUNT = 4;
-
+/**
+ * `/admin/organizacoes` é o único ponto de entrada da hierarquia
+ * Organização → Comunidade → Produtor → Planos (ver plano `navegacao-
+ * cascata-organizacoes`). ADMIN e TECHNICIAN veem a lista completa e
+ * escolhem; MANAGER e PRODUCER têm exatamente um recurso possível e são
+ * redirecionados automaticamente para ele — nunca escolhem pela UI.
+ *
+ * TECHNICIAN é tratado como ADMIN nesta navegação por falta de vínculo de
+ * organização no backend hoje (sem entidade `Technician`, sem
+ * `/technicians/me` — já levantado como pergunta ao time de backend,
+ * `relatorio-evidencias-f03/apontamentos-backend-08-08.pdf`, item 7).
+ * ATENÇÃO: `GET /organizations` é `hasRole('ADMIN')` no backend real
+ * (`OrganizationController.java`) — contra o backend real, TECHNICIAN
+ * recebe 403 aqui e cai no estado de erro abaixo. É uma lacuna de RBAC do
+ * backend, documentada no relatório de execução; não é corrigida no
+ * frontend (fora de escopo deste plano).
+ */
 export function OrganizationsPage() {
+  const router = useRouter();
+
+  const [currentRole, setCurrentRole] = useState<Role | null>(null);
+  const [roleResolved, setRoleResolved] = useState(false);
+
+  const [redirectError, setRedirectError] = useState<string | null>(null);
+
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +65,55 @@ export function OrganizationsPage() {
     null,
   );
 
-  const refresh = useCallback(async () => {
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCurrentRole(readUserFromStorage()?.role ?? null);
+    setRoleResolved(true);
+  }, []);
+
+  const resolveAndLoad = useCallback(async () => {
+    if (!roleResolved) return;
+
+    if (currentRole === "MANAGER") {
+      setRedirectError(null);
+      try {
+        const manager = await getMyManager();
+        router.replace(`/admin/organizacoes/${manager.organization.id}`);
+      } catch (err) {
+        setRedirectError(
+          err instanceof ApiError
+            ? `Não foi possível identificar a sua organização: ${err.message}`
+            : "Não foi possível identificar a sua organização.",
+        );
+      }
+      return;
+    }
+
+    if (currentRole === "PRODUCER") {
+      setRedirectError(null);
+      try {
+        const producer = await getMyProducer();
+        const community = producer.community;
+        if (!community || !community.organization) {
+          setRedirectError(
+            "Não foi possível identificar a sua comunidade/organização. Contate o suporte.",
+          );
+          return;
+        }
+        router.replace(
+          `/admin/organizacoes/${community.organization.id}/comunidades/${community.id}/produtores/${producer.id}`,
+        );
+      } catch (err) {
+        setRedirectError(
+          err instanceof ApiError
+            ? `Não foi possível identificar o seu produtor: ${err.message}`
+            : "Não foi possível identificar o seu produtor.",
+        );
+      }
+      return;
+    }
+
+    // ADMIN e TECHNICIAN: lista completa, navegação por link em cada linha.
     setLoading(true);
     setError(null);
     try {
@@ -53,18 +128,55 @@ export function OrganizationsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [currentRole, roleResolved, router]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    refresh();
-  }, [refresh]);
+    resolveAndLoad();
+  }, [resolveAndLoad]);
 
   const sortedOrganizations = useMemo(
-    () =>
-      [...organizations].sort((a, b) => a.name.localeCompare(b.name)),
+    () => [...organizations].sort((a, b) => a.name.localeCompare(b.name)),
     [organizations],
   );
+
+  // Escrita de Organização (criar/editar/criar Manager) é `hasRole('ADMIN')`
+  // no backend real (`OrganizationController.java`) — TECHNICIAN só lê.
+  const canManage = currentRole === "ADMIN";
+  const columnCount = canManage ? 4 : 3;
+
+  if (currentRole === "MANAGER" || currentRole === "PRODUCER") {
+    if (redirectError) {
+      return (
+        <div className="flex flex-col gap-6">
+          <div
+            role="alert"
+            className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          >
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{redirectError}</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => resolveAndLoad()}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-7 w-64" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -77,10 +189,12 @@ export function OrganizationsPage() {
             Cooperativas e associações cadastradas na plataforma.
           </p>
         </div>
-        <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus />
-          Nova Organização
-        </Button>
+        {canManage && (
+          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            <Plus />
+            Nova Organização
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -96,7 +210,7 @@ export function OrganizationsPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => refresh()}
+            onClick={() => resolveAndLoad()}
           >
             Tentar novamente
           </Button>
@@ -110,14 +224,16 @@ export function OrganizationsPage() {
               <TableHead>Nome</TableHead>
               <TableHead>CNPJ</TableHead>
               <TableHead>Tipo</TableHead>
-              <TableHead className="w-[1%] text-right">Ações</TableHead>
+              {canManage && (
+                <TableHead className="w-[1%] text-right">Ações</TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody className="[&_td]:h-12 [&_td]:px-4">
             {loading ? (
               Array.from({ length: 4 }).map((_, idx) => (
                 <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: COLUMN_COUNT }).map((__, cidx) => (
+                  {Array.from({ length: columnCount }).map((__, cidx) => (
                     <TableCell key={cidx}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -127,7 +243,7 @@ export function OrganizationsPage() {
             ) : sortedOrganizations.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell
-                  colSpan={COLUMN_COUNT}
+                  colSpan={columnCount}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
                   Nenhuma organização cadastrada ainda.
@@ -137,7 +253,12 @@ export function OrganizationsPage() {
               sortedOrganizations.map((organization) => (
                 <TableRow key={organization.id}>
                   <TableCell className="font-medium text-foreground">
-                    {organization.name}
+                    <Link
+                      href={`/admin/organizacoes/${organization.id}`}
+                      className="hover:underline"
+                    >
+                      {organization.name}
+                    </Link>
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {formatCnpj(organization.taxId)}
@@ -145,28 +266,30 @@ export function OrganizationsPage() {
                   <TableCell className="text-muted-foreground">
                     {ORGANIZATION_TYPE_LABELS[organization.type]}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Editar organização"
-                        onClick={() => setEditTarget(organization)}
-                      >
-                        <Pencil />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Criar Manager"
-                        onClick={() => setManagerTarget(organization)}
-                      >
-                        <UserPlus />
-                      </Button>
-                    </div>
-                  </TableCell>
+                  {canManage && (
+                    <TableCell className="text-right">
+                      <div className="inline-flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Editar organização"
+                          onClick={() => setEditTarget(organization)}
+                        >
+                          <Pencil />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="Criar Manager"
+                          onClick={() => setManagerTarget(organization)}
+                        >
+                          <UserPlus />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -174,32 +297,36 @@ export function OrganizationsPage() {
         </Table>
       </Card>
 
-      <OrganizationFormDialog
-        mode="create"
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        onSaved={refresh}
-      />
+      {canManage && (
+        <>
+          <OrganizationFormDialog
+            mode="create"
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onSaved={resolveAndLoad}
+          />
 
-      <OrganizationFormDialog
-        mode="edit"
-        organization={editTarget}
-        open={editTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditTarget(null);
-        }}
-        onSaved={refresh}
-      />
+          <OrganizationFormDialog
+            mode="edit"
+            organization={editTarget}
+            open={editTarget !== null}
+            onOpenChange={(open) => {
+              if (!open) setEditTarget(null);
+            }}
+            onSaved={resolveAndLoad}
+          />
 
-      {managerTarget && (
-        <ManagerRegisterDialog
-          organizationId={managerTarget.id}
-          organizationName={managerTarget.name}
-          open={managerTarget !== null}
-          onOpenChange={(open) => {
-            if (!open) setManagerTarget(null);
-          }}
-        />
+          {managerTarget && (
+            <ManagerRegisterDialog
+              organizationId={managerTarget.id}
+              organizationName={managerTarget.name}
+              open={managerTarget !== null}
+              onOpenChange={(open) => {
+                if (!open) setManagerTarget(null);
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   );

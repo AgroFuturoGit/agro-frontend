@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
 
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,8 @@ import {
 } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
+import { getCommunity } from "@/lib/communities";
+import { getMyProducer, listProducers } from "@/lib/producers";
 import {
   formatNumber,
   formatPlanDate,
@@ -33,11 +36,21 @@ import { DeleteExecutionDialog } from "./delete-execution-dialog";
 import { ExecutionFormDialog } from "./execution-form-dialog";
 
 type Props = {
+  orgId: string;
+  communityId: string;
+  producerId: string;
   planId: string;
 };
 
-export function PlanDetail({ planId }: Props) {
+type BreadcrumbNames = {
+  organizationName: string;
+  communityName: string;
+  producerLabel: string;
+};
+
+export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
+  const [names, setNames] = useState<BreadcrumbNames | null>(null);
   const [plan, setPlan] = useState<ProductionPlan | null>(null);
   const [comparison, setComparison] = useState<ProductionComparison | null>(
     null,
@@ -57,13 +70,73 @@ export function PlanDetail({ planId }: Props) {
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
+  // Resolução dos nomes do breadcrumb — best-effort e independente dos 3 GET
+  // principais da tela (que já são liberados às 4 roles). PRODUCER usa
+  // `GET /producers/me` (já traz comunidade+organização aninhadas); as
+  // demais roles usam `GET /communities/{id}` + `GET /producers`, ambos
+  // `hasRole('MANAGER') or hasRole('ADMIN')` no backend — se recusarem (ex.
+  // TECHNICIAN), o breadcrumb cai em rótulos genéricos sem bloquear o resto
+  // da tela.
+  useEffect(() => {
+    if (currentRole === null) return;
+    let active = true;
+
+    async function resolveNames() {
+      try {
+        if (currentRole === "PRODUCER") {
+          const producer = await getMyProducer();
+          if (!active) return;
+          setNames({
+            organizationName:
+              producer.community?.organization?.name ?? "Organização",
+            communityName: producer.community?.name ?? "Comunidade",
+            producerLabel:
+              producer.user?.fullName ?? producer.aliasName ?? "Produtor",
+          });
+          return;
+        }
+
+        const [community, producers] = await Promise.all([
+          getCommunity(communityId),
+          listProducers(communityId),
+        ]);
+        if (!active) return;
+        const producer = producers.find((item) => item.id === producerId);
+        setNames({
+          organizationName: community.organization.name,
+          communityName: community.name,
+          producerLabel:
+            producer?.user?.fullName ?? producer?.aliasName ?? "Produtor",
+        });
+      } catch {
+        if (active) {
+          setNames({
+            organizationName: "Organização",
+            communityName: "Comunidade",
+            producerLabel: "Produtor",
+          });
+        }
+      }
+    }
+
+    resolveNames();
+    return () => {
+      active = false;
+    };
+  }, [currentRole, communityId, producerId]);
+
   // Os 3 GET desta tela (plano, comparativo e execuções) estão liberados para
-  // ADMIN/MANAGER/TECHNICIAN/PRODUCER, mas POST/PUT/DELETE de apontamento
-  // continuam hasRole('PRODUCER') no backend — 403 garantido para as demais.
-  // RN4: no primeiro render a role ainda é null, então nada de escrita
-  // renderiza (falha fechado).
-  const isProducer = currentRole === "PRODUCER";
-  const columnCount = isProducer ? 3 : 2;
+  // ADMIN/MANAGER/TECHNICIAN/PRODUCER. Para escrita, o backend real
+  // (@PreAuthorize em ProductionController) aceita ADMIN/TECHNICIAN/PRODUCER
+  // em create/update de apontamento, mas só ADMIN/TECHNICIAN em delete
+  // (PRODUCER recebe 403). RN4: no primeiro render a role ainda é null,
+  // então nada de escrita renderiza (falha fechado).
+  const canWrite =
+    currentRole === "PRODUCER" ||
+    currentRole === "ADMIN" ||
+    currentRole === "TECHNICIAN";
+  const canDelete = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
+  const columnCount = canWrite ? 3 : 2;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -97,8 +170,34 @@ export function PlanDetail({ planId }: Props) {
     (b.harvestDate ?? "").localeCompare(a.harvestDate ?? ""),
   );
 
+  const backToPlansHref = `/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producerId}`;
+
   return (
     <div className="flex flex-col gap-6">
+      <Breadcrumb
+        items={[
+          { label: "Organizações", href: "/admin/organizacoes" },
+          {
+            label: names?.organizationName ?? "Organização",
+            href: `/admin/organizacoes/${orgId}`,
+          },
+          {
+            label: names?.communityName ?? "Comunidade",
+            href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
+          },
+          {
+            label: names?.producerLabel ?? "Produtor",
+            href: backToPlansHref,
+          },
+          {
+            label:
+              !loading && plan?.crop
+                ? `${plan.crop.name} — ${plan.crop.variety}`
+                : "Plano de produção",
+          },
+        ]}
+      />
+
       <div>
         <Button
           variant="ghost"
@@ -106,7 +205,7 @@ export function PlanDetail({ planId }: Props) {
           nativeButton={false}
           className="-ml-2 mb-2 text-muted-foreground"
           render={
-            <Link href="/admin/cultivos">
+            <Link href={backToPlansHref}>
               <ArrowLeft />
               Voltar para planos
             </Link>
@@ -168,7 +267,7 @@ export function PlanDetail({ planId }: Props) {
               Histórico diário do que foi colhido em campo.
             </p>
           </div>
-          {isProducer && plan && (
+          {canWrite && plan && (
             <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
               <Plus />
               Novo apontamento
@@ -182,7 +281,7 @@ export function PlanDetail({ planId }: Props) {
               <TableRow className="hover:bg-transparent">
                 <TableHead>Data da colheita</TableHead>
                 <TableHead className="text-right">Quantidade (t)</TableHead>
-                {isProducer && (
+                {canWrite && (
                   <TableHead className="w-[1%] text-right">Ações</TableHead>
                 )}
               </TableRow>
@@ -204,7 +303,7 @@ export function PlanDetail({ planId }: Props) {
                     <p className="text-sm text-muted-foreground">
                       Nenhum apontamento registrado ainda.
                     </p>
-                    {isProducer && plan && (
+                    {canWrite && plan && (
                       <Button
                         type="button"
                         size="sm"
@@ -225,7 +324,7 @@ export function PlanDetail({ planId }: Props) {
                     <TableCell className="text-right tabular-nums">
                       {formatNumber(execution.actualYield)}
                     </TableCell>
-                    {isProducer && (
+                    {canWrite && (
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-1">
                           <Button
@@ -237,16 +336,18 @@ export function PlanDetail({ planId }: Props) {
                           >
                             <Pencil />
                           </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Excluir apontamento"
-                            onClick={() => setDeleteTarget(execution)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 />
-                          </Button>
+                          {canDelete && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Excluir apontamento"
+                              onClick={() => setDeleteTarget(execution)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     )}
@@ -258,9 +359,7 @@ export function PlanDetail({ planId }: Props) {
         </Card>
       </div>
 
-      {/* Os 3 diálogos de escrita só são montados para o PRODUCER, junto das
-          ações que os abrem. */}
-      {isProducer && (
+      {canWrite && (
         <>
           <ExecutionFormDialog
             mode="create"
@@ -280,16 +379,18 @@ export function PlanDetail({ planId }: Props) {
             }}
             onSaved={refresh}
           />
-
-          <DeleteExecutionDialog
-            execution={deleteTarget}
-            open={deleteTarget !== null}
-            onOpenChange={(open) => {
-              if (!open) setDeleteTarget(null);
-            }}
-            onDeleted={refresh}
-          />
         </>
+      )}
+
+      {canDelete && (
+        <DeleteExecutionDialog
+          execution={deleteTarget}
+          open={deleteTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleteTarget(null);
+          }}
+          onDeleted={refresh}
+        />
       )}
     </div>
   );

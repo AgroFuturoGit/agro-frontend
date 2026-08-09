@@ -68,6 +68,25 @@ async function loginAs(page: Page, role: string, user?: FakeUser) {
   }
 }
 
+const ORGANIZATION = {
+  id: "aaaaaaaa-1111-0000-0000-000000000001",
+  name: "Cooperativa Serra Azul",
+  taxId: "12345678000199",
+  type: "COOP",
+};
+
+const COMMUNITY_A = {
+  id: "bbbbbbbb-1111-0000-0000-00000000000a",
+  name: "Comunidade Alto da Serra",
+  organization: ORGANIZATION,
+};
+
+const COMMUNITY_B = {
+  id: "bbbbbbbb-1111-0000-0000-00000000000b",
+  name: "Comunidade Vale do Sol",
+  organization: ORGANIZATION,
+};
+
 const PRODUCER_ANA = {
   id: "eeeeeeee-1111-0000-0000-00000000000a",
   aliasName: null,
@@ -78,10 +97,7 @@ const PRODUCER_ANA = {
     email: "ana@example.com",
     cpf: "12345678909",
   },
-  community: {
-    id: "bbbbbbbb-1111-0000-0000-00000000000a",
-    name: "Comunidade Alto da Serra",
-  },
+  community: COMMUNITY_A,
 };
 
 const PRODUCER_BRUNO = {
@@ -94,10 +110,7 @@ const PRODUCER_BRUNO = {
     email: "bruno@example.com",
     cpf: "98765432100",
   },
-  community: {
-    id: "bbbbbbbb-1111-0000-0000-00000000000b",
-    name: "Comunidade Vale do Sol",
-  },
+  community: COMMUNITY_B,
 };
 
 function planFor(producerId: string, cropName: string) {
@@ -121,8 +134,8 @@ function planFor(producerId: string, cropName: string) {
   };
 }
 
-test.describe("Planos de produção — seleção de produtor por role", () => {
-  test("TECHNICIAN escolhe um produtor no seletor e vê os planos daquele produtor", async ({
+test.describe("Planos de produção — navegação em cascata por role", () => {
+  test("TECHNICIAN acessa a URL de um produtor diretamente (sem seletor) e vê os planos dele", async ({
     page,
   }) => {
     const technicianUser: FakeUser = {
@@ -135,6 +148,14 @@ test.describe("Planos de produção — seleção de produtor por role", () => {
     };
 
     await loginAs(page, "TECHNICIAN", technicianUser);
+
+    await page.route(`**/communities/${COMMUNITY_A.id}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(COMMUNITY_A),
+      });
+    });
 
     await page.route("**/producers*", async (route) => {
       if (route.request().method() !== "GET") {
@@ -170,26 +191,20 @@ test.describe("Planos de produção — seleção de produtor por role", () => {
       },
     );
 
-    await page.goto("/admin/cultivos");
+    // TECHNICIAN chega ao produtor pelo drill-down (Organizações → org →
+    // comunidade → produtor); aqui simulamos já ter navegado até lá.
+    await page.goto(
+      `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}`,
+    );
 
-    // RN6: nenhum plano é buscado antes de escolher o produtor.
-    await expect(
-      page.getByText("Selecione um produtor para ver os planos de produção"),
-    ).toBeVisible();
-    expect(planRequests).toHaveLength(0);
-
-    // "Novo plano" é hasRole('PRODUCER') no backend — não pode aparecer aqui.
-    await expect(
-      page.getByRole("button", { name: "Novo plano" }),
-    ).toHaveCount(0);
-
-    const selector = page.getByRole("combobox", { name: "Produtor" });
-    await expect(selector).toBeVisible();
-    await selector.click();
-    await page.getByRole("option", { name: "Ana Serrana" }).click();
-
+    // "Novo plano" é hasRole('PRODUCER', 'ADMIN', 'TECHNICIAN') no backend —
+    // TECHNICIAN escreve, então o botão aparece (não-regressão RN da
+    // migração; só delete continua ADMIN/TECHNICIAN apenas).
     await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Safra 2026" })).toBeVisible();
+
+    // Sem seletor de produtor — o escopo vem inteiramente da URL.
+    await expect(page.getByRole("combobox")).toHaveCount(0);
 
     expect(planRequests).toHaveLength(1);
     expect(planRequests[0]).toContain(
@@ -197,7 +212,7 @@ test.describe("Planos de produção — seleção de produtor por role", () => {
     );
   });
 
-  test("PRODUCER continua vendo os próprios planos, sem seletor de produtor", async ({
+  test("PRODUCER cai direto nos próprios planos ao acessar /admin/organizacoes, sem seletor de produtor", async ({
     page,
   }) => {
     const producerUser: FakeUser = {
@@ -212,7 +227,8 @@ test.describe("Planos de produção — seleção de produtor por role", () => {
     await loginAs(page, "PRODUCER", producerUser);
 
     // Rede de segurança contra regressão: o PRODUCER nunca deve listar
-    // produtores — o caminho dele é `GET /producers/me` (RN5).
+    // produtores nem organizações/comunidades — o caminho dele é inteiro via
+    // `GET /producers/me` (que já traz comunidade+organização aninhadas).
     const listProducersRequests: string[] = [];
     await page.route("**/producers*", async (route) => {
       if (route.request().method() !== "GET") {
@@ -250,20 +266,36 @@ test.describe("Planos de produção — seleção de produtor por role", () => {
       },
     );
 
-    await page.goto("/admin/cultivos");
+    // `/admin/organizacoes` é o único ponto de entrada — PRODUCER é
+    // redirecionado automaticamente até o próprio produtor.
+    await page.goto("/admin/organizacoes");
+
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}$`,
+      ),
+    );
 
     await expect(
       page.getByRole("cell", { name: /Milho — Catuaí/ }),
     ).toBeVisible();
 
-    // Proibição explícita da fase: o PRODUCER não vê seletor de produtor.
+    // Proibição explícita: o PRODUCER não vê seletor de produtor nem lista
+    // GET /producers.
     await expect(page.getByRole("combobox")).toHaveCount(0);
-    await expect(page.getByText("Produtor", { exact: true })).toHaveCount(0);
     expect(listProducersRequests).toHaveLength(0);
 
     // Sem regressão do fluxo do próprio produtor.
     await expect(
       page.getByRole("button", { name: "Novo plano" }),
     ).toBeVisible();
+
+    // Breadcrumb mostra a hierarquia real do produtor, resolvida via
+    // `GET /producers/me` — não navegável para outro recurso (só o último
+    // nível é não-clicável; os anteriores levam sempre aos próprios
+    // recursos do produtor).
+    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
+    await expect(breadcrumb).toContainText(ORGANIZATION.name);
+    await expect(breadcrumb).toContainText(COMMUNITY_A.name);
   });
 });

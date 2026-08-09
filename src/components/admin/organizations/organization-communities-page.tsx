@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertCircle, Pencil, Plus } from "lucide-react";
 
+import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,18 +21,33 @@ import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
+import { getOrganization, type Organization } from "@/lib/organizations";
 
-import { CommunityFormDialog } from "./community-form-dialog";
+import { CommunityFormDialog } from "../communities/community-form-dialog";
 
-export function CommunitiesPage() {
+type Props = {
+  orgId: string;
+};
+
+export function OrganizationCommunitiesPage({ orgId }: Props) {
+  const router = useRouter();
+
+  const [currentRole, setCurrentRole] = useState<Role | null>(null);
+  const [roleResolved, setRoleResolved] = useState(false);
+
+  // Nome da organização exibido no breadcrumb/cabeçalho. Resolvido de forma
+  // diferente por role (ver `refresh`) porque `GET /organizations/{id}` é
+  // `hasRole('ADMIN')` no backend (`OrganizationController.java`) — MANAGER
+  // NUNCA pode chamá-lo, então usa a organização já embutida em
+  // `GET /managers/me`.
+  const [organization, setOrganization] = useState<Organization | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentRole, setCurrentRole] = useState<Role | null>(null);
-  const [roleResolved, setRoleResolved] = useState(false);
-  // Organização do MANAGER logado, resolvida via GET /managers/me.
-  // Também é o valor que a Task 03-02 passa para o CommunityFormDialog.
-  const [myOrgId, setMyOrgId] = useState<string | null>(null);
+  // Enquanto o MANAGER não tiver a própria organização confirmada, nada é
+  // buscado nem exibido — falha fechada (mesmo espírito da guarda de
+  // ownership de `lesson-backend-hierarchy-ownership`).
+  const [redirecting, setRedirecting] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
@@ -49,24 +67,18 @@ export function CommunitiesPage() {
     setLoading(true);
     setError(null);
     try {
-      if (currentRole === "ADMIN") {
-        // ADMIN não tem escopo: vê comunidades de todas as organizações.
-        setCommunities(await listCommunities());
-        return;
-      }
-
       if (currentRole === "MANAGER") {
-        // O backend não restringe o MANAGER à própria organização em
-        // nenhuma operação de Comunidade (memória
-        // `lesson-backend-hierarchy-ownership`, decisão D3). O filtro por
-        // organização é obrigatório aqui e NUNCA pode virar uma listagem
-        // sem filtro — nem como fallback de erro.
-        let organizationId: string;
+        // Guarda de ownership OBRIGATÓRIA (memória
+        // `lesson-backend-hierarchy-ownership`): o backend não impede um
+        // MANAGER de operar sobre a organização de outro MANAGER via URL
+        // direta. `orgId` da rota é comparado com a organização real do
+        // usuário logado ANTES de qualquer dado ser buscado/exibido.
+        let manager;
         try {
-          organizationId = (await getMyManager()).organization.id;
+          manager = await getMyManager();
         } catch (err) {
+          setOrganization(null);
           setCommunities([]);
-          setMyOrgId(null);
           setError(
             err instanceof ApiError
               ? `Não foi possível identificar a sua organização: ${err.message}`
@@ -75,50 +87,52 @@ export function CommunitiesPage() {
           return;
         }
 
-        setMyOrgId(organizationId);
-        setCommunities(await listCommunities(organizationId));
+        if (manager.organization.id !== orgId) {
+          setRedirecting(true);
+          router.replace(`/admin/organizacoes/${manager.organization.id}`);
+          return;
+        }
+
+        setOrganization(manager.organization);
+        setCommunities(await listCommunities(orgId));
         return;
       }
 
-      // Perfil desconhecido/não resolvido: não listamos nada sem escopo.
-      setCommunities([]);
-      setError(
-        "Não foi possível identificar o seu perfil de acesso. Faça login novamente.",
-      );
+      // ADMIN: caminho normal. TECHNICIAN/PRODUCER só chegam aqui por URL
+      // direta — `GET /organizations/{id}` e `GET /communities` recusam as
+      // duas roles no backend real, então a tela cai no estado de erro
+      // (comportamento aceito e documentado, mesmo padrão já usado para
+      // outras lacunas de RBAC do backend nesta base de código).
+      const [organizationData, communitiesData] = await Promise.all([
+        getOrganization(orgId),
+        listCommunities(orgId),
+      ]);
+      setOrganization(organizationData);
+      setCommunities(communitiesData);
     } catch (err) {
+      setOrganization(null);
       setCommunities([]);
       setError(
         err instanceof ApiError
           ? err.message
-          : "Não foi possível carregar as comunidades.",
+          : "Não foi possível carregar as comunidades desta organização.",
       );
     } finally {
       setLoading(false);
     }
-  }, [currentRole, roleResolved]);
+  }, [currentRole, roleResolved, orgId, router]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
-  const sortedCommunities = useMemo(
-    () =>
-      [...communities].sort(
-        (a, b) =>
-          a.organization.name.localeCompare(b.organization.name) ||
-          a.name.localeCompare(b.name),
-      ),
-    [communities],
+  const sortedCommunities = [...communities].sort((a, b) =>
+    a.name.localeCompare(b.name),
   );
 
   const canManage = currentRole === "ADMIN" || currentRole === "MANAGER";
-  // MANAGER sem organização resolvida não pode criar: a organização é
-  // path param obrigatório e nunca pode ser escolhida por ele (D3).
-  const canCreate =
-    currentRole === "ADMIN" ||
-    (currentRole === "MANAGER" && myOrgId !== null);
-  const columnCount = canManage ? 3 : 2;
+  const columnCount = canManage ? 2 : 1;
 
   function openCreateDialog() {
     setDialogMode("create");
@@ -132,18 +146,34 @@ export function CommunitiesPage() {
     setDialogOpen(true);
   }
 
+  if (redirecting) {
+    return (
+      <div className="flex flex-col gap-6">
+        <Skeleton className="h-4 w-64" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
+      <Breadcrumb
+        items={[
+          { label: "Organizações", href: "/admin/organizacoes" },
+          { label: organization?.name ?? "Organização" },
+        ]}
+      />
+
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Comunidades</h2>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            {organization?.name ?? "Comunidades"}
+          </h2>
           <p className="text-sm text-muted-foreground">
-            {currentRole === "MANAGER"
-              ? "Comunidades da sua organização."
-              : "Comunidades cadastradas nas organizações."}
+            Comunidades cadastradas nesta organização.
           </p>
         </div>
-        {canCreate && (
+        {canManage && (
           <Button type="button" size="sm" onClick={openCreateDialog}>
             <Plus />
             Nova Comunidade
@@ -176,7 +206,6 @@ export function CommunitiesPage() {
           <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
             <TableRow className="hover:bg-transparent">
               <TableHead>Nome</TableHead>
-              <TableHead>Organização</TableHead>
               {canManage && (
                 <TableHead className="w-[1%] text-right">Ações</TableHead>
               )}
@@ -199,19 +228,19 @@ export function CommunitiesPage() {
                   colSpan={columnCount}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
-                  {currentRole === "MANAGER" && myOrgId
-                    ? "Nenhuma comunidade cadastrada na sua organização ainda."
-                    : "Nenhuma comunidade cadastrada ainda."}
+                  Nenhuma comunidade cadastrada nesta organização ainda.
                 </TableCell>
               </TableRow>
             ) : (
               sortedCommunities.map((community) => (
                 <TableRow key={community.id}>
                   <TableCell className="font-medium text-foreground">
-                    {community.name}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {community.organization.name}
+                    <Link
+                      href={`/admin/organizacoes/${orgId}/comunidades/${community.id}`}
+                      className="hover:underline"
+                    >
+                      {community.name}
+                    </Link>
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">
@@ -237,8 +266,7 @@ export function CommunitiesPage() {
         <CommunityFormDialog
           mode={dialogMode}
           role={currentRole}
-          // Só o MANAGER usa esta prop; o ADMIN escolhe no seletor.
-          organizationId={currentRole === "MANAGER" ? myOrgId : null}
+          organizationId={orgId}
           community={dialogCommunity}
           open={dialogOpen}
           onOpenChange={(open) => {

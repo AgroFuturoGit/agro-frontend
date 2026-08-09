@@ -49,77 +49,84 @@ function renderSidebarNav() {
   );
 }
 
-describe("SidebarNav — RBAC de navegação (spec.md §2 Objective #3, CHECKLIST-F01)", () => {
+/**
+ * A navegação em cascata (Organização → Comunidade → Produtor → Planos,
+ * plano `navegacao-cascata-organizacoes`) removeu "Comunidades",
+ * "Produtores" e "Planos de Produção" como itens de sidebar próprios —
+ * `/admin/organizacoes` passou a ser o único ponto de entrada, visível às 4
+ * roles (cada uma pousa no nível certo dentro do próprio componente).
+ */
+describe("SidebarNav — RBAC de navegação", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
   });
 
   it.each(["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"] as const)(
-    "exibe 'Planos de Produção' e 'Relatórios' para role=%s (sem regressão)",
+    "exibe 'Organizações' e 'Relatórios' para role=%s (ponto de entrada único da hierarquia)",
     async (role) => {
       mockRole(role);
       renderSidebarNav();
 
-      expect(await screen.findByText("Planos de Produção")).toBeTruthy();
+      expect(await screen.findByText("Organizações")).toBeTruthy();
       expect(screen.getByText("Relatórios")).toBeTruthy();
-      // não deve mais existir o rótulo antigo
-      expect(screen.queryByText("Cultivos")).toBeNull();
     },
   );
 
-  it("link de 'Planos de Produção' aponta para /admin/cultivos (URL inalterada)", async () => {
-    mockRole("PRODUCER");
+  it.each(["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"] as const)(
+    "não exibe mais os itens antigos 'Comunidades', 'Produtores' e 'Planos de Produção' para role=%s",
+    async (role) => {
+      mockRole(role);
+      renderSidebarNav();
+
+      await screen.findByText("Organizações");
+      expect(screen.queryByText("Comunidades")).toBeNull();
+      expect(screen.queryByText("Produtores")).toBeNull();
+      expect(screen.queryByText("Planos de Produção")).toBeNull();
+    },
+  );
+
+  it("link de 'Organizações' aponta para /admin/organizacoes", async () => {
+    mockRole("ADMIN");
     renderSidebarNav();
 
-    const link = await screen.findByRole("link", { name: /Planos de Produção/i });
-    expect(link.getAttribute("href")).toBe("/admin/cultivos");
+    const link = await screen.findByRole("link", { name: /Organizações/i });
+    expect(link.getAttribute("href")).toBe("/admin/organizacoes");
   });
 
   it("item restrito (Perfis) permanece oculto para role sem permissão (não-regressão)", async () => {
     mockRole("PRODUCER");
     renderSidebarNav();
 
-    await screen.findByText("Planos de Produção");
+    await screen.findByText("Organizações");
     expect(screen.queryByText("Perfis")).toBeNull();
   });
 
-  it("exibe 'Organizações' para role=ADMIN", async () => {
+  it("exibe 'Perfis' apenas para role=ADMIN (não-regressão)", async () => {
     mockRole("ADMIN");
     renderSidebarNav();
 
-    expect(await screen.findByText("Organizações")).toBeTruthy();
+    expect(await screen.findByText("Perfis")).toBeTruthy();
   });
 
-  it.each(["MANAGER", "TECHNICIAN", "PRODUCER"] as const)(
-    "esconde 'Organizações' para role=%s",
-    async (role) => {
-      mockRole(role);
-      renderSidebarNav();
-
-      await screen.findByText("Planos de Produção");
-      expect(screen.queryByText("Organizações")).toBeNull();
-    },
-  );
-
   it.each(["ADMIN", "MANAGER"] as const)(
-    "exibe 'Comunidades' para role=%s",
+    "exibe 'Usuários' para role=%s (não-regressão)",
     async (role) => {
       mockRole(role);
       renderSidebarNav();
 
-      expect(await screen.findByText("Comunidades")).toBeTruthy();
+      expect(await screen.findByText("Usuários")).toBeTruthy();
     },
   );
 
   it.each(["TECHNICIAN", "PRODUCER"] as const)(
-    "esconde 'Comunidades' para role=%s",
+    "esconde 'Usuários' para role=%s (não-regressão)",
     async (role) => {
       mockRole(role);
       renderSidebarNav();
 
-      await screen.findByText("Planos de Produção");
-      expect(screen.queryByText("Comunidades")).toBeNull();
+      await screen.findByText("Organizações");
+      expect(screen.queryByText("Usuários")).toBeNull();
     },
   );
 });

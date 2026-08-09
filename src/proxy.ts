@@ -7,19 +7,21 @@ const AUTH_ROLE_COOKIE = "agro_role";
 
 const VALID_ROLES: Role[] = ["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"];
 
-const ADMIN_ONLY_PREFIXES = ["/admin/perfis", "/admin/organizacoes"];
-const ADMIN_OR_MANAGER_PREFIXES = [
-  "/admin/usuarios",
-  "/admin/produtores",
-  "/admin/comunidades",
-];
-const PRODUCER_ONLY_PREFIXES = ["/admin/cultivos", "/admin/relatorios"];
+const ADMIN_ONLY_PREFIXES = ["/admin/perfis"];
+const ADMIN_OR_MANAGER_PREFIXES = ["/admin/usuarios"];
+// `/admin/organizacoes` (e toda a navegação em cascata Organização →
+// Comunidade → Produtor → Planos aninhada sob ela) e `/admin/relatorios`
+// são compartilhadas pelas 4 roles — cada uma pousa no nível/escopo certo
+// dentro dos próprios componentes (`organizations-page.tsx` etc.), não no
+// proxy. `/admin/cultivos` foi removido nesta rota: a navegação de planos
+// de produção agora vive só sob `/admin/organizacoes/.../produtores/...`.
+const PRODUCER_ONLY_PREFIXES = ["/admin/relatorios"];
 
-// Estas rotas eram exclusivas de PRODUCER. Agora ADMIN, MANAGER e TECHNICIAN
-// também precisam consultar planos de produção e relatórios, então o grupo
-// libera as 4 roles válidas — na prática a checagem abaixo não bloqueia mais
-// ninguém, mas ela é mantida explícita (junto da constante) para documentar o
-// grupo e servir de ponto de extensão caso a restrição volte a existir.
+// Este grupo era exclusivo de PRODUCER. Agora ADMIN, MANAGER e TECHNICIAN
+// também precisam consultar relatórios, então o grupo libera as 4 roles
+// válidas — na prática a checagem abaixo não bloqueia mais ninguém, mas ela
+// é mantida explícita (junto da constante) para documentar o grupo e servir
+// de ponto de extensão caso a restrição volte a existir.
 const PRODUCER_GROUP_ALLOWED_ROLES: Role[] = [
   "ADMIN",
   "MANAGER",

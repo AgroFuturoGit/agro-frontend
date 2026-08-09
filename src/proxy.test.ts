@@ -3,26 +3,42 @@ import { NextRequest } from "next/server";
 import { proxy, resolveAccess } from "@/proxy";
 
 /**
- * Matriz completa de spec.md §5 (F01-rbac-navegacao + F02-organizacoes-comunidades):
+ * Matriz completa (F01-rbac-navegacao + F02-organizacoes-comunidades +
+ * navegacao-cascata-organizacoes):
  *
- * | Role / Cookie          | /admin/perfis        | /admin/usuarios, /admin/produtores | /admin/cultivos, /admin/relatorios | /admin, /admin/culturas, /admin/safras | /admin/organizacoes | /admin/comunidades |
- * |-------------------------|----------------------|-------------------------------------|-------------------------------------|------------------------------------------|----------------------|----------------------|
- * | ADMIN                   | permitido            | permitido                           | permitido (novo)                    | permitido                                | permitido (novo)     | permitido (novo)     |
- * | MANAGER                  | redirect /admin      | permitido                           | permitido (novo)                    | permitido                                | redirect /admin (novo) | permitido (novo)   |
- * | TECHNICIAN               | redirect /admin      | redirect /admin                     | permitido (novo)                    | permitido                                | redirect /admin (novo) | redirect /admin (novo) |
- * | PRODUCER                 | redirect /admin      | redirect /admin                     | permitido (sem regressão)           | permitido                                | redirect /admin (novo) | redirect /admin (novo) |
- * | ausente (undefined)      | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          | redirect /login (novo) | redirect /login (novo) |
- * | corrompida ("HACKER")    | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          | redirect /login (novo) | redirect /login (novo) |
- * | lowercase ("admin")      | redirect /login      | redirect /login                     | redirect /login                     | redirect /login                          | redirect /login (novo) | redirect /login (novo) |
+ * A navegação em cascata (Organização → Comunidade → Produtor → Planos)
+ * removeu `/admin/produtores`, `/admin/comunidades` e `/admin/cultivos` —
+ * substituídas por rotas aninhadas sob `/admin/organizacoes/...`. O proxy
+ * não restringe mais `/admin/organizacoes` por prefixo de role: as 4 roles
+ * válidas passam por ele (`ADMIN`/`TECHNICIAN` veem a lista completa,
+ * `MANAGER`/`PRODUCER` são redirecionados client-side para o próprio
+ * recurso — guarda de ownership feita nos componentes, não aqui).
+ *
+ * | Role / Cookie          | /admin/perfis        | /admin/usuarios      | /admin/relatorios | /admin, /admin/culturas, /admin/safras, /admin/organizacoes (e aninhadas) |
+ * |-------------------------|----------------------|-----------------------|--------------------|------------------------------------------------------------------------------|
+ * | ADMIN                   | permitido            | permitido             | permitido          | permitido                                                                     |
+ * | MANAGER                  | redirect /admin      | permitido             | permitido          | permitido (guarda de ownership é client-side, não no proxy)                  |
+ * | TECHNICIAN               | redirect /admin      | redirect /admin       | permitido          | permitido                                                                     |
+ * | PRODUCER                 | redirect /admin      | redirect /admin       | permitido          | permitido (resolução/guarda são client-side)                                 |
+ * | ausente (undefined)      | redirect /login      | redirect /login       | redirect /login    | redirect /login                                                               |
+ * | corrompida ("HACKER")    | redirect /login      | redirect /login       | redirect /login    | redirect /login                                                               |
+ * | lowercase ("admin")      | redirect /login      | redirect /login       | redirect /login    | redirect /login                                                               |
  */
 
 const ROUTE_GROUPS: Record<string, string[]> = {
   "/admin/perfis": ["/admin/perfis"],
-  "/admin/usuarios, /admin/produtores": ["/admin/usuarios", "/admin/produtores"],
-  "/admin/cultivos, /admin/relatorios": ["/admin/cultivos", "/admin/relatorios"],
-  "/admin, /admin/culturas, /admin/safras": ["/admin", "/admin/culturas", "/admin/safras"],
-  "/admin/organizacoes": ["/admin/organizacoes"],
-  "/admin/comunidades": ["/admin/comunidades"],
+  "/admin/usuarios": ["/admin/usuarios"],
+  "/admin/relatorios": ["/admin/relatorios"],
+  "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": [
+    "/admin",
+    "/admin/culturas",
+    "/admin/safras",
+    "/admin/organizacoes",
+    "/admin/organizacoes/org-1",
+    "/admin/organizacoes/org-1/comunidades/community-1",
+    "/admin/organizacoes/org-1/comunidades/community-1/produtores/producer-1",
+    "/admin/organizacoes/org-1/comunidades/community-1/produtores/producer-1/planos/plan-1",
+  ],
 };
 
 type Expectation = { action: "next" } | { action: "redirect"; to: string };
@@ -35,35 +51,27 @@ const REDIRECT_LOGIN: Expectation = { action: "redirect", to: "/login" };
 const VALID_ROLE_MATRIX: Record<string, Record<string, Expectation>> = {
   ADMIN: {
     "/admin/perfis": NEXT,
-    "/admin/usuarios, /admin/produtores": NEXT,
-    "/admin/cultivos, /admin/relatorios": NEXT,
-    "/admin, /admin/culturas, /admin/safras": NEXT,
-    "/admin/organizacoes": NEXT,
-    "/admin/comunidades": NEXT,
+    "/admin/usuarios": NEXT,
+    "/admin/relatorios": NEXT,
+    "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": NEXT,
   },
   MANAGER: {
     "/admin/perfis": REDIRECT_ADMIN,
-    "/admin/usuarios, /admin/produtores": NEXT,
-    "/admin/cultivos, /admin/relatorios": NEXT,
-    "/admin, /admin/culturas, /admin/safras": NEXT,
-    "/admin/organizacoes": REDIRECT_ADMIN,
-    "/admin/comunidades": NEXT,
+    "/admin/usuarios": NEXT,
+    "/admin/relatorios": NEXT,
+    "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": NEXT,
   },
   TECHNICIAN: {
     "/admin/perfis": REDIRECT_ADMIN,
-    "/admin/usuarios, /admin/produtores": REDIRECT_ADMIN,
-    "/admin/cultivos, /admin/relatorios": NEXT,
-    "/admin, /admin/culturas, /admin/safras": NEXT,
-    "/admin/organizacoes": REDIRECT_ADMIN,
-    "/admin/comunidades": REDIRECT_ADMIN,
+    "/admin/usuarios": REDIRECT_ADMIN,
+    "/admin/relatorios": NEXT,
+    "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": NEXT,
   },
   PRODUCER: {
     "/admin/perfis": REDIRECT_ADMIN,
-    "/admin/usuarios, /admin/produtores": REDIRECT_ADMIN,
-    "/admin/cultivos, /admin/relatorios": NEXT,
-    "/admin, /admin/culturas, /admin/safras": NEXT,
-    "/admin/organizacoes": REDIRECT_ADMIN,
-    "/admin/comunidades": REDIRECT_ADMIN,
+    "/admin/usuarios": REDIRECT_ADMIN,
+    "/admin/relatorios": NEXT,
+    "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": NEXT,
   },
 };
 
@@ -75,7 +83,7 @@ const INVALID_ROLE_VARIANTS: Record<string, string | undefined> = {
   'lowercase ("admin")': "admin",
 };
 
-describe("resolveAccess — matriz de RBAC (spec.md §5)", () => {
+describe("resolveAccess — matriz de RBAC", () => {
   describe.each(Object.entries(VALID_ROLE_MATRIX))("role=%s", (role, routeExpectations) => {
     it.each(Object.entries(routeExpectations))(
       `%s → ${role}`,
@@ -158,8 +166,8 @@ describe("proxy — tradução para NextResponse (NextRequest real)", () => {
     );
   });
 
-  it("MANAGER acessando /admin/cultivos → NextResponse.next (sem redirecionamento)", () => {
-    const request = new NextRequest("http://localhost:3000/admin/cultivos", {
+  it("MANAGER acessando /admin/organizacoes → NextResponse.next (sem redirecionamento no proxy — guarda de ownership é client-side)", () => {
+    const request = new NextRequest("http://localhost:3000/admin/organizacoes", {
       headers: {
         cookie: "agro_token=valid-token; agro_role=MANAGER",
       },

@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api";
+import type { Organization, OrganizationApiResponse } from "@/lib/organizations";
 
 export type Producer = {
   id: string;
@@ -13,6 +14,15 @@ export type Producer = {
   community: {
     id: string;
     name: string;
+    /**
+     * `GET /producers/me` (e `GET /producers`/`GET /producers/{id}`) já
+     * devolve o `CommunityResponseDTO` completo, com a organização aninhada
+     * (ver `ProducerResponseDTO.java`). Mapear esse campo evita ter que
+     * chamar `GET /communities/{id}` (proibido para PRODUCER,
+     * `hasRole('MANAGER') or hasRole('ADMIN')` em `CommunityController`) só
+     * para resolver o nome da organização na navegação em cascata.
+     */
+    organization: Organization | null;
   } | null;
 };
 
@@ -29,6 +39,7 @@ type ProducerApiResponse = {
   community: {
     id: string;
     name: string;
+    organization: OrganizationApiResponse | null;
   } | null;
 };
 
@@ -46,7 +57,18 @@ function mapProducer(raw: ProducerApiResponse): Producer {
         }
       : null,
     community: raw.community
-      ? { id: raw.community.id, name: raw.community.name }
+      ? {
+          id: raw.community.id,
+          name: raw.community.name,
+          organization: raw.community.organization
+            ? {
+                id: raw.community.organization.id,
+                name: raw.community.organization.name,
+                taxId: raw.community.organization.taxId,
+                type: raw.community.organization.type,
+              }
+            : null,
+        }
       : null,
   };
 }

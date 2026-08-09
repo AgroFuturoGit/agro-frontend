@@ -92,10 +92,14 @@ export function CommunityFormDialog({
 }: Props) {
   const isCreate = mode === "create";
   const isAdmin = role === "ADMIN";
-  // O seletor só existe para ADMIN criando uma comunidade: a organização
-  // de uma comunidade existente não é editável (PUT /communities/{id} só
-  // aceita `name`) e o MANAGER nunca escolhe organização.
-  const showOrganizationSelect = isCreate && isAdmin;
+  // O seletor só existia para ADMIN criando uma comunidade a partir de uma
+  // tela sem organização fixa. Desde a navegação em cascata
+  // (`organization-communities-page.tsx`), este diálogo é SEMPRE aberto de
+  // dentro do contexto de uma organização já conhecida — `organizationId`
+  // vem preenchido para ADMIN e MANAGER igualmente. O seletor só reaparece
+  // se, no futuro, algum chamador voltar a abrir o diálogo sem organização
+  // resolvida.
+  const showOrganizationSelect = isCreate && isAdmin && !organizationId;
 
   const [values, setValues] = useState<FormValues>(EMPTY);
   const [initialValues, setInitialValues] = useState<FormValues>(EMPTY);

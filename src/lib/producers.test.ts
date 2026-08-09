@@ -15,6 +15,13 @@ vi.mock("@/lib/api", () => ({
 
 const apiRequestMock = vi.mocked(apiRequest);
 
+const RAW_ORGANIZATION = {
+  id: "org-1",
+  name: "Cooperativa Boa Vista",
+  taxId: "11222333000181",
+  type: "COOP",
+};
+
 const RAW_PRODUCER = {
   id: "prod-1",
   aliasName: "Sítio Boa Esperança",
@@ -25,7 +32,11 @@ const RAW_PRODUCER = {
     email: "joao@agro.com",
     cpf: "55566677788",
   },
-  community: { id: "com-1", name: "Comunidade Boa Vista" },
+  community: {
+    id: "com-1",
+    name: "Comunidade Boa Vista",
+    organization: RAW_ORGANIZATION,
+  },
 };
 
 const MAPPED_PRODUCER = {
@@ -38,7 +49,11 @@ const MAPPED_PRODUCER = {
     email: "joao@agro.com",
     cpf: "55566677788",
   },
-  community: { id: "com-1", name: "Comunidade Boa Vista" },
+  community: {
+    id: "com-1",
+    name: "Comunidade Boa Vista",
+    organization: RAW_ORGANIZATION,
+  },
 };
 
 beforeEach(() => {

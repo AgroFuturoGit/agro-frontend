@@ -75,7 +75,21 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
   test("ADMIN cria uma Organização e depois cria um Manager para ela", async ({
     page,
   }) => {
-    await loginAs(page, "ADMIN");
+    // `user` é obrigatório aqui: desde a navegação em cascata,
+    // `organizations-page.tsx` gateia "Nova Organização"/"Editar"/"Criar
+    // Manager" por role (`readUserFromStorage()`, populado via
+    // `localStorage["agro_user"]`) — TECHNICIAN também alcança esta lista
+    // agora e só ADMIN pode escrever (lição
+    // `role-gating-must-cover-all-write-affordances`). Sem o `user` fabricado
+    // aqui, `currentRole` nunca resolve e o botão não aparece.
+    await loginAs(page, "ADMIN", {
+      id: "admin-user-1",
+      fullName: "Adriana Admin",
+      email: "adriana.admin@example.com",
+      cpf: "00011122233",
+      role: "ADMIN",
+      dateOfBirth: null,
+    });
 
     const organizationId = "11111111-1111-1111-1111-111111111111";
     const organizationName = "Cooperativa Vale Verde";
@@ -198,7 +212,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
     ).toBeVisible();
   });
 
-  test("MANAGER acessa /admin/comunidades e cria uma Comunidade sem ver seletor de organização", async ({
+  test("MANAGER acessa /admin/organizacoes, é redirecionado para a própria organização e cria uma Comunidade sem ver seletor", async ({
     page,
   }) => {
     const myOrganization = {
@@ -280,13 +294,16 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
       });
     });
 
-    await page.goto("/admin/comunidades");
-    await expect(page).toHaveURL(/\/admin\/comunidades/);
+    // `/admin/organizacoes` é o único ponto de entrada da hierarquia — o
+    // MANAGER é redirecionado automaticamente para a própria organização,
+    // sem nunca ver a lista completa (plano `navegacao-cascata-organizacoes`).
+    await page.goto("/admin/organizacoes");
+    await expect(page).toHaveURL(
+      new RegExp(`/admin/organizacoes/${myOrganization.id}$`),
+    );
 
     await expect(
-      page.getByText(
-        "Nenhuma comunidade cadastrada na sua organização ainda.",
-      ),
+      page.getByText("Nenhuma comunidade cadastrada nesta organização ainda."),
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Nova Comunidade" }).click();

@@ -6,12 +6,9 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Building2,
-  Home,
-  Leaf,
   LayoutDashboard,
   ShieldCheck,
   Sprout,
-  Users,
   UserCog,
   Wheat,
   type LucideIcon,
@@ -47,25 +44,15 @@ const NAV_ITEMS: NavItem[] = [
   },
   { href: "/admin/culturas", label: "Culturas", icon: Wheat },
   {
-    href: "/admin/produtores",
-    label: "Produtores",
-    icon: Users,
-    roles: ["ADMIN", "MANAGER"],
-  },
-  {
     href: "/admin/organizacoes",
     label: "Organizações",
     icon: Building2,
-    roles: ["ADMIN"],
-  },
-  {
-    href: "/admin/comunidades",
-    label: "Comunidades",
-    icon: Home,
-    roles: ["ADMIN", "MANAGER"],
+    // Ponto de entrada único da navegação em cascata (Organização →
+    // Comunidade → Produtor → Planos): visível às 4 roles. Cada role pousa
+    // no nível certo dentro de `organizations-page.tsx` — MANAGER e
+    // PRODUCER são redirecionados automaticamente, nunca escolhem pela UI.
   },
   { href: "/admin/safras", label: "Safras", icon: Sprout },
-  { href: "/admin/cultivos", label: "Planos de Produção", icon: Leaf },
   { href: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },
 ];
 

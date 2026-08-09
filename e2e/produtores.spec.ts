@@ -122,8 +122,8 @@ async function mockMyManager(page: Page) {
   });
 }
 
-test.describe("Produtores — cadastro e filtro por comunidade", () => {
-  test("MANAGER cadastra um produtor vinculado a uma comunidade e ele aparece na listagem", async ({
+test.describe("Produtores — cadastro escopado por comunidade (navegação em cascata)", () => {
+  test("MANAGER navega até uma comunidade e cadastra um produtor vinculado a ela", async ({
     page,
   }) => {
     await loginAs(page, "MANAGER", MANAGER_USER);
@@ -132,7 +132,10 @@ test.describe("Produtores — cadastro e filtro por comunidade", () => {
     // Estado fabricado do "backend": o POST alimenta o GET seguinte.
     let producers: Record<string, unknown>[] = [];
 
-    await page.route("**/communities*", async (route) => {
+    // `GET /communities/{id}` — usado por `community-producers-page.tsx`
+    // para resolver breadcrumb (organização + comunidade) e a guarda de
+    // ownership do MANAGER.
+    await page.route(`**/communities/${COMMUNITY_A.id}`, async (route) => {
       if (route.request().method() !== "GET") {
         await route.fallback();
         return;
@@ -140,7 +143,7 @@ test.describe("Produtores — cadastro e filtro por comunidade", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify([COMMUNITY_A, COMMUNITY_B]),
+        body: JSON.stringify(COMMUNITY_A),
       });
     });
 
@@ -192,10 +195,12 @@ test.describe("Produtores — cadastro e filtro por comunidade", () => {
       });
     });
 
-    await page.goto("/admin/produtores");
+    // Navegação direta ao nível de comunidade (equivalente a ter clicado
+    // Organizações → esta organização → esta comunidade).
+    await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}`);
 
     await expect(
-      page.getByText("Nenhum produtor cadastrado ainda."),
+      page.getByText("Nenhum produtor cadastrado nesta comunidade ainda."),
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Novo Produtor" }).click();
@@ -203,6 +208,9 @@ test.describe("Produtores — cadastro e filtro por comunidade", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
+    // A comunidade já vem resolvida da rota — o diálogo tem só uma opção,
+    // mas ainda pede a escolha explícita (nenhuma mudança de contrato do
+    // `ProducerRegisterDialog`).
     await dialog.getByRole("combobox").click();
     await page.getByRole("option", { name: COMMUNITY_A.name }).click();
 
@@ -232,26 +240,26 @@ test.describe("Produtores — cadastro e filtro por comunidade", () => {
     await expect(dialog).toBeHidden();
 
     await expect(page.getByRole("cell", { name: producerName })).toBeVisible();
-    await expect(
-      page.getByRole("cell", { name: COMMUNITY_A.name }),
-    ).toBeVisible();
   });
 
-  test("MANAGER filtra a listagem por comunidade e restaura com 'Todas as comunidades'", async ({
+  test("comunidades diferentes mostram produtores diferentes — o escopo agora vem da rota, sem filtro em tela", async ({
     page,
   }) => {
     await loginAs(page, "MANAGER", MANAGER_USER);
     await mockMyManager(page);
 
-    await page.route("**/communities*", async (route) => {
+    await page.route("**/communities/*", async (route) => {
       if (route.request().method() !== "GET") {
         await route.fallback();
         return;
       }
+      const community = route.request().url().includes(COMMUNITY_A.id)
+        ? COMMUNITY_A
+        : COMMUNITY_B;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify([COMMUNITY_A, COMMUNITY_B]),
+        body: JSON.stringify(community),
       });
     });
 
@@ -281,7 +289,8 @@ test.describe("Produtores — cadastro e filtro por comunidade", () => {
     };
 
     // `GET /producers` só aceita `?communityId=` — o backend fabricado
-    // reproduz exatamente esse contrato.
+    // reproduz exatamente esse contrato. Sem filtro em tela: cada URL de
+    // comunidade já traz `communityId` fixo via `listProducers(communityId)`.
     await page.route("**/producers*", async (route) => {
       const request = route.request();
       if (request.method() !== "GET") {
@@ -302,28 +311,20 @@ test.describe("Produtores — cadastro e filtro por comunidade", () => {
       });
     });
 
-    await page.goto("/admin/produtores");
-
-    await expect(page.getByRole("cell", { name: "Ana Serrana" })).toBeVisible();
-    await expect(
-      page.getByRole("cell", { name: "Bruno do Vale" }),
-    ).toBeVisible();
-
-    const filter = page.getByRole("combobox", { name: "Comunidade" });
-    await filter.click();
-    await page.getByRole("option", { name: COMMUNITY_A.name }).click();
+    await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}`);
 
     await expect(page.getByRole("cell", { name: "Ana Serrana" })).toBeVisible();
     await expect(
       page.getByRole("cell", { name: "Bruno do Vale" }),
     ).toBeHidden();
+    // Não existe mais seletor de comunidade nesta tela — o escopo é a URL.
+    await expect(page.getByRole("combobox")).toHaveCount(0);
 
-    await filter.click();
-    await page.getByRole("option", { name: "Todas as comunidades" }).click();
+    await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_B.id}`);
 
-    await expect(page.getByRole("cell", { name: "Ana Serrana" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Bruno do Vale" })).toBeVisible();
     await expect(
-      page.getByRole("cell", { name: "Bruno do Vale" }),
-    ).toBeVisible();
+      page.getByRole("cell", { name: "Ana Serrana" }),
+    ).toBeHidden();
   });
 });

@@ -55,7 +55,11 @@ const REGISTERED_PRODUCER: Producer = {
     email: "jose@agro.com",
     cpf: "12345678901",
   },
-  community: { id: "community-1", name: "Comunidade Alfa" },
+  community: {
+    id: "community-1",
+    name: "Comunidade Alfa",
+    organization: COMMUNITIES[0].organization,
+  },
 };
 
 function renderDialog(onCreated: () => void = () => {}) {

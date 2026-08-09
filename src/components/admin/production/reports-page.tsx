@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api";
-import { getMyProducer } from "@/lib/producers";
+import { getMyProducer, type Producer } from "@/lib/producers";
 import {
   formatNumber,
   getProductionComparison,
@@ -32,6 +32,13 @@ type PlanReport = {
 
 export function ReportsPage() {
   const [reports, setReports] = useState<PlanReport[]>([]);
+  // `ReportsPage` só é alcançável via `GET /producers/me` (`hasRole
+  // ('PRODUCER')` no backend) — guardado aqui só para montar o link "Ver
+  // detalhes" com a URL aninhada correta
+  // (`/admin/organizacoes/{orgId}/comunidades/{communityId}/produtores/
+  // {producerId}/planos/{planId}`), já que `/admin/cultivos/{planId}` não
+  // existe mais.
+  const [producer, setProducer] = useState<Producer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,8 +46,9 @@ export function ReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const producer = await getMyProducer();
-      const plans = await listProductionPlans(producer.id);
+      const producerData = await getMyProducer();
+      setProducer(producerData);
+      const plans = await listProductionPlans(producerData.id);
       const data = await Promise.all(
         plans.map(async (plan) => {
           try {
@@ -294,7 +302,13 @@ export function ReportsPage() {
                       nativeButton={false}
                       className="mt-1 self-start"
                       render={
-                        <Link href={`/admin/cultivos/${plan.id}`}>
+                        <Link
+                          href={
+                            producer?.community?.organization
+                              ? `/admin/organizacoes/${producer.community.organization.id}/comunidades/${producer.community.id}/produtores/${producer.id}/planos/${plan.id}`
+                              : "/admin/organizacoes"
+                          }
+                        >
                           Ver detalhes
                           <ArrowRight />
                         </Link>

@@ -207,7 +207,10 @@ describe("registerProducer", () => {
         email: "joao@agro.com",
         cpf: "55566677788",
       },
-      community: { id: "com-1", name: "Comunidade Boa Vista" },
+      // O DTO de resposta do registro não é usado como fonte da organização
+      // em nenhum fluxo — `registerProducer` sempre normaliza para `null`
+      // (ver `src/lib/communities.ts`).
+      community: { id: "com-1", name: "Comunidade Boa Vista", organization: null },
     });
   });
 
