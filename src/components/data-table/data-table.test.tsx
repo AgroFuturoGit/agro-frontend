@@ -128,6 +128,28 @@ describe("DataTable — ordenação por cabeçalho clicável", () => {
     expect(header.getAttribute("aria-sort")).toBeNull();
     expect(screen.queryByRole("button", { name: "Categoria" })).toBeNull();
   });
+
+  it("é ativável por teclado (Enter no botão focado), não só por clique de mouse", () => {
+    render(<TestHost />);
+
+    const button = screen.getByRole("button", { name: "Rótulo" });
+
+    // O botão é um `<button type="button">` nativo (sem onKeyDown próprio),
+    // por isso a ativação por Enter/Space depende inteiramente do
+    // comportamento nativo do elemento, que o jsdom não sintetiza em
+    // `click` a partir de `keydown`/`keyup` (limitação documentada do
+    // jsdom, motivo de existir o `@testing-library/user-event`, não
+    // instalado neste projeto). Focamos o botão e confirmamos que ele é de
+    // fato alcançável por teclado antes de simular o `click` nativo que um
+    // browser real dispararia ao pressionar Enter com o foco nele.
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    fireEvent.keyDown(button, { key: "Enter" });
+    fireEvent.click(button);
+    expect(bodyLabels()).toEqual(["Ana", "Bruno", "Carlos"]);
+    expect(sortableHeader().getAttribute("aria-sort")).toBe("ascending");
+  });
 });
 
 describe("DataTable — estado de carregamento", () => {
