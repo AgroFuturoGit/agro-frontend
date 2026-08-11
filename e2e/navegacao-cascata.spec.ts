@@ -14,17 +14,14 @@ import type { Page } from "@playwright/test";
  * `navegacao-cascata-organizacoes`: Organização → Comunidade → Produtor →
  * Planos → Detalhe, um único ponto de entrada em `/admin/organizacoes`.
  *
- * NOTA IMPORTANTE (achado de verificação de backend, não corrigido aqui —
- * fora de escopo por proibição explícita do plano): contra o backend real
- * (`agro-backend`), `GET /organizations` e `GET /organizations/{id}` são
- * `hasRole('ADMIN')` (não incluem MANAGER nem TECHNICIAN) e
- * `GET /communities`/`GET /communities/{id}`/`GET /producers` são
- * `hasRole('MANAGER') or hasRole('ADMIN')` (não incluem TECHNICIAN nem
- * PRODUCER). Isso significa que, contra o backend real, TECHNICIAN não
- * consegue de fato listar organizações (403) — o cenário "TECHNICIAN vê a
- * lista completa" abaixo prova o comportamento da UI assumindo que a API
- * responde (mock), não a integração real. Ver `plan.done.md` para o achado
- * completo.
+ * NOTA (histórico): até `relatorio-evidencias-f03/relatorio-navegacao-
+ * cascata-08-08.pdf`, TECHNICIAN era tratado como ADMIN nesta navegação
+ * (mesma lista de organizações), o que 403ava contra o backend real —
+ * `GET /organizations` é `hasRole('ADMIN')`. A resposta do backend em
+ * `issues-fix-back.pdf` (itens 7/8) trocou o desenho: TECHNICIAN não navega
+ * mais pela cascata institucional, ele cai direto na lista de produtores
+ * atribuídos a ele via `GET /technicians/me/producers`. Ver o cenário
+ * "TECHNICIAN cai direto na lista de produtores atendidos" abaixo.
  */
 
 const AUTH_TOKEN_COOKIE = "agro_token";
@@ -255,6 +252,16 @@ async function mockMyProducer(page: Page, producer = PRODUCER) {
   });
 }
 
+async function mockMyAssignedProducers(page: Page, producers = [PRODUCER]) {
+  await page.route("**/technicians/me/producers", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(producers),
+    });
+  });
+}
+
 async function mockPlansForProducer(page: Page, plans: unknown[] = [PLAN]) {
   await page.route(`**/producers/${PRODUCER.id}/production-plans`, async (route) => {
     await route.fulfill({
@@ -417,18 +424,54 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     expect(otherOrgDataRequested).toBe(false);
   });
 
-  test("TECHNICIAN vê a lista completa em /admin/organizacoes (mesmo comportamento do ADMIN)", async ({
+  test("TECHNICIAN cai direto na lista de produtores atendidos, sem passar pela cascata institucional", async ({
     page,
   }) => {
     await loginAs(page, "TECHNICIAN", TECHNICIAN_USER);
-    await mockOrganizations(page);
+    await mockMyAssignedProducers(page);
 
     await page.goto("/admin/organizacoes");
 
-    await expect(page.getByRole("link", { name: ORGANIZATION.name })).toBeVisible();
-    // TECHNICIAN só lê: sem afordância de escrita nesta lista (@PreAuthorize
-    // de `OrganizationController.java` restringe escrita a ADMIN).
-    await expect(page.getByRole("button", { name: "Nova Organização" })).toHaveCount(0);
+    // Fica na mesma URL (`/admin/organizacoes`), mas não é a lista de
+    // organizações — é a lista de produtores atribuídos via
+    // `GET /technicians/me/producers` (issues-fix-back.pdf itens 7/8).
+    await expect(page).toHaveURL(/\/admin\/organizacoes$/);
+    await expect(
+      page.getByRole("heading", { name: "Meus produtores atendidos" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: PRODUCER.user.fullName }),
+    ).toBeVisible();
+    await expect(page.getByText(ORGANIZATION.name)).toBeVisible();
+    await expect(page.getByText(COMMUNITY.name)).toBeVisible();
+  });
+
+  test("TECHNICIAN abre um produtor atendido e chega nos planos dele", async ({
+    page,
+  }) => {
+    await loginAs(page, "TECHNICIAN", TECHNICIAN_USER);
+    await mockMyAssignedProducers(page);
+    await mockPlansForProducer(page, [PLAN]);
+    // `GET /communities/{id}` e `GET /producers` continuam
+    // `hasRole('MANAGER') or hasRole('ADMIN')` no backend real — o
+    // breadcrumb da página de planos precisa tolerar o 403 e cair em
+    // rótulos genéricos, sem impedir a listagem de planos de carregar.
+    await page.route(`**/communities/${COMMUNITY.id}`, async (route) => {
+      await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
+    });
+    await page.route("**/producers?*", async (route) => {
+      await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
+    });
+
+    await page.goto("/admin/organizacoes");
+    await page.getByRole("link", { name: PRODUCER.user.fullName }).click();
+
+    await expect(page).toHaveURL(
+      new RegExp(
+        `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY.id}/produtores/${PRODUCER.id}$`,
+      ),
+    );
+    await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
   });
 
   test("PRODUCER acessando /admin/organizacoes cai direto nos próprios planos, com breadcrumb real", async ({
@@ -513,6 +556,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
         await mockMyManager(page);
         await mockMyProducer(page);
         await mockOrganizations(page);
+        await mockMyAssignedProducers(page, []);
         await mockCommunitiesList(page, []);
         await mockPlansForProducer(page, []);
 

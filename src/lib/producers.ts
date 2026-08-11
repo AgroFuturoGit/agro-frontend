@@ -26,7 +26,7 @@ export type Producer = {
   } | null;
 };
 
-type ProducerApiResponse = {
+export type ProducerApiResponse = {
   id: string;
   aliasName: string | null;
   isCompliant: boolean | null;
@@ -43,7 +43,7 @@ type ProducerApiResponse = {
   } | null;
 };
 
-function mapProducer(raw: ProducerApiResponse): Producer {
+export function mapProducer(raw: ProducerApiResponse): Producer {
   return {
     id: raw.id,
     aliasName: raw.aliasName ?? null,

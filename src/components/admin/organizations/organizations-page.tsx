@@ -25,7 +25,8 @@ import {
   ORGANIZATION_TYPE_LABELS,
   type Organization,
 } from "@/lib/organizations";
-import { getMyProducer } from "@/lib/producers";
+import { getMyProducer, type Producer } from "@/lib/producers";
+import { getMyAssignedProducers } from "@/lib/technicians";
 
 import { ManagerRegisterDialog } from "./manager-register-dialog";
 import { OrganizationFormDialog } from "./organization-form-dialog";
@@ -33,19 +34,22 @@ import { OrganizationFormDialog } from "./organization-form-dialog";
 /**
  * `/admin/organizacoes` é o único ponto de entrada da hierarquia
  * Organização → Comunidade → Produtor → Planos (ver plano `navegacao-
- * cascata-organizacoes`). ADMIN e TECHNICIAN veem a lista completa e
- * escolhem; MANAGER e PRODUCER têm exatamente um recurso possível e são
- * redirecionados automaticamente para ele — nunca escolhem pela UI.
+ * cascata-organizacoes`). ADMIN vê a lista completa e escolhe; MANAGER e
+ * PRODUCER têm exatamente um recurso possível e são redirecionados
+ * automaticamente para ele — nunca escolhem pela UI.
  *
- * TECHNICIAN é tratado como ADMIN nesta navegação por falta de vínculo de
- * organização no backend hoje (sem entidade `Technician`, sem
- * `/technicians/me` — já levantado como pergunta ao time de backend,
- * `relatorio-evidencias-f03/apontamentos-backend-08-08.pdf`, item 7).
- * ATENÇÃO: `GET /organizations` é `hasRole('ADMIN')` no backend real
- * (`OrganizationController.java`) — contra o backend real, TECHNICIAN
- * recebe 403 aqui e cai no estado de erro abaixo. É uma lacuna de RBAC do
- * backend, documentada no relatório de execução; não é corrigida no
- * frontend (fora de escopo deste plano).
+ * TECHNICIAN não navega pela cascata institucional (sem vínculo fixo a uma
+ * organização — ver `issues-fix-back.pdf` itens 7/8): fica na mesma URL,
+ * mas em vez da lista de organizações, vê a lista de produtores atribuídos
+ * a ele via `GET /technicians/me/producers` (relação N:N
+ * `TechnicalAssistance`). Cada linha leva para a mesma rota de planos
+ * usada pelas outras roles (`/admin/organizacoes/{orgId}/comunidades/
+ * {communityId}/produtores/{producerId}`) — os links de organização/
+ * comunidade no breadcrumb dessa página não funcionam para TECHNICIAN
+ * (`GET /organizations/{id}` e `GET /communities/{id}` continuam
+ * `ADMIN`/`MANAGER` apenas), mas a listagem de planos em si já tolera
+ * isso (`producer-plans-page.tsx` cai em rótulos genéricos quando não
+ * consegue resolver os nomes).
  */
 export function OrganizationsPage() {
   const router = useRouter();
@@ -58,6 +62,8 @@ export function OrganizationsPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [assignedProducers, setAssignedProducers] = useState<Producer[]>([]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Organization | null>(null);
@@ -113,7 +119,25 @@ export function OrganizationsPage() {
       return;
     }
 
-    // ADMIN e TECHNICIAN: lista completa, navegação por link em cada linha.
+    if (currentRole === "TECHNICIAN") {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await getMyAssignedProducers();
+        setAssignedProducers(data);
+      } catch (err) {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Não foi possível carregar os produtores atendidos.",
+        );
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // ADMIN: lista completa de organizações, navegação por link em cada linha.
     setLoading(true);
     setError(null);
     try {
@@ -138,6 +162,16 @@ export function OrganizationsPage() {
   const sortedOrganizations = useMemo(
     () => [...organizations].sort((a, b) => a.name.localeCompare(b.name)),
     [organizations],
+  );
+
+  const sortedAssignedProducers = useMemo(
+    () =>
+      [...assignedProducers].sort((a, b) =>
+        (a.user?.fullName ?? a.aliasName ?? "").localeCompare(
+          b.user?.fullName ?? b.aliasName ?? "",
+        ),
+      ),
+    [assignedProducers],
   );
 
   // Escrita de Organização (criar/editar/criar Manager) é `hasRole('ADMIN')`
@@ -174,6 +208,105 @@ export function OrganizationsPage() {
       <div className="flex flex-col gap-6">
         <Skeleton className="h-7 w-64" />
         <Skeleton className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
+
+  if (currentRole === "TECHNICIAN") {
+    return (
+      <div className="flex flex-col gap-6">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Meus produtores atendidos
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Produtores sob sua assistência técnica.
+          </p>
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          >
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => resolveAndLoad()}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        )}
+
+        <Card className="py-0">
+          <Table>
+            <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Nome</TableHead>
+                <TableHead>Comunidade</TableHead>
+                <TableHead>Organização</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody className="[&_td]:h-12 [&_td]:px-4">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <TableRow key={`skeleton-${idx}`}>
+                    {Array.from({ length: 3 }).map((__, cidx) => (
+                      <TableCell key={cidx}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : sortedAssignedProducers.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={3}
+                    className="py-12 text-center text-sm text-muted-foreground"
+                  >
+                    Nenhum produtor atribuído a você ainda.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedAssignedProducers.map((producer) => {
+                  const community = producer.community;
+                  const organization = community?.organization;
+                  const name =
+                    producer.user?.fullName ?? producer.aliasName ?? "—";
+
+                  return (
+                    <TableRow key={producer.id}>
+                      <TableCell className="font-medium text-foreground">
+                        {community && organization ? (
+                          <Link
+                            href={`/admin/organizacoes/${organization.id}/comunidades/${community.id}/produtores/${producer.id}`}
+                            className="hover:underline"
+                          >
+                            {name}
+                          </Link>
+                        ) : (
+                          name
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {community?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {organization?.name ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </Card>
       </div>
     );
   }
