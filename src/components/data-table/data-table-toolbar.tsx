@@ -59,7 +59,13 @@ export function DataTableToolbar<TData>({
     }))
     .filter((entry) => Boolean(entry.value));
 
-  const hasAnyActiveFilter = Boolean(rawSearch) || activeColumnFilters.length > 0;
+  // Valor efetivamente aplicado ao `globalFilter` da tabela — só é setado
+  // quando a regra "0 ou 3+ caracteres" (ver useEffect acima) permite
+  // propagar. Diferente de `rawSearch`, que reflete o que está sendo
+  // digitado agora, ainda sem passar pela regra.
+  const appliedSearch = (table.getState().globalFilter as string | undefined) ?? "";
+
+  const hasAnyActiveFilter = Boolean(appliedSearch) || activeColumnFilters.length > 0;
 
   function clearAll() {
     clearSearch();
@@ -98,13 +104,13 @@ export function DataTableToolbar<TData>({
 
       {hasAnyActiveFilter && (
         <div className="flex flex-wrap items-center gap-2">
-          {rawSearch && (
+          {appliedSearch && (
             <button
               type="button"
               onClick={clearSearch}
               className="inline-flex h-7 items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium hover:bg-accent"
             >
-              Busca: {rawSearch} <X className="size-3" />
+              Busca: {appliedSearch} <X className="size-3" />
             </button>
           )}
           {activeColumnFilters.map(({ filter, value }) => (

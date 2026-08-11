@@ -210,11 +210,18 @@ describe("DataTableToolbar — filtro por coluna via botao 'Filtros'", () => {
 describe("DataTableToolbar — chips removiveis e botao Limpar", () => {
   afterEach(cleanup);
 
-  it("chip de busca aparece ao digitar e some ao clicar no X, limpando o globalFilter", () => {
+  it("chip de busca aparece apos o debounce aplicar o filtro e some ao clicar no X, limpando o globalFilter", () => {
+    vi.useFakeTimers();
     render(<TestHost />);
 
     const input = screen.getByPlaceholderText("Buscar…");
     fireEvent.change(input, { target: { value: "abc" } });
+
+    // O chip reflete o filtro efetivamente aplicado (`table.getState().globalFilter`),
+    // não o valor cru digitado — por isso precisa esperar o debounce completar.
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
 
     const chip = screen.getByRole("button", { name: /Busca: abc/ });
     expect(chip).toBeTruthy();
@@ -223,6 +230,8 @@ describe("DataTableToolbar — chips removiveis e botao Limpar", () => {
 
     expect(screen.queryByRole("button", { name: /Busca: abc/ })).toBeNull();
     expect(globalFilterDebug()).toBe("");
+
+    vi.useRealTimers();
   });
 
   it("chip de filtro de coluna aparece com filtro ativo e some ao clicar no X", async () => {

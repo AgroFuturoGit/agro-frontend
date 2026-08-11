@@ -102,7 +102,7 @@ export function UsersPage() {
     const baseColumns = [
       columnHelper.accessor("fullName", {
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Nome" />
+          <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
         ),
         cell: (info) => (
           <span className="font-medium text-foreground">{info.getValue()}</span>
@@ -110,7 +110,7 @@ export function UsersPage() {
       }),
       columnHelper.accessor("email", {
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="E-mail" />
+          <DataTableColumnHeader column={column} title="E-mail" disabled={loading} />
         ),
         cell: (info) => (
           <span className="text-muted-foreground">{info.getValue()}</span>
@@ -127,7 +127,7 @@ export function UsersPage() {
       }),
       columnHelper.accessor("role", {
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Papel" />
+          <DataTableColumnHeader column={column} title="Papel" disabled={loading} />
         ),
         cell: (info) => ROLE_LABELS[info.getValue() as Role] ?? info.getValue(),
         filterFn: (row, columnId, filterValue) =>
@@ -135,7 +135,7 @@ export function UsersPage() {
       }),
       columnHelper.accessor("dateOfBirth", {
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Nascimento" />
+          <DataTableColumnHeader column={column} title="Nascimento" disabled={loading} />
         ),
         cell: (info) => (
           <span className="text-muted-foreground">
@@ -184,7 +184,7 @@ export function UsersPage() {
       User,
       unknown
     >[];
-  }, [canManage]);
+  }, [canManage, loading]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
