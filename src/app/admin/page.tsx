@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "Painel · Agro",
+  title: "Painel · ProduPlan",
 };
 
 const STATS = [

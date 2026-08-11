@@ -33,7 +33,7 @@ export default function AdminLayout({
                   <Sprout className="size-4" />
                 </span>
                 <span className="group-data-[collapsible=icon]:hidden">
-                  Agro
+                  ProduPlan
                 </span>
               </Link>
             </SidebarHeader>
@@ -44,7 +44,7 @@ export default function AdminLayout({
             </SidebarContent>
             <SidebarFooter>
               <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-                © {new Date().getFullYear()} Agro
+                © {new Date().getFullYear()} ProduPlan
               </p>
             </SidebarFooter>
           </Sidebar>

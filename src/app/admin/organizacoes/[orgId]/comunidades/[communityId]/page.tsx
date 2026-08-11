@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { CommunityProducersPage } from "@/components/admin/communities/community-producers-page";
 
 export const metadata: Metadata = {
-  title: "Produtores · Agro",
+  title: "Produtores · ProduPlan",
 };
 
 export default async function AdminCommunityProducersPage({

@@ -10,8 +10,8 @@ const HERO_IMAGE_URL =
   "https://images.unsplash.com/photo-1625246333195-78d9c38ad449?auto=format&fit=crop&w=1600&q=80";
 
 export const metadata: Metadata = {
-  title: "Entrar · Agro",
-  description: "Acesse o painel do Agro",
+  title: "Entrar · ProduPlan",
+  description: "Acesse o painel do ProduPlan",
 };
 
 export default function LoginPage() {
@@ -26,7 +26,7 @@ export default function LoginPage() {
             <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
               <Sprout className="size-4" />
             </span>
-            Agro
+            ProduPlan
           </Link>
         </div>
 
@@ -37,7 +37,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground md:text-left">
-          © {new Date().getFullYear()} Agro. Todos os direitos reservados.
+          © {new Date().getFullYear()} ProduPlan. Todos os direitos reservados.
         </p>
       </div>
 
@@ -65,7 +65,7 @@ export default function LoginPage() {
             <span className="grid size-7 place-items-center rounded-md bg-white/15 text-white backdrop-blur">
               <Sprout className="size-3.5" />
             </span>
-            Agro · Plataforma
+            ProduPlan · Plataforma
           </div>
 
           <div className="max-w-md space-y-6 drop-shadow-sm">

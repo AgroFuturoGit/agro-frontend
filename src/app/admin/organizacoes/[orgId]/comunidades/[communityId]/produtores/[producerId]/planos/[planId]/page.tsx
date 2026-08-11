@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PlanDetail } from "@/components/admin/production/plan-detail";
 
 export const metadata: Metadata = {
-  title: "Plano de produção · Agro",
+  title: "Plano de produção · ProduPlan",
 };
 
 export default async function AdminProductionPlanDetailPage({
