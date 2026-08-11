@@ -81,7 +81,10 @@ export function UserFormDrawer({
     }
   }, [open, mode, user]);
 
-  function update<K extends keyof typeof values>(key: K, value: (typeof values)[K]) {
+  function update<K extends keyof typeof values>(
+    key: K,
+    value: (typeof values)[K],
+  ) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -109,7 +112,8 @@ export function UserFormDrawer({
         if (stored && stored.id === user.id) {
           const token =
             typeof document !== "undefined"
-              ? (document.cookie.match(/(?:^|; )agro_token=([^;]*)/)?.[1] ?? null)
+              ? (document.cookie.match(/(?:^|; )agro_token=([^;]*)/)?.[1] ??
+                null)
               : null;
           if (token) {
             persistSession({
@@ -146,135 +150,140 @@ export function UserFormDrawer({
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {error && (
-            <div
-              role="alert"
-              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-            >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="fullName">Nome completo</Label>
-            <Input
-              id="fullName"
-              value={values.fullName}
-              onChange={(e) => update("fullName", e.target.value)}
-              required
-              disabled={submitting}
-              autoComplete="name"
-            />
-          </div>
-
-          {isCreate ? (
-            <>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={values.email}
-                  onChange={(e) => update("email", e.target.value)}
-                  required
-                  disabled={submitting}
-                  autoComplete="email"
-                />
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col overflow-y-auto"
+        >
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            {error && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{error}</span>
               </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="password">Senha</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={values.password}
-                  onChange={(e) => update("password", e.target.value)}
-                  required
-                  minLength={8}
-                  disabled={submitting}
-                  autoComplete="new-password"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="cpf">CPF</Label>
-                <Input
-                  id="cpf"
-                  value={values.cpf}
-                  onChange={(e) => update("cpf", formatCpf(e.target.value))}
-                  required
-                  inputMode="numeric"
-                  maxLength={14}
-                  placeholder="000.000.000-00"
-                  disabled={submitting}
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="email-readonly">E-mail</Label>
-                <Input
-                  id="email-readonly"
-                  value={values.email}
-                  readOnly
-                  disabled
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="cpf-readonly">CPF</Label>
-                <Input
-                  id="cpf-readonly"
-                  value={formatCpf(values.cpf)}
-                  readOnly
-                  disabled
-                />
-              </div>
-            </>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="dateOfBirth">Data de nascimento</Label>
-            <Input
-              id="dateOfBirth"
-              type="date"
-              value={values.dateOfBirth}
-              onChange={(e) => update("dateOfBirth", e.target.value)}
-              required
-              disabled={submitting}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="role">Papel</Label>
-            <Select
-              value={values.role}
-              onValueChange={(v) => update("role", v as Role)}
-            >
-              <SelectTrigger id="role" className="w-full">
-                <SelectValue placeholder="Selecione o papel">
-                  {(v) =>
-                    v ? (ROLE_LABELS[v as Role] ?? v) : "Selecione o papel"
-                  }
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {(isCreate ? CREATABLE_ROLES : ROLES).map((role) => (
-                  <SelectItem key={role} value={role}>
-                    {ROLE_LABELS[role]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {isCreate && (
-              <p className="text-xs text-muted-foreground">
-                Gestores e Produtores não são criados aqui — use os fluxos de
-                Organização e Comunidade.
-              </p>
             )}
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="fullName">Nome completo</Label>
+              <Input
+                id="fullName"
+                value={values.fullName}
+                onChange={(e) => update("fullName", e.target.value)}
+                required
+                disabled={submitting}
+                autoComplete="name"
+              />
+            </div>
+
+            {isCreate ? (
+              <>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={values.email}
+                    onChange={(e) => update("email", e.target.value)}
+                    required
+                    disabled={submitting}
+                    autoComplete="email"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={values.password}
+                    onChange={(e) => update("password", e.target.value)}
+                    required
+                    minLength={8}
+                    disabled={submitting}
+                    autoComplete="new-password"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="cpf">CPF</Label>
+                  <Input
+                    id="cpf"
+                    value={values.cpf}
+                    onChange={(e) => update("cpf", formatCpf(e.target.value))}
+                    required
+                    inputMode="numeric"
+                    maxLength={14}
+                    placeholder="000.000.000-00"
+                    disabled={submitting}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="email-readonly">E-mail</Label>
+                  <Input
+                    id="email-readonly"
+                    value={values.email}
+                    readOnly
+                    disabled
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="cpf-readonly">CPF</Label>
+                  <Input
+                    id="cpf-readonly"
+                    value={formatCpf(values.cpf)}
+                    readOnly
+                    disabled
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="dateOfBirth">Data de nascimento</Label>
+              <Input
+                id="dateOfBirth"
+                type="date"
+                value={values.dateOfBirth}
+                onChange={(e) => update("dateOfBirth", e.target.value)}
+                required
+                disabled={submitting}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="role">Papel</Label>
+              <Select
+                value={values.role}
+                onValueChange={(v) => update("role", v as Role)}
+              >
+                <SelectTrigger id="role" className="w-full">
+                  <SelectValue placeholder="Selecione o papel">
+                    {(v) =>
+                      v ? (ROLE_LABELS[v as Role] ?? v) : "Selecione o papel"
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(isCreate ? CREATABLE_ROLES : ROLES).map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {ROLE_LABELS[role]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isCreate && (
+                <p className="text-xs text-muted-foreground">
+                  Gestores e Produtores não são criados aqui — use os fluxos de
+                  Organização e Comunidade.
+                </p>
+              )}
+            </div>
           </div>
 
           <SheetFooter>
