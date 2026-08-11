@@ -20,7 +20,7 @@ import { formatCpf } from "@/lib/cpf";
 import { listUsers, ROLE_LABELS, type User } from "@/lib/users";
 
 import { DeleteUserDialog } from "./delete-user-dialog";
-import { UserFormDialog } from "./user-form-dialog";
+import { UserFormDrawer } from "./user-form-drawer";
 
 function formatDate(value: string | null): string {
   if (!value) return "—";
@@ -182,14 +182,14 @@ export function UsersPage() {
         </Table>
       </Card>
 
-      <UserFormDialog
+      <UserFormDrawer
         mode="create"
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSaved={refresh}
       />
 
-      <UserFormDialog
+      <UserFormDrawer
         mode="edit"
         user={editTarget}
         open={editTarget !== null}
