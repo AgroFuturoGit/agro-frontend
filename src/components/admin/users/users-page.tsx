@@ -1,23 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type PaginationState,
+  type Row,
+  type SortingState,
+} from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf } from "@/lib/cpf";
-import { listUsers, ROLE_LABELS, type User } from "@/lib/users";
+import { listUsers, ROLE_LABELS, ROLES, type User } from "@/lib/users";
 
 import { DeleteUserDialog } from "./delete-user-dialog";
 import { UserFormDrawer } from "./user-form-drawer";
@@ -29,6 +36,23 @@ function formatDate(value: string | null): string {
   return `${day}/${month}/${year}`;
 }
 
+/**
+ * Busca livre escopada a nome/e-mail/CPF, case-insensitive — regra de
+ * negócio de `domain.md`.
+ */
+function usersGlobalFilter(row: Row<User>, _columnId: string, filterValue: string) {
+  const q = filterValue.trim().toLowerCase();
+  if (!q) return true;
+  const u = row.original;
+  return (
+    u.fullName.toLowerCase().includes(q) ||
+    u.email.toLowerCase().includes(q) ||
+    u.cpf.includes(q)
+  );
+}
+
+const columnHelper = createColumnHelper<User>();
+
 export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,8 +63,15 @@ export function UsersPage() {
   const [editTarget, setEditTarget] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
 
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
@@ -64,14 +95,112 @@ export function UsersPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
-  const sortedUsers = useMemo(
-    () => [...users].sort((a, b) => a.fullName.localeCompare(b.fullName)),
-    [users],
-  );
+  const columns = useMemo(() => {
+    const baseColumns = [
+      columnHelper.accessor("fullName", {
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Nome" />
+        ),
+        cell: (info) => (
+          <span className="font-medium text-foreground">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("email", {
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="E-mail" />
+        ),
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("cpf", {
+        header: "CPF",
+        enableSorting: false,
+        cell: (info) => (
+          <span className="font-mono text-xs text-muted-foreground">
+            {formatCpf(info.getValue())}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("role", {
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Papel" />
+        ),
+        cell: (info) => ROLE_LABELS[info.getValue() as Role] ?? info.getValue(),
+        filterFn: (row, columnId, filterValue) =>
+          !filterValue || row.getValue(columnId) === filterValue,
+      }),
+      columnHelper.accessor("dateOfBirth", {
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Nascimento" />
+        ),
+        cell: (info) => (
+          <span className="text-muted-foreground">
+            {formatDate(info.getValue())}
+          </span>
+        ),
+      }),
+    ];
+
+    const actionsColumn = columnHelper.display({
+      id: "actions",
+      header: "Ações",
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <div className="inline-flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Editar usuário"
+              onClick={() => setEditTarget(user)}
+            >
+              <Pencil />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Excluir usuário"
+              onClick={() => setDeleteTarget(user)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        );
+      },
+    });
+
+    // `createColumnHelper` infere um TValue concreto por coluna (string,
+    // Role, string | null…); o `<DataTable>` genérico é parametrizado por
+    // um único `TValue` para o array inteiro — a normalização abaixo é o
+    // mesmo boundary cast usado pelos exemplos oficiais do TanStack Table.
+    return (canManage ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
+      User,
+      unknown
+    >[];
+  }, [canManage]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: users,
+    columns,
+    state: { sorting, columnFilters, globalFilter, pagination },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
+    globalFilterFn: usersGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -90,97 +219,36 @@ export function UsersPage() {
         )}
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      <DataTableToolbar
+        table={table}
+        searchPlaceholder="Buscar por nome, e-mail ou CPF…"
+        filters={[
+          {
+            columnId: "role",
+            label: "Papel",
+            options: ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] })),
+          },
+        ]}
+      />
 
-      <Card className="py-0">
-        <Table>
-          <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Nome</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>CPF</TableHead>
-              <TableHead>Papel</TableHead>
-              <TableHead>Nascimento</TableHead>
-              {canManage && (
-                <TableHead className="w-[1%] text-right">Ações</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="[&_td]:h-12 [&_td]:px-4">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, idx) => (
-                <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: canManage ? 6 : 5 }).map((__, cidx) => (
-                    <TableCell key={cidx}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : sortedUsers.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell
-                  colSpan={canManage ? 6 : 5}
-                  className="py-12 text-center text-sm text-muted-foreground"
-                >
-                  Nenhum usuário cadastrado ainda.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium text-foreground">
-                    {user.fullName}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.email}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {formatCpf(user.cpf)}
-                  </TableCell>
-                  <TableCell>{ROLE_LABELS[user.role] ?? user.role}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(user.dateOfBirth)}
-                  </TableCell>
-                  {canManage && (
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Editar usuário"
-                          onClick={() => setEditTarget(user)}
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Excluir usuário"
-                          onClick={() => setDeleteTarget(user)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <DataTable
+        table={table}
+        columns={columns}
+        isLoading={loading}
+        hasError={Boolean(error)}
+        onRetry={refresh}
+        hasActiveFilters={
+          Boolean(table.getState().globalFilter) ||
+          table.getState().columnFilters.length > 0
+        }
+        onClearFilters={() => {
+          table.setGlobalFilter("");
+          table.resetColumnFilters();
+        }}
+        emptyTitle="Nenhum usuário cadastrado ainda."
+      />
+
+      <DataTablePagination table={table} />
 
       <UserFormDrawer
         mode="create"
