@@ -77,16 +77,6 @@ export default function LoginPage() {
               Decisões mais rápidas, baseadas em dados reais da sua operação.
             </p>
           </div>
-
-          <p className="text-xs text-white/70">
-            Precisa de ajuda?{" "}
-            <a
-              href="mailto:suporte@agro.com.br"
-              className="font-medium text-white underline-offset-4 hover:underline"
-            >
-              suporte@agro.com.br
-            </a>
-          </p>
         </div>
       </aside>
     </div>
