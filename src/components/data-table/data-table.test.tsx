@@ -6,7 +6,8 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DataTable } from "./data-table";
@@ -91,32 +92,34 @@ describe("DataTable — renderização das linhas", () => {
 describe("DataTable — ordenação por cabeçalho clicável", () => {
   afterEach(cleanup);
 
-  it("alterna asc → desc → asc ao clicar no mesmo cabeçalho, nunca voltando a 'sem ordenação'", () => {
+  it("alterna asc → desc → asc ao clicar no mesmo cabeçalho, nunca voltando a 'sem ordenação'", async () => {
+    const user = userEvent.setup();
     render(<TestHost />);
 
     const button = screen.getByRole("button", { name: "Rótulo" });
 
-    fireEvent.click(button);
+    await user.click(button);
     expect(bodyLabels()).toEqual(["Ana", "Bruno", "Carlos"]);
 
-    fireEvent.click(button);
+    await user.click(button);
     expect(bodyLabels()).toEqual(["Carlos", "Bruno", "Ana"]);
 
-    fireEvent.click(button);
+    await user.click(button);
     expect(bodyLabels()).toEqual(["Ana", "Bruno", "Carlos"]);
   });
 
-  it("reflete o estado real da ordenação no aria-sort do <th>", () => {
+  it("reflete o estado real da ordenação no aria-sort do <th>", async () => {
+    const user = userEvent.setup();
     render(<TestHost />);
 
     const button = screen.getByRole("button", { name: "Rótulo" });
 
     expect(sortableHeader().getAttribute("aria-sort")).toBe("none");
 
-    fireEvent.click(button);
+    await user.click(button);
     expect(sortableHeader().getAttribute("aria-sort")).toBe("ascending");
 
-    fireEvent.click(button);
+    await user.click(button);
     expect(sortableHeader().getAttribute("aria-sort")).toBe("descending");
   });
 
@@ -129,24 +132,23 @@ describe("DataTable — ordenação por cabeçalho clicável", () => {
     expect(screen.queryByRole("button", { name: "Categoria" })).toBeNull();
   });
 
-  it("é ativável por teclado (Enter no botão focado), não só por clique de mouse", () => {
+  it("é ativável por teclado (Enter no botão focado), não só por clique de mouse", async () => {
+    const user = userEvent.setup();
     render(<TestHost />);
 
     const button = screen.getByRole("button", { name: "Rótulo" });
 
-    // O botão é um `<button type="button">` nativo (sem onKeyDown próprio),
-    // por isso a ativação por Enter/Space depende inteiramente do
-    // comportamento nativo do elemento, que o jsdom não sintetiza em
-    // `click` a partir de `keydown`/`keyup` (limitação documentada do
-    // jsdom, motivo de existir o `@testing-library/user-event`, não
-    // instalado neste projeto). Focamos o botão e confirmamos que ele é de
-    // fato alcançável por teclado antes de simular o `click` nativo que um
-    // browser real dispararia ao pressionar Enter com o foco nele.
-    button.focus();
+    // O botão é um `<button type="button">` nativo, então a ativação por
+    // Enter depende do comportamento nativo do elemento — que o jsdom não
+    // sintetiza em `click` a partir de um `keydown` cru. É exatamente o
+    // buraco que o `@testing-library/user-event` preenche: ele reproduz a
+    // sequência que o browser dispara, incluindo o `click` resultante.
+    // Assim o teste prova a ativação por teclado de verdade, em vez de
+    // simular o clique final à mão e presumir o resto.
+    await user.tab();
     expect(document.activeElement).toBe(button);
 
-    fireEvent.keyDown(button, { key: "Enter" });
-    fireEvent.click(button);
+    await user.keyboard("{Enter}");
     expect(bodyLabels()).toEqual(["Ana", "Bruno", "Carlos"]);
     expect(sortableHeader().getAttribute("aria-sort")).toBe("ascending");
   });
@@ -168,7 +170,8 @@ describe("DataTable — estado de carregamento", () => {
 describe("DataTable — os três estados de DataTableStatus", () => {
   afterEach(cleanup);
 
-  it("erro: anuncia com role='alert', oferece 'Tentar novamente' e nunca cai no texto de vazio", () => {
+  it("erro: anuncia com role='alert', oferece 'Tentar novamente' e nunca cai no texto de vazio", async () => {
+    const user = userEvent.setup();
     const onRetry = vi.fn();
     render(<TestHost data={[]} hasError onRetry={onRetry} />);
 
@@ -178,7 +181,7 @@ describe("DataTable — os três estados de DataTableStatus", () => {
     expect(screen.queryByText("Nenhum registro cadastrado ainda.")).toBeNull();
     expect(screen.queryByText("Nenhum resultado para os filtros aplicados.")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
@@ -192,7 +195,8 @@ describe("DataTable — os três estados de DataTableStatus", () => {
     expect(screen.queryByRole("button", { name: "Tentar novamente" })).toBeNull();
   });
 
-  it("vazio com filtro ativo: mensagem distinta e ação 'Limpar filtros'", () => {
+  it("vazio com filtro ativo: mensagem distinta e ação 'Limpar filtros'", async () => {
+    const user = userEvent.setup();
     const onClearFilters = vi.fn();
     render(<TestHost data={[]} hasActiveFilters onClearFilters={onClearFilters} />);
 
@@ -201,7 +205,7 @@ describe("DataTable — os três estados de DataTableStatus", () => {
     expect(status.textContent).toContain("Tente ajustar ou limpar os filtros.");
     expect(screen.queryByText("Nenhum registro cadastrado ainda.")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
 });

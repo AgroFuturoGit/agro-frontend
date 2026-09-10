@@ -92,6 +92,13 @@ function highlightedOption(): HTMLElement {
  * "Filtros" (revela o combobox), depois abrimos o combobox pelo teclado
  * (o valor atual já entra destacado) e caminhamos até o alvo antes de
  * confirmar com Enter.
+ *
+ * Mantido em `fireEvent` de propósito, mesmo com o `user-event` disponível
+ * no projeto: o caminho depende de navegar item a item pelo DESTAQUE
+ * interno do `@base-ui/react`, lendo `highlightedOption()` entre cada
+ * tecla. O `user-event` entrega uma sequência de teclado mais fiel ao
+ * browser, mas não dá esse controle passo a passo — e é ele que faz o
+ * teste funcionar no jsdom.
  */
 async function selectCategoryOption(label: string) {
   fireEvent.click(screen.getByRole("button", { name: /Filtros/ }));
@@ -118,6 +125,11 @@ async function selectCategoryOption(label: string) {
   fireEvent.keyUp(highlighted, { key: "Enter" });
 }
 
+// Este bloco fica em `fireEvent.change` em vez de `user.type`, por
+// decisão: o alvo do teste é o LIMITE do debounce (499ms não propaga,
+// 500ms propaga). `user.type` digita tecla a tecla e reinicia o debounce a
+// cada caractere, o que embaralharia exatamente a fronteira sob teste. Uma
+// única mudança de valor é o estímulo certo aqui.
 describe("DataTableToolbar — busca com debounce", () => {
   beforeEach(() => {
     vi.useFakeTimers();

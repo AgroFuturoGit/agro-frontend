@@ -7,6 +7,7 @@ import {
   type PaginationState,
 } from "@tanstack/react-table";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { DataTablePagination } from "./data-table-pagination";
@@ -60,10 +61,11 @@ describe("DataTablePagination — resumo e navegação", () => {
     expect(status.textContent).toContain("25");
   });
 
-  it("avança e atualiza o resumo para '11–20' ao clicar em 'Próxima página'", () => {
+  it("avança e atualiza o resumo para '11–20' ao clicar em 'Próxima página'", async () => {
+    const user = userEvent.setup();
     render(<TestHost />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    await user.click(screen.getByRole("button", { name: "Próxima página" }));
 
     const status = screen.getByRole("status");
     expect(status.textContent).toContain("11");
@@ -81,14 +83,15 @@ describe("DataTablePagination — resumo e navegação", () => {
     expect(previous.disabled).toBe(true);
   });
 
-  it("desabilita 'Próxima página' na última página", () => {
+  it("desabilita 'Próxima página' na última página", async () => {
+    const user = userEvent.setup();
     render(<TestHost />);
 
     const next = screen.getByRole("button", {
       name: "Próxima página",
     }) as HTMLButtonElement;
-    fireEvent.click(next); // página 2
-    fireEvent.click(next); // página 3 (última: 25 itens, 10 por página)
+    await user.click(next); // página 2
+    await user.click(next); // página 3 (última: 25 itens, 10 por página)
 
     expect(screen.getByText("Página 3 de 3")).toBeTruthy();
     expect(next.disabled).toBe(true);
