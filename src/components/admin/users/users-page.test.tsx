@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UsersPage } from "@/components/admin/users/users-page";
@@ -96,6 +97,13 @@ function highlightedOption(): HTMLElement {
  * abrimos "Filtros" (revela o combobox), navegamos pelo teclado até o
  * papel alvo e confirmamos com Enter (mesma técnica de
  * `data-table-toolbar.test.tsx`).
+ *
+ * Mantido em `fireEvent` de propósito, mesmo com o `user-event` disponível
+ * no projeto: o caminho depende de navegar item a item pelo DESTAQUE
+ * interno do `@base-ui/react`, lendo `highlightedOption()` entre cada
+ * tecla. O `user-event` entrega uma sequência de teclado mais fiel ao
+ * browser, mas não dá esse controle passo a passo — e é ele que faz o
+ * teste funcionar no jsdom.
  */
 async function selectRoleFilter(label: string) {
   fireEvent.click(screen.getByRole("button", { name: /Filtros/ }));
@@ -185,9 +193,12 @@ describe("UsersPage — busca livre", () => {
     await renderUsersPage();
 
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    // `user-event` espera o relógio andar entre as teclas; com timers
+    // falsos ele travaria sem este `advanceTimers`.
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
     const input = screen.getByPlaceholderText("Buscar por nome, e-mail ou CPF…");
-    fireEvent.change(input, { target: { value: "Bruno" } });
+    await user.type(input, "Bruno");
 
     await act(async () => {
       vi.advanceTimersByTime(500);
@@ -210,12 +221,13 @@ describe("UsersPage — integração com UserFormDrawer e DeleteUserDialog", () 
   });
 
   it("clicar em 'Editar' abre o drawer em modo edit com os campos do usuário certo pré-preenchidos", async () => {
+    const user = userEvent.setup();
     await mockRole("ADMIN");
     await mockUsers(USERS);
 
     await renderUsersPage();
 
-    fireEvent.click(
+    await user.click(
       screen.getAllByRole("button", { name: "Editar usuário" })[0],
     );
 
@@ -225,6 +237,7 @@ describe("UsersPage — integração com UserFormDrawer e DeleteUserDialog", () 
   });
 
   it("clicar em 'Excluir' abre o DeleteUserDialog com o usuário certo", async () => {
+    const user = userEvent.setup();
     await mockRole("ADMIN");
     await mockUsers(USERS);
 
@@ -233,7 +246,7 @@ describe("UsersPage — integração com UserFormDrawer e DeleteUserDialog", () 
     const deleteButtons = screen.getAllByRole("button", {
       name: "Excluir usuário",
     });
-    fireEvent.click(deleteButtons[0]);
+    await user.click(deleteButtons[0]);
 
     expect(await screen.findByText("Excluir usuário")).toBeTruthy();
     expect(
