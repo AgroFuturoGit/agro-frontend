@@ -8,17 +8,12 @@ import { getCommunity, type Community } from "@/lib/communities";
 import { getMyManager, type Manager } from "@/lib/managers";
 import { listProducers, type Producer } from "@/lib/producers";
 import type { Organization } from "@/lib/organizations";
+import { resetNavigationMock, router } from "@/test/next-navigation";
 
-const replace = vi.fn();
-// Referência ESTÁVEL entre renders — o `useRouter()` real do Next.js
-// devolve o mesmo objeto a cada render; um literal novo por chamada aqui
-// quebraria a identidade de `refresh` (que depende de `router`) e faria o
-// efeito de busca disparar de novo a cada render, mascarando bugs reais de
-// "buscou mais de uma vez" atrás de um artefato do mock.
-const router = { replace };
-vi.mock("next/navigation", () => ({
-  useRouter: () => router,
-}));
+vi.mock("next/navigation", async () => {
+  const { navigationMockModule } = await import("@/test/next-navigation");
+  return navigationMockModule;
+});
 
 vi.mock("@/lib/communities", async () => {
   const actual =
@@ -120,6 +115,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  resetNavigationMock();
 });
 
 describe("CommunityProducersPage — escopo por comunidade", () => {
@@ -139,7 +135,7 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
     render(<CommunityProducersPage communityId="community-alfa" />);
 
     expect(await screen.findByText("Ana Alves")).toBeTruthy();
-    expect(replace).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("MANAGER: comunidade de outra organização é bloqueada e redireciona (guarda de ownership)", async () => {
@@ -149,7 +145,7 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
     render(<CommunityProducersPage communityId="community-externa" />);
 
     await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith(`/admin/organizacoes/${MY_ORGANIZATION.id}`),
+      expect(router.replace).toHaveBeenCalledWith(`/admin/organizacoes/${MY_ORGANIZATION.id}`),
     );
     // Nenhum dado da comunidade de outra organização chega a aparecer.
     expect(screen.queryByText("Ana Alves")).toBeNull();
