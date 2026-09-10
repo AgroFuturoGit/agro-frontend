@@ -13,9 +13,18 @@
 # testing
 /coverage
 
+# playwright
+/playwright-report/
+/test-results/
+/blob-report/
+
 # next.js
 /.next/
 /out/
+
+# pwa (gerado pelo @serwist/next a cada `npm run build`; a fonte é src/app/sw.ts)
+/public/sw.js
+/public/sw.js.map
 
 # production
 /build
@@ -39,3 +48,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# pwdev-code framework (local planning state, not project source)
+.claude/
+.planning/
+PRD.md

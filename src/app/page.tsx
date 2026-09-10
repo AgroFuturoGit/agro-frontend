@@ -16,7 +16,7 @@ export default function HomePage() {
             <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
               <Sprout className="size-5" />
             </div>
-            <span className="text-lg font-bold tracking-tight">SmartAgro</span>
+            <span className="text-lg font-bold tracking-tight">ProduPlan</span>
           </Link>
 
           <nav className="hidden items-center gap-8 text-sm font-medium text-muted-foreground md:flex">
@@ -134,7 +134,7 @@ export default function HomePage() {
                 <div className="size-3 rounded-full bg-emerald-500/60" />
               </div>
               <div className="flex h-6 w-64 items-center justify-center rounded-md bg-background/80 px-3 text-xs text-muted-foreground font-mono">
-                app.smartagro.com.br
+                app.produplan.com.br
               </div>
               <div className="w-10" />
             </div>
@@ -174,10 +174,10 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 text-xs text-muted-foreground sm:flex-row sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 font-medium">
             <Sprout className="size-4 text-emerald-600" />
-            <span>SmartAgro — Plataforma Integrada de Gestão Agrícola</span>
+            <span>ProduPlan — Plataforma Integrada de Gestão Agrícola</span>
           </div>
           <p>
-            © {new Date().getFullYear()} SmartAgro. Todos os direitos
+            © {new Date().getFullYear()} ProduPlan. Todos os direitos
             reservados.
           </p>
         </div>
