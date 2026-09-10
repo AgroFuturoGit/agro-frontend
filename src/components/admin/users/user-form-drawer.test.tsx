@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UserFormDrawer } from "@/components/admin/users/user-form-drawer";
@@ -45,6 +46,13 @@ const USER: User = {
  * teclado (mesma técnica de `data-table-toolbar.test.tsx` e
  * `users-page.test.tsx`); aqui só precisamos ler a lista de opções, sem
  * navegar até um alvo nem confirmar com Enter.
+ *
+ * Mantido em `fireEvent` de propósito, mesmo com o `user-event` disponível
+ * no projeto: o caminho depende de navegar item a item pelo DESTAQUE
+ * interno do `@base-ui/react`, lendo `highlightedOption()` entre cada
+ * tecla. O `user-event` entrega uma sequência de teclado mais fiel ao
+ * browser, mas não dá esse controle passo a passo — e é ele que faz o
+ * teste funcionar no jsdom.
  */
 function openRoleSelect() {
   const trigger = screen.getByLabelText("Papel");
@@ -106,6 +114,7 @@ describe("UserFormDrawer — modo edit", () => {
   });
 
   it("modo edit: submeter chama adminUpdateUser com fullName/dateOfBirth/role, sem email/cpf", async () => {
+    const user = userEvent.setup();
     vi.mocked(adminUpdateUser).mockResolvedValue({
       ...USER,
       fullName: "Ana Souza Silva",
@@ -116,10 +125,10 @@ describe("UserFormDrawer — modo edit", () => {
       <UserFormDrawer mode="edit" user={USER} open onOpenChange={() => {}} onSaved={onSaved} />,
     );
 
-    fireEvent.change(screen.getByLabelText("Nome completo"), {
-      target: { value: "Ana Souza Silva" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Salvar alterações" }));
+    const fullName = screen.getByLabelText("Nome completo");
+    await user.clear(fullName);
+    await user.type(fullName, "Ana Souza Silva");
+    await user.click(screen.getByRole("button", { name: "Salvar alterações" }));
 
     await waitFor(() => {
       expect(adminUpdateUser).toHaveBeenCalledWith("u1", {
@@ -129,5 +138,69 @@ describe("UserFormDrawer — modo edit", () => {
       });
       expect(onSaved).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+/**
+ * Sobe do campo até o `<form>` procurando um contêiner com padding
+ * horizontal.
+ *
+ * Guarda a regressão corrigida em `ec8c2e9` (issue #23): o `<form>` não
+ * tinha padding horizontal e os campos ficavam colados na borda do drawer,
+ * enquanto `SheetHeader` e `SheetFooter` já vinham com `p-4` do próprio
+ * `ui/sheet`. Percorrer a cadeia de ancestrais em vez de fixar a
+ * profundidade exata da árvore deixa o teste sobreviver a um wrapper a
+ * mais, mas ainda falhar se o padding sumir.
+ */
+function paddedAncestor(field: HTMLElement, form: HTMLElement) {
+  for (
+    let node: HTMLElement | null = field;
+    node && node !== form.parentElement;
+    node = node.parentElement
+  ) {
+    if (typeof node.className === "string" && /\b(px-4|p-4)\b/.test(node.className)) {
+      return node;
+    }
+  }
+  return null;
+}
+
+describe("UserFormDrawer — layout interno", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("campos ficam dentro de um contêiner com padding horizontal, e não colados na borda do drawer", async () => {
+    render(
+      <UserFormDrawer mode="edit" user={USER} open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    const field = await screen.findByLabelText("Nome completo");
+    const form = field.closest("form");
+    expect(form).not.toBeNull();
+
+    const container = paddedAncestor(field, form as HTMLElement);
+    expect(container).not.toBeNull();
+    expect(container).toContainElement(field);
+    // Alinha com o `p-4` que SheetHeader e SheetFooter já aplicam.
+    expect(container!.className).toMatch(/\bpx-4\b/);
+  });
+
+  it("o mesmo contêiner envolve todos os campos do formulário, não só o primeiro", async () => {
+    render(
+      <UserFormDrawer mode="edit" user={USER} open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    const form = (await screen.findByLabelText("Nome completo")).closest(
+      "form",
+    ) as HTMLElement;
+
+    const containers = ["Nome completo", "E-mail", "CPF"].map((label) =>
+      paddedAncestor(screen.getByLabelText(label), form),
+    );
+
+    expect(containers.every(Boolean)).toBe(true);
+    expect(new Set(containers).size).toBe(1);
   });
 });
