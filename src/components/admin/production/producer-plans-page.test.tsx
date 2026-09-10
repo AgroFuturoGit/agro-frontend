@@ -8,14 +8,12 @@ import { getCommunity, type Community } from "@/lib/communities";
 import { getMyProducer, listProducers, type Producer } from "@/lib/producers";
 import { listProductionPlans, type ProductionPlan } from "@/lib/production";
 import type { Organization } from "@/lib/organizations";
+import { resetNavigationMock, router } from "@/test/next-navigation";
 
-const replace = vi.fn();
-// Referência ESTÁVEL entre renders — ver comentário equivalente em
-// `community-producers-page.test.tsx`.
-const router = { replace };
-vi.mock("next/navigation", () => ({
-  useRouter: () => router,
-}));
+vi.mock("next/navigation", async () => {
+  const { navigationMockModule } = await import("@/test/next-navigation");
+  return navigationMockModule;
+});
 
 vi.mock("@/lib/communities", async () => {
   const actual =
@@ -127,6 +125,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  resetNavigationMock();
 });
 
 describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", () => {
@@ -148,7 +147,7 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     renderPage("producer-1");
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
-    expect(replace).not.toHaveBeenCalled();
+    expect(router.replace).not.toHaveBeenCalled();
   });
 
   it("PRODUCER: acessando producerId de outro produtor é bloqueado e redireciona (guarda de ownership)", async () => {
@@ -158,7 +157,7 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     renderPage("producer-2");
 
     await waitFor(() =>
-      expect(replace).toHaveBeenCalledWith("/admin/organizacoes"),
+      expect(router.replace).toHaveBeenCalledWith("/admin/organizacoes"),
     );
     expect(listProductionPlans).not.toHaveBeenCalled();
     expect(screen.queryByText("Milho — BRS 1010")).toBeNull();

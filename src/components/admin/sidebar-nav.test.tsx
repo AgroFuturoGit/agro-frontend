@@ -5,9 +5,10 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import * as auth from "@/lib/auth";
 import type { AuthUser } from "@/lib/auth";
 
-vi.mock("next/navigation", () => ({
-  usePathname: () => "/admin",
-}));
+vi.mock("next/navigation", async () => {
+  const { navigationMockModule } = await import("@/test/next-navigation");
+  return navigationMockModule;
+});
 
 // jsdom não implementa window.matchMedia — necessário para o hook
 // useIsMobile usado internamente por <SidebarProvider>.
