@@ -182,10 +182,13 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
     expect(screen.queryByRole("button", { name: /Novo plano/i })).toBeNull();
   });
 
-  // canWrite = FARMER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
-  // apenas (@PreAuthorize real do ProductionController). ADMIN e TECHNICIAN
-  // têm as 3 ações (Novo plano, Editar, Excluir); FARMER edita mas nunca
-  // exclui.
+  // canWrite = FARMER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN apenas.
+  // ATENÇÃO: `canDelete` NÃO reflete o backend — o `@PreAuthorize` real de
+  // `DELETE /production-plans/{planId}` é
+  // `hasAnyRole('ADMIN', 'TECHNICIAN', 'FARMER')`. O teste abaixo fixa a
+  // implementação ATUAL do front, não o contrato desejado; ver a divergência
+  // documentada em `producer-plans-page.tsx`. Quando o delete for liberado
+  // ao agricultor, este bloco muda junto.
   it.each(["ADMIN", "TECHNICIAN"] as const)(
     "%s: com plano em tela, vê todas as ações de escrita, incluindo excluir",
     async (role) => {
@@ -202,7 +205,7 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
     },
   );
 
-  it("FARMER: com plano em tela, vê Novo/Editar plano, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
+  it("FARMER: com plano em tela, vê Novo/Editar plano, mas NÃO vê Excluir (divergência conhecida — a API aceitaria o delete)", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 

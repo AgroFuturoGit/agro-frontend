@@ -128,9 +128,18 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   // Os 3 GET desta tela (plano, comparativo e execuções) estão liberados para
   // ADMIN/MANAGER/TECHNICIAN/FARMER. Para escrita, o backend real
   // (@PreAuthorize em ProductionController) aceita ADMIN/TECHNICIAN/FARMER
-  // em create/update de apontamento, mas só ADMIN/TECHNICIAN em delete
-  // (FARMER recebe 403). RN4: no primeiro render a role ainda é null,
-  // então nada de escrita renderiza (falha fechado).
+  // em create/update de apontamento — e também em delete
+  // (`hasAnyRole('ADMIN', 'TECHNICIAN', 'FARMER')` em
+  // `DELETE /production-executions/{executionId}`).
+  //
+  // DIVERGÊNCIA CONHECIDA: o `canDelete` abaixo ainda exclui FARMER, então o
+  // agricultor registra uma colheita com valor errado e não consegue
+  // removê-la, apesar de a API aceitar. Mesma pendência de
+  // `producer-plans-page.tsx` — ver o comentário de lá para a verificação de
+  // ownership exigida antes de liberar.
+  //
+  // RN4: no primeiro render a role ainda é null, então nada de escrita
+  // renderiza (falha fechado).
   const canWrite =
     currentRole === "FARMER" ||
     currentRole === "ADMIN" ||

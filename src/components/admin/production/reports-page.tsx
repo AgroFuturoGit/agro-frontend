@@ -32,12 +32,20 @@ type PlanReport = {
 
 export function ReportsPage() {
   const [reports, setReports] = useState<PlanReport[]>([]);
-  // `ReportsPage` só é alcançável via `GET /farmers/me` (`hasRole
-  // ('FARMER')` no backend) — guardado aqui só para montar o link "Ver
-  // detalhes" com a URL aninhada correta
-  // (`/admin/organizacoes/{orgId}/comunidades/{communityId}/produtores/
-  // {producerId}/planos/{planId}`), já que `/admin/cultivos/{planId}` não
-  // existe mais.
+  // Guardado aqui para montar o link "Ver detalhes" com a URL aninhada
+  // correta (`/admin/organizacoes/{orgId}/comunidades/{communityId}/
+  // produtores/{producerId}/planos/{planId}`), já que
+  // `/admin/cultivos/{planId}` não existe mais.
+  //
+  // ATENÇÃO — esta tela só funciona para FARMER: `refresh()` chama
+  // `getMyProducer()` (`GET /farmers/me`, `hasRole('FARMER')`) sem branch por
+  // role, mas NADA restringe o acesso até aqui: `sidebar-nav.tsx` renderiza
+  // "Relatórios" para as 4 roles e `proxy.ts` deixa as 4 passarem
+  // (`FARMER_GROUP_ALLOWED_ROLES` contém todas). Logo ADMIN/MANAGER/
+  // TECHNICIAN chegam na tela e recebem 403, vendo só o alerta de erro.
+  // Gap pré-existente, rastreado como R8 em
+  // `.planning/product/roadmap/RISKS.md` — o fix exige decidir entre gatear
+  // a navegação para FARMER ou dar um caminho de dados às outras roles.
   const [producer, setProducer] = useState<Producer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

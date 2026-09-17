@@ -207,10 +207,13 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     expect(queryWriteAffordances().novoApontamento).toBeNull();
   });
 
-  // canWrite = FARMER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
-  // apenas (@PreAuthorize real do ProductionController — comentário em
-  // `plan-detail.tsx`). ADMIN e TECHNICIAN têm as 4 ações; FARMER edita
-  // mas nunca exclui.
+  // canWrite = FARMER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN apenas.
+  // ATENÇÃO: `canDelete` NÃO reflete o backend — o `@PreAuthorize` real de
+  // `DELETE /production-executions/{executionId}` é
+  // `hasAnyRole('ADMIN', 'TECHNICIAN', 'FARMER')`. O teste abaixo fixa a
+  // implementação ATUAL do front, não o contrato desejado; ver a divergência
+  // documentada em `plan-detail.tsx`. Quando o delete for liberado ao
+  // agricultor, este bloco muda junto.
   it.each(["ADMIN", "TECHNICIAN"] as const)(
     "%s: vê as 4 ações de escrita, incluindo excluir (create/update/delete liberados)",
     async (role) => {
@@ -233,7 +236,7 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     },
   );
 
-  it("FARMER: vê Novo/Editar apontamento, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
+  it("FARMER: vê Novo/Editar apontamento, mas NÃO vê Excluir (divergência conhecida — a API aceitaria o delete)", async () => {
     loginAs("FARMER");
 
     renderPlanDetail();

@@ -81,9 +81,21 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   }, []);
 
   // Backend real (@PreAuthorize em ProductionController): create/update de
-  // plano aceitam ADMIN, TECHNICIAN e FARMER; delete aceita só ADMIN e
-  // TECHNICIAN (FARMER recebe 403). RN4 preservada: enquanto a role for
-  // desconhecida, nenhuma afordância de escrita renderiza.
+  // plano aceitam ADMIN, TECHNICIAN e FARMER — e o delete aceita essas
+  // mesmas 3 roles (`hasAnyRole('ADMIN', 'TECHNICIAN', 'FARMER')`), desde o
+  // commit `e7930c8` do backend ("allow the producer to delete their
+  // production plans").
+  //
+  // DIVERGÊNCIA CONHECIDA: o `canDelete` abaixo ainda exclui FARMER, então o
+  // agricultor não consegue apagar um plano que a API aceitaria. Não é
+  // decisão de produto — o front nunca acompanhou aquele commit. Antes de
+  // liberar, confirmar contra o backend REAL se um agricultor consegue
+  // apagar o plano de OUTRO agricultor (ver
+  // `.planning/memory/lesson-backend-hierarchy-ownership.md`): expor a
+  // afordância sem essa garantia é pior que não ter botão.
+  //
+  // RN4 preservada: enquanto a role for desconhecida, nenhuma afordância de
+  // escrita renderiza.
   const canWrite =
     currentRole === "FARMER" ||
     currentRole === "ADMIN" ||
