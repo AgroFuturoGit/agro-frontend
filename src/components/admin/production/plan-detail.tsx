@@ -132,11 +132,13 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   // (`hasAnyRole('ADMIN', 'TECHNICIAN', 'FARMER')` em
   // `DELETE /production-executions/{executionId}`).
   //
-  // DIVERGÊNCIA CONHECIDA: o `canDelete` abaixo ainda exclui FARMER, então o
-  // agricultor registra uma colheita com valor errado e não consegue
-  // removê-la, apesar de a API aceitar. Mesma pendência de
-  // `producer-plans-page.tsx` — ver o comentário de lá para a verificação de
-  // ownership exigida antes de liberar.
+  // OWNERSHIP VERIFICADO contra o backend REAL em 2026-09-17: autenticado
+  // como o agricultor A, `DELETE /production-executions/{apontamento_de_B}`
+  // devolveu 403 ("O agricultor só tem acesso aos seus próprios dados de
+  // produção") e `DELETE /production-executions/{apontamento_de_A}` devolveu
+  // 204, com o apontamento sumindo na releitura. A tabela completa das 4
+  // chamadas está no comentário equivalente de `producer-plans-page.tsx`.
+  // Por isso o FARMER entra no `canDelete` abaixo.
   //
   // RN4: no primeiro render a role ainda é null, então nada de escrita
   // renderiza (falha fechado).
@@ -144,7 +146,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     currentRole === "FARMER" ||
     currentRole === "ADMIN" ||
     currentRole === "TECHNICIAN";
-  const canDelete = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
+  // Mesmo conjunto de roles da escrita em geral; mantido como constante
+  // própria porque é o gate citado nos testes desta tela.
+  const canDelete = canWrite;
   const columnCount = canWrite ? 3 : 2;
 
   const refresh = useCallback(async () => {

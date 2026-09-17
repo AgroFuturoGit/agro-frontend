@@ -86,13 +86,22 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   // commit `e7930c8` do backend ("allow the producer to delete their
   // production plans").
   //
-  // DIVERGÊNCIA CONHECIDA: o `canDelete` abaixo ainda exclui FARMER, então o
-  // agricultor não consegue apagar um plano que a API aceitaria. Não é
-  // decisão de produto — o front nunca acompanhou aquele commit. Antes de
-  // liberar, confirmar contra o backend REAL se um agricultor consegue
-  // apagar o plano de OUTRO agricultor (ver
-  // `.planning/memory/lesson-backend-hierarchy-ownership.md`): expor a
-  // afordância sem essa garantia é pior que não ter botão.
+  // OWNERSHIP VERIFICADO contra o backend REAL em 2026-09-17, antes de
+  // liberar a afordância (memória `backend-hierarchy-ownership`: o backend
+  // não garante escopo hierárquico por padrão, então isso se mede, não se
+  // presume). Cenário: dois agricultores A e B na mesma comunidade, cada um
+  // com um plano e um apontamento próprios; autenticado como A:
+  //
+  //   DELETE /production-plans/{plano_de_B}          → 403
+  //   DELETE /production-executions/{apontamento_B}  → 403
+  //   DELETE /production-executions/{apontamento_A}  → 204 (some na releitura)
+  //   DELETE /production-plans/{plano_de_A}          → 204 (some na releitura)
+  //
+  // Os 403 vêm do próprio Use Case ("O agricultor só tem acesso aos seus
+  // próprios dados de produção"), não apenas do `@PreAuthorize` — as duas
+  // camadas concordam aqui, ao contrário do que produziu R8/R9 (ver
+  // `.planning/memory/lesson-f01-frontend-only-not-e2e-verified.md`). Por
+  // isso o FARMER entra no `canDelete` abaixo.
   //
   // RN4 preservada: enquanto a role for desconhecida, nenhuma afordância de
   // escrita renderiza.
@@ -100,7 +109,9 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     currentRole === "FARMER" ||
     currentRole === "ADMIN" ||
     currentRole === "TECHNICIAN";
-  const canDelete = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
+  // Mesmo conjunto de roles da escrita em geral; mantido como constante
+  // própria porque é o gate citado nos testes desta tela.
+  const canDelete = canWrite;
   const columnCount = canWrite ? 6 : 5;
 
   const runGuard = useCallback(async () => {
