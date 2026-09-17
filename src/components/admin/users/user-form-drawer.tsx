@@ -279,7 +279,7 @@ export function UserFormDrawer({
               </Select>
               {isCreate && (
                 <p className="text-xs text-muted-foreground">
-                  Gestores e Produtores não são criados aqui — use os fluxos de
+                  Gestores e Agricultores não são criados aqui — use os fluxos de
                   Organização e Comunidade.
                 </p>
               )}

@@ -119,14 +119,14 @@ afterEach(() => {
 });
 
 describe("CommunityProducersPage — escopo por comunidade", () => {
-  it("ADMIN: lista os produtores da comunidade sem filtro adicional", async () => {
+  it("ADMIN: lista os agricultores da comunidade sem filtro adicional", async () => {
     loginAs("ADMIN");
 
     render(<CommunityProducersPage communityId="community-alfa" />);
 
     expect(await screen.findByText("Ana Alves")).toBeTruthy();
     expect(listProducers).toHaveBeenCalledExactlyOnceWith("community-alfa");
-    expect(screen.getByRole("button", { name: "Novo Produtor" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Novo Agricultor" })).toBeTruthy();
   });
 
   it("MANAGER: comunidade da própria organização é exibida normalmente", async () => {
@@ -158,7 +158,7 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
 
     expect(await screen.findByText("Ana Alves")).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: "Novo Produtor" }),
+      screen.queryByRole("button", { name: "Novo Agricultor" }),
     ).toBeNull();
   });
 
@@ -169,7 +169,7 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
     render(<CommunityProducersPage communityId="community-alfa" />);
 
     expect(
-      await screen.findByText("Nenhum produtor cadastrado nesta comunidade ainda."),
+      await screen.findByText("Nenhum agricultor cadastrado nesta comunidade ainda."),
     ).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -186,7 +186,7 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
     expect(alert.textContent).toContain("Erro interno do servidor");
   });
 
-  it("falha de getMyManager (MANAGER) bloqueia com alerta, sem exibir produtores", async () => {
+  it("falha de getMyManager (MANAGER) bloqueia com alerta, sem exibir agricultores", async () => {
     loginAs("MANAGER");
     vi.mocked(getMyManager).mockRejectedValue(new ApiError(500, "Falhou", {}));
 

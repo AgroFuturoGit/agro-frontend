@@ -129,7 +129,7 @@ afterEach(() => {
 });
 
 describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", () => {
-  it("ADMIN: lista os planos do produtor da URL diretamente", async () => {
+  it("ADMIN: lista os planos do agricultor da URL diretamente", async () => {
     loginAs("ADMIN");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 
@@ -140,8 +140,8 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     expect(screen.queryByRole("combobox")).toBeNull();
   });
 
-  it("PRODUCER: acessando o próprio producerId, vê os planos normalmente", async () => {
-    loginAs("PRODUCER");
+  it("FARMER: acessando o próprio producerId, vê os planos normalmente", async () => {
+    loginAs("FARMER");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 
     renderPage("producer-1");
@@ -150,8 +150,8 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("PRODUCER: acessando producerId de outro produtor é bloqueado e redireciona (guarda de ownership)", async () => {
-    loginAs("PRODUCER");
+  it("FARMER: acessando producerId de outro agricultor é bloqueado e redireciona (guarda de ownership)", async () => {
+    loginAs("FARMER");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 
     renderPage("producer-2");
@@ -182,9 +182,9 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
     expect(screen.queryByRole("button", { name: /Novo plano/i })).toBeNull();
   });
 
-  // canWrite = PRODUCER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
+  // canWrite = FARMER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
   // apenas (@PreAuthorize real do ProductionController). ADMIN e TECHNICIAN
-  // têm as 3 ações (Novo plano, Editar, Excluir); PRODUCER edita mas nunca
+  // têm as 3 ações (Novo plano, Editar, Excluir); FARMER edita mas nunca
   // exclui.
   it.each(["ADMIN", "TECHNICIAN"] as const)(
     "%s: com plano em tela, vê todas as ações de escrita, incluindo excluir",
@@ -202,8 +202,8 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
     },
   );
 
-  it("PRODUCER: com plano em tela, vê Novo/Editar plano, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
-    loginAs("PRODUCER");
+  it("FARMER: com plano em tela, vê Novo/Editar plano, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
+    loginAs("FARMER");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 
     renderPage("producer-1");

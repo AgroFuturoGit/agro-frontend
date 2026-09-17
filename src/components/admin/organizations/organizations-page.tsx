@@ -35,13 +35,13 @@ import { OrganizationFormDialog } from "./organization-form-dialog";
  * `/admin/organizacoes` é o único ponto de entrada da hierarquia
  * Organização → Comunidade → Produtor → Planos (ver plano `navegacao-
  * cascata-organizacoes`). ADMIN vê a lista completa e escolhe; MANAGER e
- * PRODUCER têm exatamente um recurso possível e são redirecionados
+ * FARMER têm exatamente um recurso possível e são redirecionados
  * automaticamente para ele — nunca escolhem pela UI.
  *
  * TECHNICIAN não navega pela cascata institucional (sem vínculo fixo a uma
  * organização — ver `issues-fix-back.pdf` itens 7/8): fica na mesma URL,
  * mas em vez da lista de organizações, vê a lista de produtores atribuídos
- * a ele via `GET /technicians/me/producers` (relação N:N
+ * a ele via `GET /technicians/me/farmers` (relação N:N
  * `TechnicalAssistance`). Cada linha leva para a mesma rota de planos
  * usada pelas outras roles (`/admin/organizacoes/{orgId}/comunidades/
  * {communityId}/produtores/{producerId}`) — os links de organização/
@@ -95,7 +95,7 @@ export function OrganizationsPage() {
       return;
     }
 
-    if (currentRole === "PRODUCER") {
+    if (currentRole === "FARMER") {
       setRedirectError(null);
       try {
         const producer = await getMyProducer();
@@ -112,8 +112,8 @@ export function OrganizationsPage() {
       } catch (err) {
         setRedirectError(
           err instanceof ApiError
-            ? `Não foi possível identificar o seu produtor: ${err.message}`
-            : "Não foi possível identificar o seu produtor.",
+            ? `Não foi possível identificar o seu agricultor: ${err.message}`
+            : "Não foi possível identificar o seu agricultor.",
         );
       }
       return;
@@ -129,7 +129,7 @@ export function OrganizationsPage() {
         setError(
           err instanceof ApiError
             ? err.message
-            : "Não foi possível carregar os produtores atendidos.",
+            : "Não foi possível carregar os agricultores atendidos.",
         );
       } finally {
         setLoading(false);
@@ -179,7 +179,7 @@ export function OrganizationsPage() {
   const canManage = currentRole === "ADMIN";
   const columnCount = canManage ? 4 : 3;
 
-  if (currentRole === "MANAGER" || currentRole === "PRODUCER") {
+  if (currentRole === "MANAGER" || currentRole === "FARMER") {
     if (redirectError) {
       return (
         <div className="flex flex-col gap-6">
@@ -217,10 +217,10 @@ export function OrganizationsPage() {
       <div className="flex flex-col gap-6">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            Meus produtores atendidos
+            Meus agricultores atendidos
           </h2>
           <p className="text-sm text-muted-foreground">
-            Produtores sob sua assistência técnica.
+            Agricultores sob sua assistência técnica.
           </p>
         </div>
 
@@ -270,7 +270,7 @@ export function OrganizationsPage() {
                     colSpan={3}
                     className="py-12 text-center text-sm text-muted-foreground"
                   >
-                    Nenhum produtor atribuído a você ainda.
+                    Nenhum agricultor atribuído a você ainda.
                   </TableCell>
                 </TableRow>
               ) : (

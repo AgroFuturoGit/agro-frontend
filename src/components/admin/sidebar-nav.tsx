@@ -50,7 +50,7 @@ const NAV_ITEMS: NavItem[] = [
     // Ponto de entrada único da navegação em cascata (Organização →
     // Comunidade → Produtor → Planos): visível às 4 roles. Cada role pousa
     // no nível certo dentro de `organizations-page.tsx` — MANAGER e
-    // PRODUCER são redirecionados automaticamente, nunca escolhem pela UI.
+    // FARMER são redirecionados automaticamente, nunca escolhem pela UI.
   },
   { href: "/admin/safras", label: "Safras", icon: Sprout },
   { href: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },

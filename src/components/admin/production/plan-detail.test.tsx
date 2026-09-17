@@ -174,7 +174,7 @@ afterEach(() => {
 /**
  * Gap C2 do `qa-report.md`: esta tela tinha ZERO teste e passou a ser
  * alcançável por MANAGER/TECHNICIAN/ADMIN em F03 (os 3 GET foram abertos às 4
- * roles). POST/PUT/DELETE de apontamento continuam `hasRole('PRODUCER')` no
+ * roles). POST/PUT/DELETE de apontamento continuam `hasRole('FARMER')` no
  * backend, então toda afordância de escrita visível para as demais roles é
  * 403 garantido.
  */
@@ -207,9 +207,9 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     expect(queryWriteAffordances().novoApontamento).toBeNull();
   });
 
-  // canWrite = PRODUCER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
+  // canWrite = FARMER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
   // apenas (@PreAuthorize real do ProductionController — comentário em
-  // `plan-detail.tsx`). ADMIN e TECHNICIAN têm as 4 ações; PRODUCER edita
+  // `plan-detail.tsx`). ADMIN e TECHNICIAN têm as 4 ações; FARMER edita
   // mas nunca exclui.
   it.each(["ADMIN", "TECHNICIAN"] as const)(
     "%s: vê as 4 ações de escrita, incluindo excluir (create/update/delete liberados)",
@@ -233,8 +233,8 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     },
   );
 
-  it("PRODUCER: vê Novo/Editar apontamento, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
-    loginAs("PRODUCER");
+  it("FARMER: vê Novo/Editar apontamento, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
+    loginAs("FARMER");
 
     renderPlanDetail();
 
@@ -252,8 +252,8 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     ).toBeNull();
   });
 
-  it("PRODUCER sem apontamentos: vê 'Registrar primeira colheita'", async () => {
-    loginAs("PRODUCER");
+  it("FARMER sem apontamentos: vê 'Registrar primeira colheita'", async () => {
+    loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue([]);
 
     renderPlanDetail();
@@ -300,7 +300,7 @@ describe("PlanDetail — erro de API e recuperação", () => {
   });
 
   it("'Tentar novamente' refaz os 3 GET e a tela se recupera", async () => {
-    loginAs("PRODUCER");
+    loginAs("FARMER");
     vi.mocked(getProductionPlan)
       .mockRejectedValueOnce(new ApiError(503, "Serviço indisponível", {}))
       .mockResolvedValue(PLAN);
@@ -322,7 +322,7 @@ describe("PlanDetail — erro de API e recuperação", () => {
   });
 
   it("erro não-ApiError cai na mensagem genérica da tela", async () => {
-    loginAs("PRODUCER");
+    loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockRejectedValue(new Error("boom"));
 
     renderPlanDetail();

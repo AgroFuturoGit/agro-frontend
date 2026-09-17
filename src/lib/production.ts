@@ -146,7 +146,7 @@ function mapComparison(raw: ComparisonApiResponse): ProductionComparison {
 
 export function listProductionPlans(producerId: string) {
   return apiRequest<PlanApiResponse[]>(
-    `/producers/${producerId}/production-plans`,
+    `/farmers/${producerId}/production-plans`,
     { method: "GET" },
   ).then((res) => res.map(mapPlan));
 }
@@ -162,7 +162,7 @@ export function createProductionPlan(
   payload: ProductionPlanCreatePayload,
 ) {
   return apiRequest<PlanApiResponse>(
-    `/producers/${producerId}/production-plans`,
+    `/farmers/${producerId}/production-plans`,
     { method: "POST", body: payload },
   ).then(mapPlan);
 }

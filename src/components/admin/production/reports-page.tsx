@@ -32,8 +32,8 @@ type PlanReport = {
 
 export function ReportsPage() {
   const [reports, setReports] = useState<PlanReport[]>([]);
-  // `ReportsPage` só é alcançável via `GET /producers/me` (`hasRole
-  // ('PRODUCER')` no backend) — guardado aqui só para montar o link "Ver
+  // `ReportsPage` só é alcançável via `GET /farmers/me` (`hasRole
+  // ('FARMER')` no backend) — guardado aqui só para montar o link "Ver
   // detalhes" com a URL aninhada correta
   // (`/admin/organizacoes/{orgId}/comunidades/{communityId}/produtores/
   // {producerId}/planos/{planId}`), já que `/admin/cultivos/{planId}` não

@@ -49,15 +49,15 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [roleResolved, setRoleResolved] = useState(false);
 
-  // Guarda de ownership do PRODUCER (memória `lesson-backend-hierarchy-
-  // ownership`, aplicada ao caso PRODUCER→produtor descrito nas Prohibitions
+  // Guarda de ownership do FARMER (memória `lesson-backend-hierarchy-
+  // ownership`, aplicada ao caso FARMER→produtor descrito nas Prohibitions
   // do plano): falha fechada até o próprio produtor ser confirmado.
   const [guardPassed, setGuardPassed] = useState(false);
   const [guardError, setGuardError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
 
   // Nomes do breadcrumb são resolvidos à parte da listagem de planos: em
-  // TECHNICIAN, por exemplo, `GET /communities/{id}` e `GET /producers`
+  // TECHNICIAN, por exemplo, `GET /communities/{id}` e `GET /farmers`
   // recusam (`hasRole('MANAGER') or hasRole('ADMIN')` no backend), mas os 3
   // GET de planos de produção continuam liberados às 4 roles. Um breadcrumb
   // com rótulos genéricos não deve impedir a listagem de planos de
@@ -81,11 +81,11 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   }, []);
 
   // Backend real (@PreAuthorize em ProductionController): create/update de
-  // plano aceitam ADMIN, TECHNICIAN e PRODUCER; delete aceita só ADMIN e
-  // TECHNICIAN (PRODUCER recebe 403). RN4 preservada: enquanto a role for
+  // plano aceitam ADMIN, TECHNICIAN e FARMER; delete aceita só ADMIN e
+  // TECHNICIAN (FARMER recebe 403). RN4 preservada: enquanto a role for
   // desconhecida, nenhuma afordância de escrita renderiza.
   const canWrite =
-    currentRole === "PRODUCER" ||
+    currentRole === "FARMER" ||
     currentRole === "ADMIN" ||
     currentRole === "TECHNICIAN";
   const canDelete = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
@@ -94,7 +94,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   const runGuard = useCallback(async () => {
     if (!roleResolved) return;
 
-    if (currentRole !== "PRODUCER") {
+    if (currentRole !== "FARMER") {
       setGuardPassed(true);
       return;
     }
@@ -103,7 +103,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     try {
       const producer = await getMyProducer();
       if (producer.id !== producerId) {
-        // PRODUCER tentando abrir a URL de outro produtor: nunca deixamos os
+        // FARMER tentando abrir a URL de outro produtor: nunca deixamos os
         // dados dele chegarem a renderizar — redireciona para a resolução
         // automática do próprio recurso.
         setRedirecting(true);
@@ -113,14 +113,14 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       setNames({
         organizationName: producer.community?.organization?.name ?? "Organização",
         communityName: producer.community?.name ?? "Comunidade",
-        producerLabel: producer.user?.fullName ?? producer.aliasName ?? "Produtor",
+        producerLabel: producer.user?.fullName ?? producer.aliasName ?? "Agricultor",
       });
       setGuardPassed(true);
     } catch (err) {
       setGuardError(
         err instanceof ApiError
           ? err.message
-          : "Não foi possível verificar o acesso a este produtor.",
+          : "Não foi possível verificar o acesso a este agricultor.",
       );
     }
   }, [roleResolved, currentRole, producerId, router]);
@@ -130,10 +130,10 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     runGuard();
   }, [runGuard]);
 
-  // Resolve nomes do breadcrumb para quem não é PRODUCER (o PRODUCER já
+  // Resolve nomes do breadcrumb para quem não é FARMER (o FARMER já
   // resolve tudo dentro da guarda acima, sem chamada extra).
   useEffect(() => {
-    if (!guardPassed || currentRole === "PRODUCER") return;
+    if (!guardPassed || currentRole === "FARMER") return;
     let active = true;
 
     Promise.all([getCommunity(communityId), listProducers(communityId)])
@@ -144,7 +144,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
           organizationName: community.organization.name,
           communityName: community.name,
           producerLabel:
-            producer?.user?.fullName ?? producer?.aliasName ?? "Produtor",
+            producer?.user?.fullName ?? producer?.aliasName ?? "Agricultor",
         });
       })
       .catch(() => {
@@ -155,7 +155,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
           setNames({
             organizationName: "Organização",
             communityName: "Comunidade",
-            producerLabel: "Produtor",
+            producerLabel: "Agricultor",
           });
         }
       });
@@ -235,7 +235,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
             label: names?.communityName ?? "Comunidade",
             href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
           },
-          { label: names?.producerLabel ?? "Produtor" },
+          { label: names?.producerLabel ?? "Agricultor" },
         ]}
       />
 

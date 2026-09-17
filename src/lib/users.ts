@@ -34,14 +34,14 @@ export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: "Administrador",
   MANAGER: "Gerente",
   TECHNICIAN: "Técnico",
-  PRODUCER: "Produtor",
+  FARMER: "Agricultor",
 };
 
-export const ROLES: Role[] = ["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"];
+export const ROLES: Role[] = ["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"];
 
 /**
  * Perfis que podem ser criados pela rota genérica `POST /users/register`.
- * MANAGER e PRODUCER nascem pelos fluxos da hierarquia (Organização e
+ * MANAGER e FARMER nascem pelos fluxos da hierarquia (Organização e
  * Comunidade) — o backend rejeita a criação genérica desses perfis (400).
  */
 export const CREATABLE_ROLES: Role[] = ["ADMIN", "TECHNICIAN"];

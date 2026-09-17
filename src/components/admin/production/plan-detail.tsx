@@ -71,9 +71,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   }, []);
 
   // Resolução dos nomes do breadcrumb — best-effort e independente dos 3 GET
-  // principais da tela (que já são liberados às 4 roles). PRODUCER usa
-  // `GET /producers/me` (já traz comunidade+organização aninhadas); as
-  // demais roles usam `GET /communities/{id}` + `GET /producers`, ambos
+  // principais da tela (que já são liberados às 4 roles). FARMER usa
+  // `GET /farmers/me` (já traz comunidade+organização aninhadas); as
+  // demais roles usam `GET /communities/{id}` + `GET /farmers`, ambos
   // `hasRole('MANAGER') or hasRole('ADMIN')` no backend — se recusarem (ex.
   // TECHNICIAN), o breadcrumb cai em rótulos genéricos sem bloquear o resto
   // da tela.
@@ -83,7 +83,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
     async function resolveNames() {
       try {
-        if (currentRole === "PRODUCER") {
+        if (currentRole === "FARMER") {
           const producer = await getMyProducer();
           if (!active) return;
           setNames({
@@ -91,7 +91,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               producer.community?.organization?.name ?? "Organização",
             communityName: producer.community?.name ?? "Comunidade",
             producerLabel:
-              producer.user?.fullName ?? producer.aliasName ?? "Produtor",
+              producer.user?.fullName ?? producer.aliasName ?? "Agricultor",
           });
           return;
         }
@@ -106,14 +106,14 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           organizationName: community.organization.name,
           communityName: community.name,
           producerLabel:
-            producer?.user?.fullName ?? producer?.aliasName ?? "Produtor",
+            producer?.user?.fullName ?? producer?.aliasName ?? "Agricultor",
         });
       } catch {
         if (active) {
           setNames({
             organizationName: "Organização",
             communityName: "Comunidade",
-            producerLabel: "Produtor",
+            producerLabel: "Agricultor",
           });
         }
       }
@@ -126,13 +126,13 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   }, [currentRole, communityId, producerId]);
 
   // Os 3 GET desta tela (plano, comparativo e execuções) estão liberados para
-  // ADMIN/MANAGER/TECHNICIAN/PRODUCER. Para escrita, o backend real
-  // (@PreAuthorize em ProductionController) aceita ADMIN/TECHNICIAN/PRODUCER
+  // ADMIN/MANAGER/TECHNICIAN/FARMER. Para escrita, o backend real
+  // (@PreAuthorize em ProductionController) aceita ADMIN/TECHNICIAN/FARMER
   // em create/update de apontamento, mas só ADMIN/TECHNICIAN em delete
-  // (PRODUCER recebe 403). RN4: no primeiro render a role ainda é null,
+  // (FARMER recebe 403). RN4: no primeiro render a role ainda é null,
   // então nada de escrita renderiza (falha fechado).
   const canWrite =
-    currentRole === "PRODUCER" ||
+    currentRole === "FARMER" ||
     currentRole === "ADMIN" ||
     currentRole === "TECHNICIAN";
   const canDelete = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
@@ -186,7 +186,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
           },
           {
-            label: names?.producerLabel ?? "Produtor",
+            label: names?.producerLabel ?? "Agricultor",
             href: backToPlansHref,
           },
           {
