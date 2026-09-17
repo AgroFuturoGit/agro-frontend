@@ -14,11 +14,6 @@ export type CropWritePayload = {
   isPriority: boolean;
 };
 
-export type CropListParams = {
-  search?: string;
-  isPriority?: boolean;
-};
-
 type CropApiResponse = {
   id: string;
   name: string;
@@ -35,27 +30,10 @@ function mapCrop(raw: CropApiResponse): Crop {
   };
 }
 
-export async function listCrops(params?: CropListParams): Promise<Crop[]> {
-  const all = await apiRequest<CropApiResponse[]>("/crops", {
-    method: "GET",
-  }).then((res) => res.map(mapCrop));
-
-  let result = all;
-
-  if (params?.search) {
-    const q = params.search.toLowerCase();
-    result = result.filter(
-      (c) =>
-        c.name.toLowerCase().includes(q) ||
-        c.variety.toLowerCase().includes(q),
-    );
-  }
-
-  if (params?.isPriority) {
-    result = result.filter((c) => c.isPriority);
-  }
-
-  return result;
+export async function listCrops(): Promise<Crop[]> {
+  return apiRequest<CropApiResponse[]>("/crops", { method: "GET" }).then(
+    (res) => res.map(mapCrop),
+  );
 }
 
 export function getCrop(id: string) {

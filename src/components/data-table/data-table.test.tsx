@@ -1,17 +1,25 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
+  type Row,
   type SortingState,
 } from "@tanstack/react-table";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { useIsMobile } from "@/hooks/use-mobile";
+
 import { DataTable } from "./data-table";
 import { DataTableColumnHeader } from "./data-table-column-header";
+
+// `useIsMobile` mockado no boundary do hook — cada teste controla o
+// viewport explicitamente, sem depender de `window.matchMedia` (que o
+// jsdom não implementa).
+vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: vi.fn(() => false) }));
 
 // Fixture propositalmente genérico: nenhum tipo de entidade concreta do
 // domínio aparece aqui, para provar que os componentes são reusáveis.
@@ -46,7 +54,16 @@ type TestHostProps = {
   onRetry?: () => void;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
+  renderMobileCard?: (row: Row<Item>) => ReactNode;
 };
+
+function renderItemCard(row: Row<Item>) {
+  return (
+    <div data-testid={`card-${row.original.id}`}>
+      {row.original.label} — {row.original.category}
+    </div>
+  );
+}
 
 function TestHost({ data = ITEMS, ...rest }: TestHostProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -204,6 +221,113 @@ describe("DataTable — os três estados de DataTableStatus", () => {
     expect(status.textContent).toContain("Nenhum resultado para os filtros aplicados.");
     expect(status.textContent).toContain("Tente ajustar ou limpar os filtros.");
     expect(screen.queryByText("Nenhum registro cadastrado ainda.")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("DataTable — compatibilidade sem renderMobileCard", () => {
+  afterEach(cleanup);
+
+  it("em viewport mobile, sem a prop renderMobileCard, continua renderizando <table>", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+
+    render(<TestHost />);
+
+    expect(screen.getByRole("table")).toBeTruthy();
+    expect(bodyLabels()).toEqual(["Carlos", "Ana", "Bruno"]);
+  });
+});
+
+describe("DataTable — modo card (mobile)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it("em viewport mobile com renderMobileCard, renderiza um card por item e nenhuma <table>", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+
+    render(<TestHost renderMobileCard={renderItemCard} />);
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByTestId("card-1")).toBeTruthy();
+    expect(screen.getByTestId("card-2")).toBeTruthy();
+    expect(screen.getByTestId("card-3")).toBeTruthy();
+  });
+
+  it("em viewport desktop, mesmo com renderMobileCard informado, continua renderizando <table>", () => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+
+    render(<TestHost renderMobileCard={renderItemCard} />);
+
+    expect(screen.getByRole("table")).toBeTruthy();
+    expect(screen.queryByTestId("card-1")).toBeNull();
+  });
+
+  it("carregando: cards de skeleton no lugar dos cards de dado, fora de qualquer <table>", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+
+    const { container } = render(
+      <TestHost renderMobileCard={renderItemCard} isLoading />,
+    );
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("card-1")).toBeNull();
+  });
+
+  it("erro: mesmo alerta e ação 'Tentar novamente' do modo tabela, fora de qualquer <table>", async () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+
+    render(
+      <TestHost
+        renderMobileCard={renderItemCard}
+        data={[]}
+        hasError
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.queryByRole("table")).toBeNull();
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível carregar os dados.");
+
+    await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("vazio sem filtro ativo: mesma mensagem do modo tabela, fora de qualquer <table>", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+
+    render(<TestHost renderMobileCard={renderItemCard} data={[]} />);
+
+    expect(screen.queryByRole("table")).toBeNull();
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("Nenhum registro cadastrado ainda.");
+    expect(screen.queryByRole("button", { name: "Limpar filtros" })).toBeNull();
+  });
+
+  it("vazio com filtro ativo: mesma mensagem e ação 'Limpar filtros' do modo tabela", async () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    const user = userEvent.setup();
+    const onClearFilters = vi.fn();
+
+    render(
+      <TestHost
+        renderMobileCard={renderItemCard}
+        data={[]}
+        hasActiveFilters
+        onClearFilters={onClearFilters}
+      />,
+    );
+
+    expect(screen.queryByRole("table")).toBeNull();
+    const status = screen.getByRole("status");
+    expect(status.textContent).toContain("Nenhum resultado para os filtros aplicados.");
 
     await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);

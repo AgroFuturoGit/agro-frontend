@@ -1,66 +1,87 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, Pencil, Plus, Search } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type PaginationState,
+  type Row,
+  type SortingState,
+} from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCrops, type Crop } from "@/lib/crops";
 
 import { CropFormDialog } from "./crop-form-dialog";
+import { DeleteCropDialog } from "./delete-crop-dialog";
 import { PriorityBadge } from "./priority-badge";
 
+/**
+ * Busca livre escopada a nome/variedade, case-insensitive — mesma regra da
+ * implementação anterior, agora expressa como `globalFilterFn` client-side
+ * (o dado em si já vem inteiro do backend; só o lugar do filtro mudou).
+ */
+function cropsGlobalFilter(row: Row<Crop>, _columnId: string, filterValue: string) {
+  const q = filterValue.trim().toLowerCase();
+  if (!q) return true;
+  const crop = row.original;
+  return (
+    crop.name.toLowerCase().includes(q) || crop.variety.toLowerCase().includes(q)
+  );
+}
+
+const columnHelper = createColumnHelper<Crop>();
+
 export function CropsPage() {
-  const isMobile = useIsMobile();
   const [crops, setCrops] = useState<Crop[]>([]);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [onlyPriority, setOnlyPriority] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Crop | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Crop | null>(null);
+
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSearch(searchInput.trim());
-    }, 300);
-    return () => window.clearTimeout(timer);
-  }, [searchInput]);
-
-  const canManage =
-    currentRole === "ADMIN" || currentRole === "TECHNICIAN";
+  const canManage = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await listCrops({
-        search: search || undefined,
-        isPriority: onlyPriority || undefined,
-      });
+      // `listCrops()` sem parâmetros: a filtragem (antes feita dentro do
+      // wrapper) agora vive inteiramente no `globalFilter`/`columnFilters`
+      // da tabela — o dado sempre vem inteiro do backend, como já era de
+      // fato (ver `src/lib/crops.ts`).
+      const result = await listCrops();
       setCrops(result);
     } catch (err) {
       setError(
@@ -71,15 +92,141 @@ export function CropsPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, onlyPriority]);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
-  function handlePriorityFilterChange(checked: boolean) {
-    setOnlyPriority(checked);
+  const columns = useMemo(() => {
+    const baseColumns = [
+      columnHelper.accessor("name", {
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
+        ),
+        cell: (info) => (
+          <span className="font-medium text-foreground">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("variety", {
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Variedade" disabled={loading} />
+        ),
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("isPriority", {
+        header: "Prioritária",
+        enableSorting: false,
+        cell: (info) => <PriorityBadge isPriority={info.getValue()} />,
+        // Controlado pelo checkbox "Somente prioritárias" abaixo da
+        // toolbar, não pelo dropdown genérico de `filters` — mantém a
+        // mesma interação (checkbox) da implementação anterior.
+        filterFn: (row, columnId, filterValue) =>
+          !filterValue || row.getValue(columnId) === true,
+      }),
+    ];
+
+    const actionsColumn = columnHelper.display({
+      id: "actions",
+      header: "Ações",
+      cell: ({ row }) => {
+        const crop = row.original;
+        return (
+          <div className="inline-flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Editar cultura"
+              onClick={() => setEditTarget(crop)}
+            >
+              <Pencil />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Excluir cultura"
+              onClick={() => setDeleteTarget(crop)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 />
+            </Button>
+          </div>
+        );
+      },
+    });
+
+    // `createColumnHelper` infere um TValue concreto por coluna; o
+    // `<DataTable>` genérico é parametrizado por um único `TValue` para o
+    // array inteiro — mesmo boundary cast usado em `UsersPage`.
+    return (canManage ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
+      Crop,
+      unknown
+    >[];
+  }, [canManage, loading]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: crops,
+    columns,
+    state: { sorting, columnFilters, globalFilter, pagination },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
+    globalFilterFn: cropsGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  const isPriorityFilterActive = Boolean(
+    table.getColumn("isPriority")?.getFilterValue(),
+  );
+
+  function renderMobileCard(row: Row<Crop>) {
+    const crop = row.original;
+    return (
+      <Card className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground">
+              {crop.name} — {crop.variety}
+            </p>
+            <div className="mt-2">
+              <PriorityBadge isPriority={crop.isPriority} />
+            </div>
+          </div>
+          {canManage && (
+            <div className="flex shrink-0 gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditTarget(crop)}
+              >
+                <Pencil />
+                Editar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Excluir cultura"
+                onClick={() => setDeleteTarget(crop)}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
+    );
   }
 
   return (
@@ -102,22 +249,15 @@ export function CropsPage() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-sm">
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Buscar por nome ou variedade…"
-            className="pl-9"
-            aria-label="Buscar por nome ou variedade"
-          />
+        <div className="flex-1">
+          <DataTableToolbar table={table} searchPlaceholder="Buscar por nome ou variedade…" />
         </div>
         <div className="flex items-center gap-2">
           <Checkbox
             id="only-priority"
-            checked={onlyPriority}
+            checked={isPriorityFilterActive}
             onCheckedChange={(checked) =>
-              handlePriorityFilterChange(checked === true)
+              table.getColumn("isPriority")?.setFilterValue(checked === true ? true : undefined)
             }
           />
           <Label htmlFor="only-priority" className="font-normal">
@@ -126,159 +266,22 @@ export function CropsPage() {
         </div>
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => refresh()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
-      )}
+      <DataTable
+        table={table}
+        columns={columns}
+        isLoading={loading}
+        hasError={Boolean(error)}
+        onRetry={refresh}
+        hasActiveFilters={Boolean(globalFilter) || isPriorityFilterActive}
+        onClearFilters={() => {
+          table.setGlobalFilter("");
+          table.getColumn("isPriority")?.setFilterValue(undefined);
+        }}
+        emptyTitle="Nenhuma cultura cadastrada."
+        renderMobileCard={renderMobileCard}
+      />
 
-      {isMobile ? (
-        <div className="flex flex-col gap-3">
-          {loading ? (
-            Array.from({ length: 3 }).map((_, idx) => (
-              <Card key={`skeleton-${idx}`} className="p-4">
-                <Skeleton className="mb-2 h-5 w-3/4" />
-                <Skeleton className="h-4 w-1/3" />
-              </Card>
-            ))
-          ) : crops.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhuma cultura cadastrada.
-              </p>
-              {canManage && (
-                <Button
-                  type="button"
-                  size="sm"
-                  className="mt-4"
-                  onClick={() => setCreateOpen(true)}
-                >
-                  Cadastrar primeira cultura
-                </Button>
-              )}
-            </Card>
-          ) : (
-            crops.map((crop) => (
-              <Card key={crop.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-foreground">
-                      {crop.name} — {crop.variety}
-                    </p>
-                    <div className="mt-2">
-                      <PriorityBadge isPriority={crop.isPriority} />
-                    </div>
-                  </div>
-                  {canManage && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setEditTarget(crop)}
-                    >
-                      <Pencil />
-                      Editar
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            ))
-          )}
-        </div>
-      ) : (
-        <Card className="py-0">
-          <Table>
-            <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Nome</TableHead>
-                <TableHead>Variedade</TableHead>
-                <TableHead>Prioritária</TableHead>
-                {canManage && (
-                  <TableHead className="w-[1%] text-right">Ações</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody className="[&_td]:h-12 [&_td]:px-4">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <TableRow key={`skeleton-${idx}`}>
-                    {Array.from({ length: canManage ? 4 : 3 }).map(
-                      (__, cidx) => (
-                        <TableCell key={cidx}>
-                          <Skeleton className="h-4 w-full" />
-                        </TableCell>
-                      ),
-                    )}
-                  </TableRow>
-                ))
-              ) : crops.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={canManage ? 4 : 3}
-                    className="py-12 text-center"
-                  >
-                    <p className="text-sm text-muted-foreground">
-                      Nenhuma cultura cadastrada.
-                    </p>
-                    {canManage && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="mt-4"
-                        onClick={() => setCreateOpen(true)}
-                      >
-                        Cadastrar primeira cultura
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                crops.map((crop) => (
-                  <TableRow key={crop.id}>
-                    <TableCell className="font-medium text-foreground">
-                      {crop.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {crop.variety}
-                    </TableCell>
-                    <TableCell>
-                      <PriorityBadge isPriority={crop.isPriority} />
-                    </TableCell>
-                    {canManage && (
-                      <TableCell className="text-right">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Editar cultura"
-                          onClick={() => setEditTarget(crop)}
-                        >
-                          <Pencil />
-                        </Button>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
-
+      <DataTablePagination table={table} />
 
       <CropFormDialog
         mode="create"
@@ -295,6 +298,15 @@ export function CropsPage() {
           if (!open) setEditTarget(null);
         }}
         onSaved={refresh}
+      />
+
+      <DeleteCropDialog
+        crop={deleteTarget}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        onDeleted={refresh}
       />
     </div>
   );
