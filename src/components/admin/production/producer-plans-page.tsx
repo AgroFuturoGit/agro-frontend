@@ -49,9 +49,9 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [roleResolved, setRoleResolved] = useState(false);
 
-  // Guarda de ownership do FARMER (memória `lesson-backend-hierarchy-
-  // ownership`, aplicada ao caso FARMER→produtor descrito nas Prohibitions
-  // do plano): falha fechada até o próprio produtor ser confirmado.
+  // Guarda de ownership do FARMER: o backend não impõe escopo hierárquico em
+  // toda rota, então a UI nunca deixa um agricultor abrir os dados de outro.
+  // Falha fechada até o próprio agricultor ser confirmado.
   const [guardPassed, setGuardPassed] = useState(false);
   const [guardError, setGuardError] = useState<string | null>(null);
   const [redirecting, setRedirecting] = useState(false);
@@ -87,10 +87,10 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   // production plans").
   //
   // OWNERSHIP VERIFICADO contra o backend REAL em 2026-09-17, antes de
-  // liberar a afordância (memória `backend-hierarchy-ownership`: o backend
-  // não garante escopo hierárquico por padrão, então isso se mede, não se
-  // presume). Cenário: dois agricultores A e B na mesma comunidade, cada um
-  // com um plano e um apontamento próprios; autenticado como A:
+  // liberar a afordância — o backend não garante escopo hierárquico em toda
+  // rota, então isso se mede, não se presume. Cenário: dois agricultores A e
+  // B na mesma comunidade, cada um com um plano e um apontamento próprios;
+  // autenticado como A:
   //
   //   DELETE /production-plans/{plano_de_B}          → 403
   //   DELETE /production-executions/{apontamento_B}  → 403
@@ -98,10 +98,11 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   //   DELETE /production-plans/{plano_de_A}          → 204 (some na releitura)
   //
   // Os 403 vêm do próprio Use Case ("O agricultor só tem acesso aos seus
-  // próprios dados de produção"), não apenas do `@PreAuthorize` — as duas
-  // camadas concordam aqui, ao contrário do que produziu R8/R9 (ver
-  // `.planning/memory/lesson-f01-frontend-only-not-e2e-verified.md`). Por
-  // isso o FARMER entra no `canDelete` abaixo.
+  // próprios dados de produção"), não apenas do `@PreAuthorize`. Checar as
+  // duas camadas importa: já houve caso neste projeto em que a validação
+  // interna do Use Case era mais restritiva que o `@PreAuthorize` do
+  // controller, e nenhuma suíte mockada pegou. Aqui elas concordam, por isso
+  // o FARMER entra no `canDelete` abaixo.
   //
   // RN4 preservada: enquanto a role for desconhecida, nenhuma afordância de
   // escrita renderiza.

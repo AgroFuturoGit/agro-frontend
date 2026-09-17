@@ -325,10 +325,8 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
 
     // A listagem começa NÃO-VAZIA de propósito: "Excluir plano" é ação de
     // linha e não renderiza sem linha — um mock vazio faria o teste passar
-    // sem exercitar nada (memória
-    // `role-gating-must-cover-all-write-affordances`, regra 4). Depois do
-    // DELETE, o mesmo endpoint passa a devolver lista vazia, provando que a
-    // tela recarregou.
+    // sem exercitar nada. Depois do DELETE, o mesmo endpoint passa a
+    // devolver lista vazia, provando que a tela recarregou.
     let planDeleted = false;
     const planListRequests: string[] = [];
     await page.route("**/farmers/*/production-plans*", async (route) => {

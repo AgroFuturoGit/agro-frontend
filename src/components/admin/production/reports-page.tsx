@@ -43,9 +43,8 @@ export function ReportsPage() {
   // "Relatórios" para as 4 roles e `proxy.ts` deixa as 4 passarem
   // (`FARMER_GROUP_ALLOWED_ROLES` contém todas). Logo ADMIN/MANAGER/
   // TECHNICIAN chegam na tela e recebem 403, vendo só o alerta de erro.
-  // Gap pré-existente, rastreado como R8 em
-  // `.planning/product/roadmap/RISKS.md` — o fix exige decidir entre gatear
-  // a navegação para FARMER ou dar um caminho de dados às outras roles.
+  // Gap pré-existente e conhecido — o fix exige decidir entre gatear a
+  // navegação para FARMER ou dar um caminho de dados às outras roles.
   const [producer, setProducer] = useState<Producer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
