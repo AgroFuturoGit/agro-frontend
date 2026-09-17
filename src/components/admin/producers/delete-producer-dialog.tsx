@@ -44,7 +44,7 @@ export function DeleteProducerDialog({
       setError(
         err instanceof ApiError
           ? err.message
-          : "Não foi possível excluir o produtor.",
+          : "Não foi possível excluir o agricultor.",
       );
     } finally {
       setSubmitting(false);
@@ -55,11 +55,11 @@ export function DeleteProducerDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Excluir produtor</AlertDialogTitle>
+          <AlertDialogTitle>Excluir agricultor</AlertDialogTitle>
           <AlertDialogDescription>
             Esta ação removerá{" "}
             <span className="font-medium text-foreground">
-              {producer?.user?.fullName ?? "o produtor"}
+              {producer?.user?.fullName ?? "o agricultor"}
             </span>{" "}
             do sistema. Não é possível desfazer.
           </AlertDialogDescription>

@@ -80,7 +80,7 @@ describe("UserFormDrawer — modo create", () => {
 
     expect(labels).toEqual(["Administrador", "Técnico"]); // CREATABLE_ROLES
     expect(labels).not.toContain("Gerente");
-    expect(labels).not.toContain("Produtor");
+    expect(labels).not.toContain("Agricultor");
   });
 });
 
@@ -109,7 +109,7 @@ describe("UserFormDrawer — modo edit", () => {
       "Administrador",
       "Gerente",
       "Técnico",
-      "Produtor",
+      "Agricultor",
     ]);
   });
 

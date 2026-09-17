@@ -61,12 +61,12 @@ beforeEach(() => {
 });
 
 describe("getMyProducer", () => {
-  it("chama apiRequest com /producers/me e método GET", async () => {
+  it("chama apiRequest com /farmers/me e método GET", async () => {
     apiRequestMock.mockResolvedValue(RAW_PRODUCER);
 
     await getMyProducer();
 
-    expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith("/producers/me", {
+    expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith("/farmers/me", {
       method: "GET",
     });
   });
@@ -118,12 +118,12 @@ describe("getMyProducer", () => {
 });
 
 describe("listProducers", () => {
-  it("sem argumento chama GET /producers, sem query string", async () => {
+  it("sem argumento chama GET /farmers, sem query string", async () => {
     apiRequestMock.mockResolvedValue([]);
 
     await listProducers();
 
-    expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith("/producers", {
+    expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith("/farmers", {
       method: "GET",
     });
   });
@@ -134,7 +134,7 @@ describe("listProducers", () => {
     await listProducers("community-beta");
 
     expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith(
-      "/producers?communityId=community-beta",
+      "/farmers?communityId=community-beta",
       { method: "GET" },
     );
   });
@@ -145,7 +145,7 @@ describe("listProducers", () => {
     await listProducers("a b&c=d");
 
     expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith(
-      "/producers?communityId=a%20b%26c%3Dd",
+      "/farmers?communityId=a%20b%26c%3Dd",
       { method: "GET" },
     );
   });
@@ -155,7 +155,7 @@ describe("listProducers", () => {
 
     await listProducers("");
 
-    expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith("/producers", {
+    expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith("/farmers", {
       method: "GET",
     });
   });
@@ -195,13 +195,13 @@ describe("updateProducer", () => {
     isCompliant: false,
   };
 
-  it("chama apiRequest com PUT /producers/{id} e o payload", async () => {
+  it("chama apiRequest com PUT /farmers/{id} e o payload", async () => {
     apiRequestMock.mockResolvedValue(RAW_PRODUCER);
 
     await updateProducer("prod-1", payload);
 
     expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith(
-      "/producers/prod-1",
+      "/farmers/prod-1",
       { method: "PUT", body: payload },
     );
   });
@@ -222,13 +222,13 @@ describe("updateProducer", () => {
 });
 
 describe("deleteProducer", () => {
-  it("chama apiRequest com DELETE /producers/{id}", async () => {
+  it("chama apiRequest com DELETE /farmers/{id}", async () => {
     apiRequestMock.mockResolvedValue(undefined);
 
     await deleteProducer("prod-1");
 
     expect(apiRequestMock).toHaveBeenCalledExactlyOnceWith(
-      "/producers/prod-1",
+      "/farmers/prod-1",
       { method: "DELETE" },
     );
   });

@@ -63,7 +63,7 @@ export function CommunityProducersPage({ communityId }: Props) {
     setError(null);
     try {
       // `GET /communities/{id}` é `hasRole('MANAGER') or hasRole('ADMIN')`
-      // no backend (`CommunityController.java`) — TECHNICIAN/PRODUCER só
+      // no backend (`CommunityController.java`) — TECHNICIAN/FARMER só
       // chegam aqui por URL direta e caem no estado de erro abaixo.
       const communityData = await getCommunity(communityId);
 
@@ -93,7 +93,7 @@ export function CommunityProducersPage({ communityId }: Props) {
       }
 
       setCommunity(communityData);
-      // `GET /producers?communityId=` já escopa no backend — nenhum filtro
+      // `GET /farmers?communityId=` já escopa no backend — nenhum filtro
       // client-side adicional é necessário aqui (diferente da listagem
       // antiga sem escopo por rota).
       setProducers(await listProducers(communityId));
@@ -103,7 +103,7 @@ export function CommunityProducersPage({ communityId }: Props) {
       setError(
         err instanceof ApiError
           ? err.message
-          : "Não foi possível carregar os produtores desta comunidade.",
+          : "Não foi possível carregar os agricultores desta comunidade.",
       );
     } finally {
       setLoading(false);
@@ -150,10 +150,10 @@ export function CommunityProducersPage({ communityId }: Props) {
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            {community?.name ?? "Produtores"}
+            {community?.name ?? "Agricultores"}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Produtores cadastrados nesta comunidade.
+            Agricultores cadastrados nesta comunidade.
           </p>
         </div>
         {canManage && (
@@ -164,7 +164,7 @@ export function CommunityProducersPage({ communityId }: Props) {
             disabled={community === null}
           >
             <Plus />
-            Novo Produtor
+            Novo Agricultor
           </Button>
         )}
       </div>
@@ -219,7 +219,7 @@ export function CommunityProducersPage({ communityId }: Props) {
                   colSpan={colCount}
                   className="py-12 text-center text-sm text-muted-foreground"
                 >
-                  Nenhum produtor cadastrado nesta comunidade ainda.
+                  Nenhum agricultor cadastrado nesta comunidade ainda.
                 </TableCell>
               </TableRow>
             ) : (
@@ -259,7 +259,7 @@ export function CommunityProducersPage({ communityId }: Props) {
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Editar produtor"
+                          aria-label="Editar agricultor"
                           onClick={() => setEditTarget(producer)}
                         >
                           <Pencil />
@@ -268,7 +268,7 @@ export function CommunityProducersPage({ communityId }: Props) {
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Excluir produtor"
+                          aria-label="Excluir agricultor"
                           onClick={() => setDeleteTarget(producer)}
                           className="text-destructive hover:text-destructive"
                         >

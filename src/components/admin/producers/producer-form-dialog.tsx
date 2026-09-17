@@ -61,7 +61,7 @@ export function ProducerFormDialog({
       setError(
         err instanceof ApiError
           ? err.message
-          : "Não foi possível salvar o produtor.",
+          : "Não foi possível salvar o agricultor.",
       );
     } finally {
       setSubmitting(false);
@@ -72,9 +72,9 @@ export function ProducerFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Editar produtor</DialogTitle>
+          <DialogTitle>Editar agricultor</DialogTitle>
           <DialogDescription>
-            Atualize os dados do produtor{" "}
+            Atualize os dados do agricultor{" "}
             <span className="font-medium text-foreground">
               {producer?.user?.fullName ?? ""}
             </span>
@@ -100,7 +100,7 @@ export function ProducerFormDialog({
               value={aliasName}
               onChange={(e) => setAliasName(e.target.value)}
               disabled={submitting}
-              placeholder="Como o produtor é conhecido"
+              placeholder="Como o agricultor é conhecido"
             />
           </div>
 
@@ -112,7 +112,7 @@ export function ProducerFormDialog({
               disabled={submitting}
             />
             <Label htmlFor="isCompliant" className="font-normal">
-              Produtor em conformidade
+              Agricultor em conformidade
             </Label>
           </div>
 

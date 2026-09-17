@@ -191,7 +191,7 @@ describe("registerProducer", () => {
     const producer = await registerProducer("com-1", payload);
 
     expect(apiRequestMock).toHaveBeenCalledWith(
-      "/communities/com-1/producers",
+      "/communities/com-1/farmers",
       {
         method: "POST",
         body: payload,

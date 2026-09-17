@@ -63,7 +63,7 @@ describe("SidebarNav — RBAC de navegação", () => {
     vi.restoreAllMocks();
   });
 
-  it.each(["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"] as const)(
+  it.each(["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"] as const)(
     "exibe 'Organizações' e 'Relatórios' para role=%s (ponto de entrada único da hierarquia)",
     async (role) => {
       mockRole(role);
@@ -74,7 +74,7 @@ describe("SidebarNav — RBAC de navegação", () => {
     },
   );
 
-  it.each(["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"] as const)(
+  it.each(["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"] as const)(
     "não exibe mais os itens antigos 'Comunidades', 'Produtores' e 'Planos de Produção' para role=%s",
     async (role) => {
       mockRole(role);
@@ -96,7 +96,7 @@ describe("SidebarNav — RBAC de navegação", () => {
   });
 
   it("item restrito (Perfis) permanece oculto para role sem permissão (não-regressão)", async () => {
-    mockRole("PRODUCER");
+    mockRole("FARMER");
     renderSidebarNav();
 
     await screen.findByText("Organizações");
@@ -120,7 +120,7 @@ describe("SidebarNav — RBAC de navegação", () => {
     },
   );
 
-  it.each(["TECHNICIAN", "PRODUCER"] as const)(
+  it.each(["TECHNICIAN", "FARMER"] as const)(
     "esconde 'Usuários' para role=%s (não-regressão)",
     async (role) => {
       mockRole(role);

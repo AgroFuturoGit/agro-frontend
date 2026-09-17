@@ -147,7 +147,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
       });
     });
 
-    await page.route("**/producers*", async (route) => {
+    await page.route("**/farmers*", async (route) => {
       if (route.request().method() !== "GET") {
         await route.fallback();
         return;
@@ -164,10 +164,10 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     let registerBody: Record<string, unknown> | null = null;
 
     // Rota mais específica registrada por último = maior prioridade no
-    // Playwright. `POST /communities/{id}/producers` é o endpoint
+    // Playwright. `POST /communities/{id}/farmers` é o endpoint
     // hierárquico de `registerProducer()` — `POST /users/register` rejeita
-    // `role: "PRODUCER"`.
-    await page.route("**/communities/*/producers", async (route) => {
+    // `role: "FARMER"`.
+    await page.route("**/communities/*/farmers", async (route) => {
       const request = route.request();
       if (request.method() !== "POST") {
         await route.fallback();
@@ -200,10 +200,10 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}`);
 
     await expect(
-      page.getByText("Nenhum produtor cadastrado nesta comunidade ainda."),
+      page.getByText("Nenhum agricultor cadastrado nesta comunidade ainda."),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Novo Produtor" }).click();
+    await page.getByRole("button", { name: "Novo Agricultor" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -228,7 +228,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     await expect(dialog.getByRole("status")).toContainText(producerName);
     await expect(dialog.getByRole("status")).toContainText(COMMUNITY_A.name);
 
-    expect(registerUrl).toContain(`/communities/${COMMUNITY_A.id}/producers`);
+    expect(registerUrl).toContain(`/communities/${COMMUNITY_A.id}/farmers`);
     expect(registerBody).toMatchObject({
       fullName: producerName,
       email: "joao.mata@example.com",
@@ -288,10 +288,10 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
       community: { id: COMMUNITY_B.id, name: COMMUNITY_B.name },
     };
 
-    // `GET /producers` só aceita `?communityId=` — o backend fabricado
+    // `GET /farmers` só aceita `?communityId=` — o backend fabricado
     // reproduz exatamente esse contrato. Sem filtro em tela: cada URL de
     // comunidade já traz `communityId` fixo via `listProducers(communityId)`.
-    await page.route("**/producers*", async (route) => {
+    await page.route("**/farmers*", async (route) => {
       const request = route.request();
       if (request.method() !== "GET") {
         await route.fallback();

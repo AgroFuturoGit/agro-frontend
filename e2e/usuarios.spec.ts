@@ -94,7 +94,7 @@ const USERS: FakeUser[] = [
     fullName: "Diego Ferreira",
     email: "diego.ferreira@example.com",
     cpf: "10000000004",
-    role: "PRODUCER",
+    role: "FARMER",
     dateOfBirth: "1992-03-10",
   },
   {
@@ -126,7 +126,7 @@ const USERS: FakeUser[] = [
     fullName: "Hugo Santos",
     email: "hugo.santos@example.com",
     cpf: "10000000008",
-    role: "PRODUCER",
+    role: "FARMER",
     dateOfBirth: "1994-04-18",
   },
   {
@@ -158,7 +158,7 @@ const USERS: FakeUser[] = [
     fullName: "Luís Yamamoto",
     email: "luis.yamamoto@example.com",
     cpf: "10000000012",
-    role: "PRODUCER",
+    role: "FARMER",
     dateOfBirth: "1993-02-27",
   },
   {

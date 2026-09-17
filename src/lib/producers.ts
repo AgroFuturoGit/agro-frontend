@@ -15,10 +15,10 @@ export type Producer = {
     id: string;
     name: string;
     /**
-     * `GET /producers/me` (e `GET /producers`/`GET /producers/{id}`) já
+     * `GET /farmers/me` (e `GET /farmers`/`GET /farmers/{id}`) já
      * devolve o `CommunityResponseDTO` completo, com a organização aninhada
      * (ver `ProducerResponseDTO.java`). Mapear esse campo evita ter que
-     * chamar `GET /communities/{id}` (proibido para PRODUCER,
+     * chamar `GET /communities/{id}` (proibido para FARMER,
      * `hasRole('MANAGER') or hasRole('ADMIN')` em `CommunityController`) só
      * para resolver o nome da organização na navegação em cascata.
      */
@@ -80,7 +80,7 @@ export type ProducerUpdatePayload = {
 
 /** Dados do produtor vinculado ao usuário autenticado. */
 export function getMyProducer() {
-  return apiRequest<ProducerApiResponse>("/producers/me", {
+  return apiRequest<ProducerApiResponse>("/farmers/me", {
     method: "GET",
   }).then(mapProducer);
 }
@@ -93,18 +93,18 @@ export function listProducers(communityId?: string) {
   const query = communityId
     ? `?communityId=${encodeURIComponent(communityId)}`
     : "";
-  return apiRequest<ProducerApiResponse[]>(`/producers${query}`, {
+  return apiRequest<ProducerApiResponse[]>(`/farmers${query}`, {
     method: "GET",
   }).then((list) => list.map(mapProducer));
 }
 
 export function updateProducer(id: string, payload: ProducerUpdatePayload) {
-  return apiRequest<ProducerApiResponse>(`/producers/${id}`, {
+  return apiRequest<ProducerApiResponse>(`/farmers/${id}`, {
     method: "PUT",
     body: payload,
   }).then(mapProducer);
 }
 
 export function deleteProducer(id: string) {
-  return apiRequest<void>(`/producers/${id}`, { method: "DELETE" });
+  return apiRequest<void>(`/farmers/${id}`, { method: "DELETE" });
 }

@@ -35,7 +35,7 @@ export const STATS: StatItem[] = [
 export const FEATURES: FeatureCard[] = [
   {
     icon: Users,
-    title: "Comunidades & Produtores",
+    title: "Comunidades & Agricultores",
     description:
       "Cadastro estruturado por hierarquia cooperativa, garantindo segurança de dados e conformidade de associados.",
     highlight: "Vinculação direta por comunidade",

@@ -91,7 +91,7 @@ function validateField(
       case "dateOfBirth":
         return "Informe a data de nascimento";
       case "communityId":
-        return "Selecione a comunidade do produtor";
+        return "Selecione a comunidade do agricultor";
       default:
         return "Campo obrigatório";
     }
@@ -194,7 +194,7 @@ export function ProducerRegisterDialog({
         }
         setFormError(err.message);
       } else {
-        setFormError("Não foi possível cadastrar o produtor.");
+        setFormError("Não foi possível cadastrar o agricultor.");
       }
     } finally {
       setSubmitting(false);
@@ -213,9 +213,9 @@ export function ProducerRegisterDialog({
         {registeredName ? (
           <>
             <DialogHeader>
-              <DialogTitle>Produtor cadastrado</DialogTitle>
+              <DialogTitle>Agricultor cadastrado</DialogTitle>
               <DialogDescription>
-                O produtor foi vinculado à comunidade selecionada.
+                O agricultor foi vinculado à comunidade selecionada.
               </DialogDescription>
             </DialogHeader>
 
@@ -226,7 +226,7 @@ export function ProducerRegisterDialog({
               <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
               <span>
                 <strong>{registeredName}</strong> foi cadastrado(a) como
-                produtor(a)
+                agricultor(a)
                 {registeredCommunity ? ` da comunidade "${registeredCommunity}"` : ""}
                 .
               </span>
@@ -241,9 +241,9 @@ export function ProducerRegisterDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>Novo produtor</DialogTitle>
+              <DialogTitle>Novo agricultor</DialogTitle>
               <DialogDescription>
-                Cadastre um produtor vinculado a uma comunidade.
+                Cadastre um agricultor vinculado a uma comunidade.
               </DialogDescription>
             </DialogHeader>
 

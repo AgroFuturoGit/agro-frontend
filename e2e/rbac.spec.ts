@@ -34,10 +34,10 @@ test("MANAGER acessa /admin/organizacoes sem redirecionamento", async ({
   await expect(page).toHaveURL(/\/admin\/organizacoes/);
 });
 
-test("PRODUCER é redirecionado de /admin/perfis para /admin", async ({
+test("FARMER é redirecionado de /admin/perfis para /admin", async ({
   page,
 }) => {
-  await loginAs(page, "PRODUCER");
+  await loginAs(page, "FARMER");
 
   await page.goto("/admin/perfis");
 

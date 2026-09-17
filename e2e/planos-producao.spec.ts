@@ -14,8 +14,8 @@ import type { Page } from "@playwright/test";
  * quebrava de verdade para o MANAGER contra o backend real
  * (memória `f01-frontend-only-not-e2e-verified`).
  *
- * Agrava o caso aqui: `GET /producers` (TECHNICIAN) e
- * `GET /producers/{id}/production-plans` (MANAGER) dependem das correções
+ * Agrava o caso aqui: `GET /farmers` (TECHNICIAN) e
+ * `GET /farmers/{id}/production-plans` (MANAGER) dependem das correções
  * da branch `fix/rbac-alinhamento-frontend` do `agro-backend` (risco R10).
  * Contra o backend atual essas chamadas ainda respondem 403 — o mock passa
  * por cima disso.
@@ -157,7 +157,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
       });
     });
 
-    await page.route("**/producers*", async (route) => {
+    await page.route("**/farmers*", async (route) => {
       if (route.request().method() !== "GET") {
         await route.fallback();
         return;
@@ -172,7 +172,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     // Rota mais específica registrada por último = maior prioridade.
     const planRequests: string[] = [];
     await page.route(
-      "**/producers/*/production-plans*",
+      "**/farmers/*/production-plans*",
       async (route) => {
         const request = route.request();
         if (request.method() !== "GET") {
@@ -197,9 +197,9 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
       `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}`,
     );
 
-    // "Novo plano" é hasRole('PRODUCER', 'ADMIN', 'TECHNICIAN') no backend —
+    // "Novo plano" é hasRole('FARMER', 'ADMIN', 'TECHNICIAN') no backend —
     // TECHNICIAN escreve, então o botão aparece (não-regressão RN da
-    // migração; só delete continua ADMIN/TECHNICIAN apenas).
+    // migração). O delete tem exatamente as mesmas 3 roles.
     await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Safra 2026" })).toBeVisible();
 
@@ -208,11 +208,11 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
 
     expect(planRequests).toHaveLength(1);
     expect(planRequests[0]).toContain(
-      `/producers/${PRODUCER_ANA.id}/production-plans`,
+      `/farmers/${PRODUCER_ANA.id}/production-plans`,
     );
   });
 
-  test("PRODUCER cai direto nos próprios planos ao acessar /admin/organizacoes, sem seletor de produtor", async ({
+  test("FARMER cai direto nos próprios planos ao acessar /admin/organizacoes, sem seletor de produtor", async ({
     page,
   }) => {
     const producerUser: FakeUser = {
@@ -220,17 +220,17 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
       fullName: PRODUCER_ANA.user.fullName,
       email: PRODUCER_ANA.user.email,
       cpf: PRODUCER_ANA.user.cpf,
-      role: "PRODUCER",
+      role: "FARMER",
       dateOfBirth: "1990-04-02",
     };
 
-    await loginAs(page, "PRODUCER", producerUser);
+    await loginAs(page, "FARMER", producerUser);
 
-    // Rede de segurança contra regressão: o PRODUCER nunca deve listar
+    // Rede de segurança contra regressão: o FARMER nunca deve listar
     // produtores nem organizações/comunidades — o caminho dele é inteiro via
-    // `GET /producers/me` (que já traz comunidade+organização aninhadas).
+    // `GET /farmers/me` (que já traz comunidade+organização aninhadas).
     const listProducersRequests: string[] = [];
-    await page.route("**/producers*", async (route) => {
+    await page.route("**/farmers*", async (route) => {
       if (route.request().method() !== "GET") {
         await route.fallback();
         return;
@@ -243,7 +243,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
       });
     });
 
-    await page.route("**/producers/me", async (route) => {
+    await page.route("**/farmers/me", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -252,7 +252,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     });
 
     await page.route(
-      "**/producers/*/production-plans*",
+      "**/farmers/*/production-plans*",
       async (route) => {
         if (route.request().method() !== "GET") {
           await route.fallback();
@@ -266,7 +266,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
       },
     );
 
-    // `/admin/organizacoes` é o único ponto de entrada — PRODUCER é
+    // `/admin/organizacoes` é o único ponto de entrada — FARMER é
     // redirecionado automaticamente até o próprio produtor.
     await page.goto("/admin/organizacoes");
 
@@ -280,8 +280,8 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
       page.getByRole("cell", { name: /Milho — Catuaí/ }),
     ).toBeVisible();
 
-    // Proibição explícita: o PRODUCER não vê seletor de produtor nem lista
-    // GET /producers.
+    // Proibição explícita: o FARMER não vê seletor de produtor nem lista
+    // GET /farmers.
     await expect(page.getByRole("combobox")).toHaveCount(0);
     expect(listProducersRequests).toHaveLength(0);
 
@@ -291,11 +291,102 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     ).toBeVisible();
 
     // Breadcrumb mostra a hierarquia real do produtor, resolvida via
-    // `GET /producers/me` — não navegável para outro recurso (só o último
+    // `GET /farmers/me` — não navegável para outro recurso (só o último
     // nível é não-clicável; os anteriores levam sempre aos próprios
     // recursos do produtor).
     const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
     await expect(breadcrumb).toContainText(ORGANIZATION.name);
     await expect(breadcrumb).toContainText(COMMUNITY_A.name);
+  });
+
+  test("FARMER exclui o próprio plano: vê o botão, confirma no dialog e a lista recarrega sem ele", async ({
+    page,
+  }) => {
+    const farmerUser: FakeUser = {
+      id: PRODUCER_ANA.user.id,
+      fullName: PRODUCER_ANA.user.fullName,
+      email: PRODUCER_ANA.user.email,
+      cpf: PRODUCER_ANA.user.cpf,
+      role: "FARMER",
+      dateOfBirth: "1990-04-02",
+    };
+
+    await loginAs(page, "FARMER", farmerUser);
+
+    const PLAN = planFor(PRODUCER_ANA.id, "Milho");
+
+    await page.route("**/farmers/me", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(PRODUCER_ANA),
+      });
+    });
+
+    // A listagem começa NÃO-VAZIA de propósito: "Excluir plano" é ação de
+    // linha e não renderiza sem linha — um mock vazio faria o teste passar
+    // sem exercitar nada. Depois do DELETE, o mesmo endpoint passa a
+    // devolver lista vazia, provando que a tela recarregou.
+    let planDeleted = false;
+    const planListRequests: string[] = [];
+    await page.route("**/farmers/*/production-plans*", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.fallback();
+        return;
+      }
+      planListRequests.push(route.request().url());
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(planDeleted ? [] : [PLAN]),
+      });
+    });
+
+    const deleteRequests: string[] = [];
+    await page.route("**/production-plans/*", async (route) => {
+      if (route.request().method() !== "DELETE") {
+        await route.fallback();
+        return;
+      }
+      deleteRequests.push(route.request().url());
+      planDeleted = true;
+      await route.fulfill({ status: 204, body: "" });
+    });
+
+    await page.goto(
+      `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}`,
+    );
+
+    // Pré-condição: há uma linha em tela, logo a ação de linha é alcançável.
+    await expect(
+      page.getByRole("cell", { name: /Milho — Catuaí/ }),
+    ).toBeVisible();
+
+    const deleteButton = page.getByRole("button", { name: "Excluir plano" });
+    await expect(deleteButton).toBeVisible();
+    await deleteButton.click();
+
+    // Confirmação pendente: o dialog abre e nada foi excluído ainda.
+    const dialog = page.getByRole("alertdialog", {
+      name: "Excluir plano de produção",
+    });
+    await expect(dialog).toBeVisible();
+    expect(deleteRequests).toHaveLength(0);
+
+    await dialog.getByRole("button", { name: "Excluir", exact: true }).click();
+
+    // Sucesso: o dialog fecha, o DELETE bateu no plano certo e a lista
+    // recarregou — agora sem o plano.
+    await expect(dialog).toBeHidden();
+    expect(deleteRequests).toHaveLength(1);
+    expect(deleteRequests[0]).toContain(`/production-plans/${PLAN.id}`);
+
+    await expect(
+      page.getByText("Nenhum plano de produção cadastrado ainda."),
+    ).toBeVisible();
+    await expect(page.getByRole("cell", { name: /Milho — Catuaí/ })).toHaveCount(
+      0,
+    );
+    expect(planListRequests.length).toBeGreaterThanOrEqual(2);
   });
 });

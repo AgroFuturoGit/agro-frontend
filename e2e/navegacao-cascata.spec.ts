@@ -20,7 +20,7 @@ import type { Page } from "@playwright/test";
  * `GET /organizations` é `hasRole('ADMIN')`. A resposta do backend em
  * `issues-fix-back.pdf` (itens 7/8) trocou o desenho: TECHNICIAN não navega
  * mais pela cascata institucional, ele cai direto na lista de produtores
- * atribuídos a ele via `GET /technicians/me/producers`. Ver o cenário
+ * atribuídos a ele via `GET /technicians/me/farmers`. Ver o cenário
  * "TECHNICIAN cai direto na lista de produtores atendidos" abaixo.
  */
 
@@ -153,7 +153,7 @@ const PRODUCER_USER: FakeUser = {
   fullName: PRODUCER.user.fullName,
   email: PRODUCER.user.email,
   cpf: PRODUCER.user.cpf,
-  role: "PRODUCER",
+  role: "FARMER",
   dateOfBirth: "1990-04-02",
 };
 
@@ -229,7 +229,7 @@ async function mockCommunityById(page: Page, community = COMMUNITY) {
 }
 
 async function mockProducersList(page: Page, producers = [PRODUCER]) {
-  await page.route("**/producers?*", async (route) => {
+  await page.route("**/farmers?*", async (route) => {
     if (route.request().method() !== "GET") {
       await route.fallback();
       return;
@@ -243,7 +243,7 @@ async function mockProducersList(page: Page, producers = [PRODUCER]) {
 }
 
 async function mockMyProducer(page: Page, producer = PRODUCER) {
-  await page.route("**/producers/me", async (route) => {
+  await page.route("**/farmers/me", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -253,7 +253,7 @@ async function mockMyProducer(page: Page, producer = PRODUCER) {
 }
 
 async function mockMyAssignedProducers(page: Page, producers = [PRODUCER]) {
-  await page.route("**/technicians/me/producers", async (route) => {
+  await page.route("**/technicians/me/farmers", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -263,7 +263,7 @@ async function mockMyAssignedProducers(page: Page, producers = [PRODUCER]) {
 }
 
 async function mockPlansForProducer(page: Page, plans: unknown[] = [PLAN]) {
-  await page.route(`**/producers/${PRODUCER.id}/production-plans`, async (route) => {
+  await page.route(`**/farmers/${PRODUCER.id}/production-plans`, async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -434,10 +434,10 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
 
     // Fica na mesma URL (`/admin/organizacoes`), mas não é a lista de
     // organizações — é a lista de produtores atribuídos via
-    // `GET /technicians/me/producers` (issues-fix-back.pdf itens 7/8).
+    // `GET /technicians/me/farmers` (issues-fix-back.pdf itens 7/8).
     await expect(page).toHaveURL(/\/admin\/organizacoes$/);
     await expect(
-      page.getByRole("heading", { name: "Meus produtores atendidos" }),
+      page.getByRole("heading", { name: "Meus agricultores atendidos" }),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: PRODUCER.user.fullName }),
@@ -452,14 +452,14 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await loginAs(page, "TECHNICIAN", TECHNICIAN_USER);
     await mockMyAssignedProducers(page);
     await mockPlansForProducer(page, [PLAN]);
-    // `GET /communities/{id}` e `GET /producers` continuam
+    // `GET /communities/{id}` e `GET /farmers` continuam
     // `hasRole('MANAGER') or hasRole('ADMIN')` no backend real — o
     // breadcrumb da página de planos precisa tolerar o 403 e cair em
     // rótulos genéricos, sem impedir a listagem de planos de carregar.
     await page.route(`**/communities/${COMMUNITY.id}`, async (route) => {
       await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
     });
-    await page.route("**/producers?*", async (route) => {
+    await page.route("**/farmers?*", async (route) => {
       await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
     });
 
@@ -474,10 +474,10 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
   });
 
-  test("PRODUCER acessando /admin/organizacoes cai direto nos próprios planos, com breadcrumb real", async ({
+  test("FARMER acessando /admin/organizacoes cai direto nos próprios planos, com breadcrumb real", async ({
     page,
   }) => {
-    await loginAs(page, "PRODUCER", PRODUCER_USER);
+    await loginAs(page, "FARMER", PRODUCER_USER);
     await mockMyProducer(page);
     await mockPlansForProducer(page, [PLAN]);
 
@@ -519,7 +519,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
 
     await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY.id}`);
     await expect(
-      page.getByText("Nenhum produtor cadastrado nesta comunidade ainda."),
+      page.getByText("Nenhum agricultor cadastrado nesta comunidade ainda."),
     ).toBeVisible();
     // Não usa `getByRole("alert")` aqui: o Next.js injeta um elemento
     // `role="alert"` global (route announcer de acessibilidade) em toda
@@ -541,7 +541,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
   });
 
   test.describe("Sidebar — itens antigos não existem mais para nenhuma role", () => {
-    for (const role of ["ADMIN", "MANAGER", "TECHNICIAN", "PRODUCER"]) {
+    for (const role of ["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"]) {
       test(`role=${role}: 'Comunidades', 'Produtores' e 'Planos de Produção' não aparecem na sidebar`, async ({
         page,
       }) => {

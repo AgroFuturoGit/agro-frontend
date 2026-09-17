@@ -98,7 +98,7 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         return;
       }
 
-      // ADMIN: caminho normal. TECHNICIAN/PRODUCER só chegam aqui por URL
+      // ADMIN: caminho normal. TECHNICIAN/FARMER só chegam aqui por URL
       // direta — `GET /organizations/{id}` e `GET /communities` recusam as
       // duas roles no backend real, então a tela cai no estado de erro
       // (comportamento aceito e documentado, mesmo padrão já usado para

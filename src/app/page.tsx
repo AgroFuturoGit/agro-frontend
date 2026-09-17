@@ -70,7 +70,7 @@ export default function HomePage() {
 
             <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground sm:text-lg">
               Acompanhe talhões, estimativas de safra, apontamentos diários de
-              colheita e a conformidade de produtores em uma única plataforma
+              colheita e a conformidade de agricultores em uma única plataforma
               integrada, preparada para funcionar no campo.
             </p>
 

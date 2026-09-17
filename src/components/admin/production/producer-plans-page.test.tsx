@@ -6,7 +6,11 @@ import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
 import { getMyProducer, listProducers, type Producer } from "@/lib/producers";
-import { listProductionPlans, type ProductionPlan } from "@/lib/production";
+import {
+  deleteProductionPlan,
+  listProductionPlans,
+  type ProductionPlan,
+} from "@/lib/production";
 import type { Organization } from "@/lib/organizations";
 import { resetNavigationMock, router } from "@/test/next-navigation";
 
@@ -34,7 +38,11 @@ vi.mock("@/lib/production", async () => {
     await vi.importActual<typeof import("@/lib/production")>(
       "@/lib/production",
     );
-  return { ...actual, listProductionPlans: vi.fn() };
+  return {
+    ...actual,
+    listProductionPlans: vi.fn(),
+    deleteProductionPlan: vi.fn(),
+  };
 });
 
 vi.mock("@/lib/auth", async () => {
@@ -120,6 +128,7 @@ beforeEach(() => {
   vi.mocked(getCommunity).mockResolvedValue(COMMUNITY);
   vi.mocked(listProducers).mockResolvedValue([MY_PRODUCER, OTHER_PRODUCER]);
   vi.mocked(listProductionPlans).mockResolvedValue([]);
+  vi.mocked(deleteProductionPlan).mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -129,7 +138,7 @@ afterEach(() => {
 });
 
 describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", () => {
-  it("ADMIN: lista os planos do produtor da URL diretamente", async () => {
+  it("ADMIN: lista os planos do agricultor da URL diretamente", async () => {
     loginAs("ADMIN");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 
@@ -140,8 +149,8 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     expect(screen.queryByRole("combobox")).toBeNull();
   });
 
-  it("PRODUCER: acessando o próprio producerId, vê os planos normalmente", async () => {
-    loginAs("PRODUCER");
+  it("FARMER: acessando o próprio producerId, vê os planos normalmente", async () => {
+    loginAs("FARMER");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 
     renderPage("producer-1");
@@ -150,8 +159,8 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     expect(router.replace).not.toHaveBeenCalled();
   });
 
-  it("PRODUCER: acessando producerId de outro produtor é bloqueado e redireciona (guarda de ownership)", async () => {
-    loginAs("PRODUCER");
+  it("FARMER: acessando producerId de outro agricultor é bloqueado e redireciona (guarda de ownership)", async () => {
+    loginAs("FARMER");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
 
     renderPage("producer-2");
@@ -182,11 +191,13 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
     expect(screen.queryByRole("button", { name: /Novo plano/i })).toBeNull();
   });
 
-  // canWrite = PRODUCER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
-  // apenas (@PreAuthorize real do ProductionController). ADMIN e TECHNICIAN
-  // têm as 3 ações (Novo plano, Editar, Excluir); PRODUCER edita mas nunca
-  // exclui.
-  it.each(["ADMIN", "TECHNICIAN"] as const)(
+  // canWrite = canDelete = FARMER/ADMIN/TECHNICIAN, espelhando o
+  // `@PreAuthorize` real de `DELETE /production-plans/{planId}`
+  // (`hasAnyRole('ADMIN', 'TECHNICIAN', 'FARMER')`). O FARMER entrou nesta
+  // lista depois de o ownership ser medido contra o backend real (403 no
+  // plano de outro agricultor, 204 no próprio) — ver o comentário em
+  // `producer-plans-page.tsx`.
+  it.each(["ADMIN", "TECHNICIAN", "FARMER"] as const)(
     "%s: com plano em tela, vê todas as ações de escrita, incluindo excluir",
     async (role) => {
       loginAs(role);
@@ -201,19 +212,6 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
       expect(screen.getByRole("button", { name: /Novo plano/i })).toBeTruthy();
     },
   );
-
-  it("PRODUCER: com plano em tela, vê Novo/Editar plano, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
-    loginAs("PRODUCER");
-    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
-
-    renderPage("producer-1");
-
-    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: "Ações" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Editar plano" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Novo plano/i })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Excluir plano" })).toBeNull();
-  });
 
   it("MANAGER: sem planos, vê o estado vazio SEM atalho de criação", async () => {
     loginAs("MANAGER");
@@ -238,6 +236,75 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
     );
     expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Novo plano/i })).toBeNull();
+  });
+});
+
+/**
+ * Estados do `DeletePlanDialog` exercitados pela role recém-liberada. A lista
+ * SEMPRE tem pelo menos uma linha (lição
+ * `role-gating-must-cover-all-write-affordances`, regra 4): sem linha, a ação
+ * de linha não renderiza e o teste passaria por vazio.
+ */
+describe("ProducerPlansPage — exclusão de plano pelo FARMER", () => {
+  async function openDeleteDialog() {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Excluir plano" }));
+    expect(
+      await screen.findByRole("alertdialog", {
+        name: "Excluir plano de produção",
+      }),
+    ).toBeTruthy();
+  }
+
+  it("confirmação pendente: o dialog abre e NADA é excluído antes do confirmar", async () => {
+    await openDeleteDialog();
+
+    expect(deleteProductionPlan).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeTruthy();
+    // Só os carregamentos iniciais — nenhum refresh disparado ainda.
+    expect(vi.mocked(listProductionPlans).mock.calls.length).toBe(1);
+  });
+
+  it("sucesso: chama a API, fecha o dialog e recarrega a lista", async () => {
+    await openDeleteDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
+
+    await waitFor(() =>
+      expect(deleteProductionPlan).toHaveBeenCalledWith("plan-1"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("alertdialog", {
+          name: "Excluir plano de produção",
+        }),
+      ).toBeNull(),
+    );
+    expect(vi.mocked(listProductionPlans).mock.calls.length).toBe(2);
+  });
+
+  it("erro da API: mostra o alerta, mantém o dialog aberto e não recarrega", async () => {
+    await openDeleteDialog();
+    vi.mocked(deleteProductionPlan).mockRejectedValue(
+      new ApiError(403, "Você não pode excluir este plano.", null),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
+
+    expect(
+      await screen.findByText("Você não pode excluir este plano."),
+    ).toBeTruthy();
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(
+      screen.getByRole("alertdialog", { name: "Excluir plano de produção" }),
+    ).toBeTruthy();
+    expect(vi.mocked(listProductionPlans).mock.calls.length).toBe(1);
   });
 });
 

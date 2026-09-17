@@ -13,6 +13,7 @@ import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getMyProducer, listProducers } from "@/lib/producers";
 import {
+  deleteProductionExecution,
   getProductionComparison,
   getProductionPlan,
   listProductionExecutions,
@@ -36,6 +37,7 @@ vi.mock("@/lib/production", async () => {
     getProductionPlan: vi.fn(),
     getProductionComparison: vi.fn(),
     listProductionExecutions: vi.fn(),
+    deleteProductionExecution: vi.fn(),
   };
 });
 
@@ -159,6 +161,7 @@ beforeEach(() => {
   vi.mocked(getProductionPlan).mockResolvedValue(PLAN);
   vi.mocked(getProductionComparison).mockResolvedValue(COMPARISON);
   vi.mocked(listProductionExecutions).mockResolvedValue(EXECUTIONS);
+  vi.mocked(deleteProductionExecution).mockResolvedValue(undefined);
   // Resolução do breadcrumb: best-effort, não faz parte das asserções deste
   // arquivo — qualquer resultado plausível serve.
   vi.mocked(getCommunity).mockRejectedValue(new Error("not relevant here"));
@@ -174,7 +177,7 @@ afterEach(() => {
 /**
  * Gap C2 do `qa-report.md`: esta tela tinha ZERO teste e passou a ser
  * alcançável por MANAGER/TECHNICIAN/ADMIN em F03 (os 3 GET foram abertos às 4
- * roles). POST/PUT/DELETE de apontamento continuam `hasRole('PRODUCER')` no
+ * roles). POST/PUT/DELETE de apontamento continuam `hasRole('FARMER')` no
  * backend, então toda afordância de escrita visível para as demais roles é
  * 403 garantido.
  */
@@ -207,11 +210,13 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     expect(queryWriteAffordances().novoApontamento).toBeNull();
   });
 
-  // canWrite = PRODUCER/ADMIN/TECHNICIAN; canDelete = ADMIN/TECHNICIAN
-  // apenas (@PreAuthorize real do ProductionController — comentário em
-  // `plan-detail.tsx`). ADMIN e TECHNICIAN têm as 4 ações; PRODUCER edita
-  // mas nunca exclui.
-  it.each(["ADMIN", "TECHNICIAN"] as const)(
+  // canWrite = canDelete = FARMER/ADMIN/TECHNICIAN, espelhando o
+  // `@PreAuthorize` real de `DELETE /production-executions/{executionId}`
+  // (`hasAnyRole('ADMIN', 'TECHNICIAN', 'FARMER')`). O FARMER entrou nesta
+  // lista depois de o ownership ser medido contra o backend real (403 no
+  // apontamento de outro agricultor, 204 no próprio) — ver o comentário em
+  // `plan-detail.tsx`.
+  it.each(["ADMIN", "TECHNICIAN", "FARMER"] as const)(
     "%s: vê as 4 ações de escrita, incluindo excluir (create/update/delete liberados)",
     async (role) => {
       loginAs(role);
@@ -233,27 +238,8 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     },
   );
 
-  it("PRODUCER: vê Novo/Editar apontamento, mas NÃO vê Excluir (delete é só ADMIN/TECHNICIAN)", async () => {
-    loginAs("PRODUCER");
-
-    renderPlanDetail();
-
-    await expectPlanIsReadable();
-
-    expect(
-      screen.getByRole("button", { name: /Novo apontamento/i }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", { name: "Editar apontamento" }),
-    ).toBeTruthy();
-    expect(screen.getByRole("columnheader", { name: "Ações" })).toBeTruthy();
-    expect(
-      screen.queryByRole("button", { name: "Excluir apontamento" }),
-    ).toBeNull();
-  });
-
-  it("PRODUCER sem apontamentos: vê 'Registrar primeira colheita'", async () => {
-    loginAs("PRODUCER");
+  it("FARMER sem apontamentos: vê 'Registrar primeira colheita'", async () => {
+    loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue([]);
 
     renderPlanDetail();
@@ -283,6 +269,72 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
   });
 });
 
+/**
+ * Estados do `DeleteExecutionDialog` exercitados pela role recém-liberada.
+ * `EXECUTIONS` tem uma linha de propósito: a ação de linha só renderiza se
+ * houver linha (lição `role-gating-must-cover-all-write-affordances`,
+ * regra 4).
+ */
+describe("PlanDetail — exclusão de apontamento pelo FARMER", () => {
+  async function openDeleteDialog() {
+    loginAs("FARMER");
+
+    renderPlanDetail();
+
+    await expectPlanIsReadable();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Excluir apontamento" }),
+    );
+    expect(
+      await screen.findByRole("alertdialog", { name: "Excluir apontamento" }),
+    ).toBeTruthy();
+  }
+
+  it("confirmação pendente: o dialog abre e NADA é excluído antes do confirmar", async () => {
+    await openDeleteDialog();
+
+    expect(deleteProductionExecution).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Excluir" })).toBeTruthy();
+    expect(vi.mocked(listProductionExecutions).mock.calls.length).toBe(1);
+  });
+
+  it("sucesso: chama a API, fecha o dialog e recarrega os 3 GET da tela", async () => {
+    await openDeleteDialog();
+
+    fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
+
+    await waitFor(() =>
+      expect(deleteProductionExecution).toHaveBeenCalledWith("execution-1"),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("alertdialog", { name: "Excluir apontamento" }),
+      ).toBeNull(),
+    );
+    expect(vi.mocked(listProductionExecutions).mock.calls.length).toBe(2);
+    expect(vi.mocked(getProductionComparison).mock.calls.length).toBe(2);
+  });
+
+  it("erro da API: mostra o alerta, mantém o dialog aberto e não recarrega", async () => {
+    await openDeleteDialog();
+    vi.mocked(deleteProductionExecution).mockRejectedValue(
+      new ApiError(403, "Você não pode excluir este apontamento.", null),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
+
+    expect(
+      await screen.findByText("Você não pode excluir este apontamento."),
+    ).toBeTruthy();
+    expect(screen.getByRole("alert")).toBeTruthy();
+    expect(
+      screen.getByRole("alertdialog", { name: "Excluir apontamento" }),
+    ).toBeTruthy();
+    expect(vi.mocked(listProductionExecutions).mock.calls.length).toBe(1);
+  });
+});
+
 describe("PlanDetail — erro de API e recuperação", () => {
   it("erro no carregamento exibe role=alert com a mensagem do ApiError e nenhuma escrita", async () => {
     loginAs("MANAGER");
@@ -300,7 +352,7 @@ describe("PlanDetail — erro de API e recuperação", () => {
   });
 
   it("'Tentar novamente' refaz os 3 GET e a tela se recupera", async () => {
-    loginAs("PRODUCER");
+    loginAs("FARMER");
     vi.mocked(getProductionPlan)
       .mockRejectedValueOnce(new ApiError(503, "Serviço indisponível", {}))
       .mockResolvedValue(PLAN);
@@ -322,7 +374,7 @@ describe("PlanDetail — erro de API e recuperação", () => {
   });
 
   it("erro não-ApiError cai na mensagem genérica da tela", async () => {
-    loginAs("PRODUCER");
+    loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockRejectedValue(new Error("boom"));
 
     renderPlanDetail();

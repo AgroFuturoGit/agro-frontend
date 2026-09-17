@@ -155,7 +155,7 @@ describe("ProducerRegisterDialog — cadastro por comunidade (spec.md §5)", () 
     submitForm();
 
     expect(
-      await screen.findByText("Selecione a comunidade do produtor"),
+      await screen.findByText("Selecione a comunidade do agricultor"),
     ).toBeTruthy();
     expect(registerProducer).not.toHaveBeenCalled();
   });

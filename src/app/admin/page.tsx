@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 const STATS = [
-  { label: "Produtores ativos", value: "0", icon: Users },
+  { label: "Agricultores ativos", value: "0", icon: Users },
   { label: "Safras em curso", value: "0", icon: Sprout },
   { label: "Cultivos cadastrados", value: "0", icon: Leaf },
   { label: "Produtividade média", value: "—", icon: TrendingUp },

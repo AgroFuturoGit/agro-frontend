@@ -111,14 +111,14 @@ export function deleteCommunity(id: string): Promise<void> {
 /**
  * Registra um Producer vinculado a uma Comunidade.
  * Fluxo hierárquico obrigatório — `POST /users/register` rejeita
- * `role: "PRODUCER"` com 400.
+ * `role: "FARMER"` com 400.
  */
 export function registerProducer(
   communityId: string,
   payload: ProducerRegisterPayload,
 ): Promise<Producer> {
   return apiRequest<ProducerRegisterApiResponse>(
-    `/communities/${communityId}/producers`,
+    `/communities/${communityId}/farmers`,
     {
       method: "POST",
       body: payload,
