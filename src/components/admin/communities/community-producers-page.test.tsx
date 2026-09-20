@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 
 import { CommunityProducersPage } from "@/components/admin/communities/community-producers-page";
 import { ApiError } from "@/lib/api";
@@ -195,5 +196,69 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Falhou");
     expect(screen.queryByText("Ana Alves")).toBeNull();
+  });
+});
+
+describe("CommunityProducersPage — tabela de dados", () => {
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("filtra por e-mail após o debounce", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([
+      PRODUCER_ALFA,
+      {
+        ...PRODUCER_ALFA,
+        id: "producer-2",
+        user: { ...PRODUCER_ALFA.user!, fullName: "Bruno Silva", email: "bruno@agro.com" },
+      },
+    ]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+    await screen.findByText("Ana Alves");
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.type(
+      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou apelido…"),
+      "bruno@agro.com",
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(screen.getByText("Bruno Silva")).toBeTruthy();
+      expect(screen.queryByText("Ana Alves")).toBeNull();
+    });
+  });
+
+  it("pagina a lista em blocos de dez produtores", async () => {
+    loginAs("ADMIN");
+    const producers = Array.from({ length: 11 }, (_, index) => ({
+      ...PRODUCER_ALFA,
+      id: `producer-${index + 1}`,
+      user: {
+        ...PRODUCER_ALFA.user!,
+        fullName: `Produtor ${String(index + 1).padStart(2, "0")}`,
+      },
+    }));
+    vi.mocked(listProducers).mockResolvedValue(producers);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+    await screen.findByText("Produtor 01");
+
+    expect(screen.getByText("Produtor 10")).toBeTruthy();
+    expect(screen.queryByText("Produtor 11")).toBeNull();
+
+    await userEvent.setup().click(
+      screen.getByRole("button", { name: "Próxima página" }),
+    );
+
+    expect(screen.getByText("Produtor 11")).toBeTruthy();
+    expect(screen.queryByText("Produtor 01")).toBeNull();
   });
 });

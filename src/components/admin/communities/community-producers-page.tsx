@@ -1,22 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+  type SortingState,
+} from "@tanstack/react-table";
 
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
@@ -31,6 +38,25 @@ import { ProducerRegisterDialog } from "../producers/producer-register-dialog";
 type Props = {
   communityId: string;
 };
+
+function producersGlobalFilter(
+  row: Row<Producer>,
+  _columnId: string,
+  filterValue: string,
+) {
+  const query = filterValue.trim().toLowerCase();
+  if (!query) return true;
+
+  const producer = row.original;
+  return [
+    producer.user?.fullName,
+    producer.user?.email,
+    producer.user?.cpf,
+    producer.aliasName,
+  ].some((value) => value?.toLowerCase().includes(query));
+}
+
+const columnHelper = createColumnHelper<Producer>();
 
 export function CommunityProducersPage({ communityId }: Props) {
   const router = useRouter();
@@ -49,6 +75,12 @@ export function CommunityProducersPage({ communityId }: Props) {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Producer | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Producer | null>(null);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -115,15 +147,109 @@ export function CommunityProducersPage({ communityId }: Props) {
     refresh();
   }, [refresh]);
 
-  const sortedProducers = [...producers].sort((a, b) =>
-    (a.user?.fullName ?? a.aliasName ?? "").localeCompare(
-      b.user?.fullName ?? b.aliasName ?? "",
-    ),
-  );
-
   const canManage = currentRole === "ADMIN" || currentRole === "MANAGER";
-  const colCount = canManage ? 5 : 4;
   const orgId = community?.organization.id;
+
+  const columns = useMemo(() => {
+    const baseColumns = [
+      columnHelper.accessor((producer) => producer.user?.fullName ?? producer.aliasName ?? "", {
+        id: "fullName",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
+        ),
+        cell: ({ row }) => (
+          <Link
+            href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${row.original.id}`}
+            className="font-medium text-foreground hover:underline"
+          >
+            {row.original.user?.fullName ?? row.original.aliasName ?? "—"}
+          </Link>
+        ),
+      }),
+      columnHelper.accessor((producer) => producer.user?.cpf ?? "", {
+        id: "cpf",
+        header: "CPF",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs text-muted-foreground">
+            {row.original.user?.cpf ? formatCpf(row.original.user.cpf) : "—"}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("aliasName", {
+        header: "Apelido",
+        enableSorting: false,
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue() ?? "—"}</span>
+        ),
+      }),
+      columnHelper.accessor("isCompliant", {
+        header: "Conformidade",
+        enableSorting: false,
+        cell: (info) => {
+          const value = info.getValue();
+          if (value == null) return <span className="text-muted-foreground">—</span>;
+          return value ? (
+            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              Em conformidade
+            </span>
+          ) : (
+            <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+              Pendente
+            </span>
+          );
+        },
+      }),
+    ];
+
+    const actionsColumn = columnHelper.display({
+      id: "actions",
+      header: "Ações",
+      cell: ({ row }) => (
+        <div className="inline-flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Editar agricultor"
+            onClick={() => setEditTarget(row.original)}
+          >
+            <Pencil />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Excluir agricultor"
+            onClick={() => setDeleteTarget(row.original)}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 />
+          </Button>
+        </div>
+      ),
+    });
+
+    return (canManage ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
+      Producer,
+      unknown
+    >[];
+  }, [canManage, communityId, loading, orgId]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: producers,
+    columns,
+    state: { sorting, globalFilter, pagination },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
+    globalFilterFn: producersGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
 
   if (redirecting) {
     return (
@@ -169,120 +295,24 @@ export function CommunityProducersPage({ communityId }: Props) {
         )}
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => refresh()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
-      )}
+      <DataTableToolbar
+        table={table}
+        searchPlaceholder="Buscar por nome, e-mail, CPF ou apelido…"
+      />
 
-      <Card className="py-0">
-        <Table>
-          <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Nome</TableHead>
-              <TableHead>CPF</TableHead>
-              <TableHead>Apelido</TableHead>
-              <TableHead>Conformidade</TableHead>
-              {canManage && (
-                <TableHead className="w-[1%] text-right">Ações</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="[&_td]:h-12 [&_td]:px-4">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, idx) => (
-                <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: colCount }).map((__, cidx) => (
-                    <TableCell key={cidx}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : sortedProducers.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell
-                  colSpan={colCount}
-                  className="py-12 text-center text-sm text-muted-foreground"
-                >
-                  Nenhum agricultor cadastrado nesta comunidade ainda.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedProducers.map((producer) => (
-                <TableRow key={producer.id}>
-                  <TableCell className="font-medium text-foreground">
-                    <Link
-                      href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producer.id}`}
-                      className="hover:underline"
-                    >
-                      {producer.user?.fullName ?? producer.aliasName ?? "—"}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {producer.user?.cpf ? formatCpf(producer.user.cpf) : "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {producer.aliasName ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    {producer.isCompliant == null ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : producer.isCompliant ? (
-                      <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                        Em conformidade
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-                        Pendente
-                      </span>
-                    )}
-                  </TableCell>
-                  {canManage && (
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Editar agricultor"
-                          onClick={() => setEditTarget(producer)}
-                        >
-                          <Pencil />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Excluir agricultor"
-                          onClick={() => setDeleteTarget(producer)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <DataTable
+        table={table}
+        columns={columns}
+        isLoading={loading}
+        hasError={Boolean(error)}
+        onRetry={refresh}
+        errorHint={error ?? undefined}
+        hasActiveFilters={Boolean(table.getState().globalFilter)}
+        onClearFilters={() => table.setGlobalFilter("")}
+        emptyTitle="Nenhum agricultor cadastrado nesta comunidade ainda."
+      />
+
+      <DataTablePagination table={table} />
 
       {canManage && (
         <ProducerRegisterDialog

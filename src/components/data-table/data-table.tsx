@@ -36,6 +36,7 @@ type DataTableProps<TData, TValue> = {
   onClearFilters?: () => void;
   emptyTitle?: string;
   emptyHint?: string;
+  errorHint?: string;
   /**
    * Quando informado, o `DataTable` alterna para um layout de cards em
    * viewport mobile (`useIsMobile()`), reaproveitando os mesmos três
@@ -56,6 +57,7 @@ export function DataTable<TData, TValue>({
   onClearFilters,
   emptyTitle = "Nenhum registro cadastrado ainda.",
   emptyHint = "",
+  errorHint = "Tente novamente em alguns instantes.",
   renderMobileCard,
 }: DataTableProps<TData, TValue>) {
   const isMobile = useIsMobile();
@@ -75,7 +77,7 @@ export function DataTable<TData, TValue>({
           role="alert"
           icon={AlertTriangle}
           title="Não foi possível carregar os dados."
-          hint="Tente novamente em alguns instantes."
+          hint={errorHint}
           actionLabel="Tentar novamente"
           onAction={onRetry}
         />
