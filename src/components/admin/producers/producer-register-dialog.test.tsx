@@ -62,11 +62,14 @@ const REGISTERED_PRODUCER: Producer = {
   },
 };
 
-function renderDialog(onCreated: () => void = () => {}) {
+function renderDialog(
+  onCreated: () => void = () => {},
+  onOpenChange: (open: boolean) => void = () => {},
+) {
   return render(
     <ProducerRegisterDialog
       open
-      onOpenChange={() => {}}
+      onOpenChange={onOpenChange}
       onCreated={onCreated}
       communities={COMMUNITIES}
       loadingCommunities={false}
@@ -122,8 +125,9 @@ describe("ProducerRegisterDialog — cadastro por comunidade (spec.md §5)", () 
   it("submit válido chama registerProducer(communityId, payload) e dispara onCreated", async () => {
     vi.mocked(registerProducer).mockResolvedValue(REGISTERED_PRODUCER);
     const onCreated = vi.fn();
+    const onOpenChange = vi.fn();
 
-    renderDialog(onCreated);
+    renderDialog(onCreated, onOpenChange);
 
     await screen.findByLabelText("Nome completo");
     fillTextFields();
@@ -144,6 +148,16 @@ describe("ProducerRegisterDialog — cadastro por comunidade (spec.md §5)", () 
       }),
     );
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("renderiza o cadastro em uma barra lateral", async () => {
+    renderDialog();
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAttribute("data-slot", "sheet-content");
+    expect(dialog).toHaveAttribute("data-side", "right");
   });
 
   it("sem comunidade selecionada mostra erro e não chama registerProducer", async () => {

@@ -222,11 +222,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     await dialog.getByLabel("Nome de exibição (opcional)").fill("Joãozinho");
 
     await dialog.getByRole("button", { name: "Cadastrar" }).click();
-
-    // O diálogo NÃO fecha sozinho: mostra o painel de confirmação e só sai
-    // de cena quando o usuário clica em "Fechar".
-    await expect(dialog.getByRole("status")).toContainText(producerName);
-    await expect(dialog.getByRole("status")).toContainText(COMMUNITY_A.name);
+    await expect(dialog).toBeHidden();
 
     expect(registerUrl).toContain(`/communities/${COMMUNITY_A.id}/farmers`);
     expect(registerBody).toMatchObject({
@@ -235,9 +231,6 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
       dateOfBirth: "1988-03-15",
       aliasName: "Joãozinho",
     });
-
-    await dialog.getByRole("button", { name: "Fechar" }).click();
-    await expect(dialog).toBeHidden();
 
     await expect(page.getByRole("cell", { name: producerName })).toBeVisible();
   });

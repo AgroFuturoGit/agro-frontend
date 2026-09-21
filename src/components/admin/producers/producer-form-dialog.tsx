@@ -6,13 +6,13 @@ import { AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
@@ -69,54 +69,60 @@ export function ProducerFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Editar agricultor</DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Editar agricultor</SheetTitle>
+          <SheetDescription>
             Atualize os dados do agricultor{" "}
             <span className="font-medium text-foreground">
               {producer?.user?.fullName ?? ""}
             </span>
             .
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          {error && (
-            <div
-              role="alert"
-              className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-            >
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{error}</span>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col overflow-y-auto"
+        >
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            {error && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="aliasName">Nome/apelido</Label>
+              <Input
+                id="aliasName"
+                value={aliasName}
+                onChange={(e) => setAliasName(e.target.value)}
+                disabled={submitting}
+                placeholder="Como o agricultor é conhecido"
+              />
             </div>
-          )}
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="aliasName">Nome/apelido</Label>
-            <Input
-              id="aliasName"
-              value={aliasName}
-              onChange={(e) => setAliasName(e.target.value)}
-              disabled={submitting}
-              placeholder="Como o agricultor é conhecido"
-            />
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isCompliant"
+                checked={isCompliant}
+                onCheckedChange={(checked) => setIsCompliant(checked === true)}
+                disabled={submitting}
+              />
+              <Label htmlFor="isCompliant" className="font-normal">
+                Agricultor em conformidade
+              </Label>
+            </div>
+
           </div>
 
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="isCompliant"
-              checked={isCompliant}
-              onCheckedChange={(checked) => setIsCompliant(checked === true)}
-              disabled={submitting}
-            />
-            <Label htmlFor="isCompliant" className="font-normal">
-              Agricultor em conformidade
-            </Label>
-          </div>
-
-          <DialogFooter>
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
@@ -135,9 +141,9 @@ export function ProducerFormDialog({
                 "Salvar alterações"
               )}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

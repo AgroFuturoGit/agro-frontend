@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -119,10 +119,6 @@ export function ProducerRegisterDialog({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [registeredName, setRegisteredName] = useState<string | null>(null);
-  const [registeredCommunity, setRegisteredCommunity] = useState<string | null>(
-    null,
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -130,8 +126,6 @@ export function ProducerRegisterDialog({
     setValues(EMPTY);
     setFieldErrors({});
     setFormError(null);
-    setRegisteredName(null);
-    setRegisteredCommunity(null);
   }, [open]);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
@@ -171,7 +165,7 @@ export function ProducerRegisterDialog({
       const aliasName = values.aliasName.trim();
       // `communityId` é path param — nunca vai no corpo.
       // `isCompliant` não é enviável na criação: o backend crava `true`.
-      const result = await registerProducer(values.communityId, {
+      await registerProducer(values.communityId, {
         fullName: values.fullName.trim(),
         email: values.email.trim(),
         password: values.password,
@@ -179,13 +173,8 @@ export function ProducerRegisterDialog({
         dateOfBirth: values.dateOfBirth,
         ...(aliasName ? { aliasName } : {}),
       });
-      setRegisteredName(result.user?.fullName ?? values.fullName.trim());
-      setRegisteredCommunity(
-        result.community?.name ??
-          communities.find((item) => item.id === values.communityId)?.name ??
-          null,
-      );
       onCreated();
+      onOpenChange(false);
     } catch (err) {
       if (err instanceof ApiError) {
         const apiFieldErrors = parseProducerRegisterFieldErrors(err.payload);
@@ -208,212 +197,188 @@ export function ProducerRegisterDialog({
       : "Selecione a comunidade";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        {registeredName ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Agricultor cadastrado</DialogTitle>
-              <DialogDescription>
-                O agricultor foi vinculado à comunidade selecionada.
-              </DialogDescription>
-            </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>Novo agricultor</SheetTitle>
+          <SheetDescription>
+            Cadastre um agricultor vinculado a uma comunidade.
+          </SheetDescription>
+        </SheetHeader>
 
-            <div
-              role="status"
-              className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400"
-            >
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-              <span>
-                <strong>{registeredName}</strong> foi cadastrado(a) como
-                agricultor(a)
-                {registeredCommunity ? ` da comunidade "${registeredCommunity}"` : ""}
-                .
-              </span>
-            </div>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col overflow-y-auto"
+        >
+              <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+                <div aria-live="polite">
+                  {formError && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                    >
+                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>{formError}</span>
+                    </div>
+                  )}
+                </div>
 
-            <DialogFooter>
-              <Button type="button" onClick={() => onOpenChange(false)}>
-                Fechar
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>Novo agricultor</DialogTitle>
-              <DialogDescription>
-                Cadastre um agricultor vinculado a uma comunidade.
-              </DialogDescription>
-            </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <div aria-live="polite">
-                {formError && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="producer-community">Comunidade</Label>
+                  <Select
+                    value={values.communityId}
+                    onValueChange={(value) => update("communityId", value ?? "")}
+                    disabled={submitting || loadingCommunities}
                   >
-                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                    <span>{formError}</span>
-                  </div>
-                )}
+                    <SelectTrigger
+                      id="producer-community"
+                      className="w-full"
+                      aria-invalid={Boolean(fieldErrors.communityId)}
+                    >
+                      <SelectValue placeholder={communityPlaceholder}>
+                        {(value) =>
+                          communities.find((item) => item.id === value)?.name ??
+                          communityPlaceholder
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {communities.map((community) => (
+                        <SelectItem key={community.id} value={community.id}>
+                          {community.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {fieldErrors.communityId && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.communityId}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="producer-full-name">Nome completo</Label>
+                  <Input
+                    id="producer-full-name"
+                    value={values.fullName}
+                    onChange={(e) => update("fullName", e.target.value)}
+                    onBlur={() => handleBlur("fullName")}
+                    required
+                    disabled={submitting}
+                    autoComplete="name"
+                    aria-invalid={Boolean(fieldErrors.fullName)}
+                  />
+                  {fieldErrors.fullName && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.fullName}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="producer-email">E-mail</Label>
+                  <Input
+                    id="producer-email"
+                    type="email"
+                    value={values.email}
+                    onChange={(e) => update("email", e.target.value)}
+                    onBlur={() => handleBlur("email")}
+                    required
+                    disabled={submitting}
+                    autoComplete="email"
+                    aria-invalid={Boolean(fieldErrors.email)}
+                  />
+                  {fieldErrors.email && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.email}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="producer-password">Senha</Label>
+                  <Input
+                    id="producer-password"
+                    type="password"
+                    value={values.password}
+                    onChange={(e) => update("password", e.target.value)}
+                    onBlur={() => handleBlur("password")}
+                    required
+                    minLength={8}
+                    disabled={submitting}
+                    autoComplete="new-password"
+                    aria-invalid={Boolean(fieldErrors.password)}
+                  />
+                  {fieldErrors.password && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.password}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="producer-cpf">CPF</Label>
+                  <Input
+                    id="producer-cpf"
+                    value={values.cpf}
+                    onChange={(e) => update("cpf", formatCpf(e.target.value))}
+                    onBlur={() => handleBlur("cpf")}
+                    required
+                    inputMode="numeric"
+                    maxLength={14}
+                    placeholder="000.000.000-00"
+                    disabled={submitting}
+                    aria-invalid={Boolean(fieldErrors.cpf)}
+                  />
+                  {fieldErrors.cpf && (
+                    <p className="text-sm text-destructive">{fieldErrors.cpf}</p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="producer-date-of-birth">
+                    Data de nascimento
+                  </Label>
+                  <Input
+                    id="producer-date-of-birth"
+                    type="date"
+                    value={values.dateOfBirth}
+                    onChange={(e) => update("dateOfBirth", e.target.value)}
+                    onBlur={() => handleBlur("dateOfBirth")}
+                    required
+                    disabled={submitting}
+                    aria-invalid={Boolean(fieldErrors.dateOfBirth)}
+                  />
+                  {fieldErrors.dateOfBirth && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.dateOfBirth}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="producer-alias-name">
+                    Nome de exibição (opcional)
+                  </Label>
+                  <Input
+                    id="producer-alias-name"
+                    value={values.aliasName}
+                    onChange={(e) => update("aliasName", e.target.value)}
+                    onBlur={() => handleBlur("aliasName")}
+                    disabled={submitting}
+                    aria-invalid={Boolean(fieldErrors.aliasName)}
+                  />
+                  {fieldErrors.aliasName && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.aliasName}
+                    </p>
+                  )}
+                </div>
+
               </div>
 
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="producer-community">Comunidade</Label>
-                <Select
-                  value={values.communityId}
-                  onValueChange={(value) => update("communityId", value ?? "")}
-                  disabled={submitting || loadingCommunities}
-                >
-                  <SelectTrigger
-                    id="producer-community"
-                    className="w-full"
-                    aria-invalid={Boolean(fieldErrors.communityId)}
-                  >
-                    <SelectValue placeholder={communityPlaceholder}>
-                      {(value) =>
-                        communities.find((item) => item.id === value)?.name ??
-                        communityPlaceholder
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {communities.map((community) => (
-                      <SelectItem key={community.id} value={community.id}>
-                        {community.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldErrors.communityId && (
-                  <p className="text-sm text-destructive">
-                    {fieldErrors.communityId}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="producer-full-name">Nome completo</Label>
-                <Input
-                  id="producer-full-name"
-                  value={values.fullName}
-                  onChange={(e) => update("fullName", e.target.value)}
-                  onBlur={() => handleBlur("fullName")}
-                  required
-                  disabled={submitting}
-                  autoComplete="name"
-                  aria-invalid={Boolean(fieldErrors.fullName)}
-                />
-                {fieldErrors.fullName && (
-                  <p className="text-sm text-destructive">
-                    {fieldErrors.fullName}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="producer-email">E-mail</Label>
-                <Input
-                  id="producer-email"
-                  type="email"
-                  value={values.email}
-                  onChange={(e) => update("email", e.target.value)}
-                  onBlur={() => handleBlur("email")}
-                  required
-                  disabled={submitting}
-                  autoComplete="email"
-                  aria-invalid={Boolean(fieldErrors.email)}
-                />
-                {fieldErrors.email && (
-                  <p className="text-sm text-destructive">
-                    {fieldErrors.email}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="producer-password">Senha</Label>
-                <Input
-                  id="producer-password"
-                  type="password"
-                  value={values.password}
-                  onChange={(e) => update("password", e.target.value)}
-                  onBlur={() => handleBlur("password")}
-                  required
-                  minLength={8}
-                  disabled={submitting}
-                  autoComplete="new-password"
-                  aria-invalid={Boolean(fieldErrors.password)}
-                />
-                {fieldErrors.password && (
-                  <p className="text-sm text-destructive">
-                    {fieldErrors.password}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="producer-cpf">CPF</Label>
-                <Input
-                  id="producer-cpf"
-                  value={values.cpf}
-                  onChange={(e) => update("cpf", formatCpf(e.target.value))}
-                  onBlur={() => handleBlur("cpf")}
-                  required
-                  inputMode="numeric"
-                  maxLength={14}
-                  placeholder="000.000.000-00"
-                  disabled={submitting}
-                  aria-invalid={Boolean(fieldErrors.cpf)}
-                />
-                {fieldErrors.cpf && (
-                  <p className="text-sm text-destructive">{fieldErrors.cpf}</p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="producer-date-of-birth">
-                  Data de nascimento
-                </Label>
-                <Input
-                  id="producer-date-of-birth"
-                  type="date"
-                  value={values.dateOfBirth}
-                  onChange={(e) => update("dateOfBirth", e.target.value)}
-                  onBlur={() => handleBlur("dateOfBirth")}
-                  required
-                  disabled={submitting}
-                  aria-invalid={Boolean(fieldErrors.dateOfBirth)}
-                />
-                {fieldErrors.dateOfBirth && (
-                  <p className="text-sm text-destructive">
-                    {fieldErrors.dateOfBirth}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="producer-alias-name">
-                  Nome de exibição (opcional)
-                </Label>
-                <Input
-                  id="producer-alias-name"
-                  value={values.aliasName}
-                  onChange={(e) => update("aliasName", e.target.value)}
-                  onBlur={() => handleBlur("aliasName")}
-                  disabled={submitting}
-                  aria-invalid={Boolean(fieldErrors.aliasName)}
-                />
-                {fieldErrors.aliasName && (
-                  <p className="text-sm text-destructive">
-                    {fieldErrors.aliasName}
-                  </p>
-                )}
-              </div>
-
-              <DialogFooter>
+              <SheetFooter>
                 <Button
                   type="button"
                   variant="outline"
@@ -432,11 +397,9 @@ export function ProducerRegisterDialog({
                     "Cadastrar"
                   )}
                 </Button>
-              </DialogFooter>
+              </SheetFooter>
             </form>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
