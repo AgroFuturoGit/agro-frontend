@@ -1,22 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+  type SortingState,
+} from "@tanstack/react-table";
 
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
@@ -28,6 +36,18 @@ import { CommunityFormDrawer } from "../communities/community-form-drawer";
 type Props = {
   orgId: string;
 };
+
+function communitiesGlobalFilter(
+  row: Row<Community>,
+  _columnId: string,
+  filterValue: string,
+) {
+  const query = filterValue.trim().toLowerCase();
+  if (!query) return true;
+  return row.original.name.toLowerCase().includes(query);
+}
+
+const columnHelper = createColumnHelper<Community>();
 
 export function OrganizationCommunitiesPage({ orgId }: Props) {
   const router = useRouter();
@@ -55,8 +75,16 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
     null,
   );
 
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: false },
+  ]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
     setRoleResolved(true);
   }, []);
@@ -123,16 +151,10 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
   }, [currentRole, roleResolved, orgId, router]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
-  const sortedCommunities = [...communities].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
-
   const canManage = currentRole === "ADMIN" || currentRole === "MANAGER";
-  const columnCount = canManage ? 2 : 1;
 
   function openCreateDialog() {
     setDialogMode("create");
@@ -144,6 +166,87 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
     setDialogMode("edit");
     setDialogCommunity(community);
     setDialogOpen(true);
+  }
+
+  const columns = useMemo(() => {
+    const baseColumns = [
+      columnHelper.accessor("name", {
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
+        ),
+        cell: ({ row }) => (
+          <Link
+            href={`/admin/organizacoes/${orgId}/comunidades/${row.original.id}`}
+            className="font-medium text-foreground hover:underline"
+          >
+            {row.original.name}
+          </Link>
+        ),
+      }),
+    ];
+
+    const actionsColumn = columnHelper.display({
+      id: "actions",
+      header: "Ações",
+      cell: ({ row }) => (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Editar comunidade"
+          onClick={() => openEditDialog(row.original)}
+        >
+          <Pencil />
+        </Button>
+      ),
+    });
+
+    return (canManage ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
+      Community,
+      unknown
+    >[];
+  }, [canManage, loading, orgId]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: communities,
+    columns,
+    state: { sorting, globalFilter, pagination },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
+    globalFilterFn: communitiesGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  function renderMobileCard(row: Row<Community>) {
+    const community = row.original;
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={`/admin/organizacoes/${orgId}/comunidades/${community.id}`}
+            className="min-w-0 flex-1 font-medium text-foreground hover:underline"
+          >
+            {community.name}
+          </Link>
+          {canManage && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => openEditDialog(community)}
+            >
+              <Pencil />
+              Editar
+            </Button>
+          )}
+        </div>
+      </Card>
+    );
   }
 
   if (redirecting) {
@@ -181,86 +284,22 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         )}
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => refresh()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
-      )}
+      <DataTableToolbar table={table} searchPlaceholder="Buscar por nome…" />
 
-      <Card className="py-0">
-        <Table>
-          <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Nome</TableHead>
-              {canManage && (
-                <TableHead className="w-[1%] text-right">Ações</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="[&_td]:h-12 [&_td]:px-4">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, idx) => (
-                <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: columnCount }).map((__, cidx) => (
-                    <TableCell key={cidx}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : sortedCommunities.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell
-                  colSpan={columnCount}
-                  className="py-12 text-center text-sm text-muted-foreground"
-                >
-                  Nenhuma comunidade cadastrada nesta organização ainda.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedCommunities.map((community) => (
-                <TableRow key={community.id}>
-                  <TableCell className="font-medium text-foreground">
-                    <Link
-                      href={`/admin/organizacoes/${orgId}/comunidades/${community.id}`}
-                      className="hover:underline"
-                    >
-                      {community.name}
-                    </Link>
-                  </TableCell>
-                  {canManage && (
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label="Editar comunidade"
-                        onClick={() => openEditDialog(community)}
-                      >
-                        <Pencil />
-                      </Button>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <DataTable
+        table={table}
+        columns={columns}
+        isLoading={loading}
+        hasError={Boolean(error)}
+        onRetry={refresh}
+        errorHint={error ?? undefined}
+        hasActiveFilters={Boolean(table.getState().globalFilter)}
+        onClearFilters={() => table.setGlobalFilter("")}
+        emptyTitle="Nenhuma comunidade cadastrada nesta organização ainda."
+        renderMobileCard={renderMobileCard}
+      />
+
+      <DataTablePagination table={table} />
 
       {canManage && currentRole && (
         <CommunityFormDrawer
