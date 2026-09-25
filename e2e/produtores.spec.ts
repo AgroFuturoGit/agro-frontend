@@ -210,7 +210,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
 
     // A comunidade já vem resolvida da rota — o diálogo tem só uma opção,
     // mas ainda pede a escolha explícita (nenhuma mudança de contrato do
-    // `ProducerRegisterDialog`).
+    // `ProducerFormDrawer` em modo create).
     await dialog.getByRole("combobox").click();
     await page.getByRole("option", { name: COMMUNITY_A.name }).click();
 
@@ -311,7 +311,10 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
       page.getByRole("cell", { name: "Bruno do Vale" }),
     ).toBeHidden();
     // Não existe mais seletor de comunidade nesta tela — o escopo é a URL.
-    await expect(page.getByRole("combobox")).toHaveCount(0);
+    // (O único combobox da página é o "itens por página" da paginação.)
+    await expect(
+      page.getByRole("combobox", { name: /comunidade/i }),
+    ).toHaveCount(0);
 
     await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_B.id}`);
 

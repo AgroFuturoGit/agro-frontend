@@ -146,7 +146,9 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
     expect(listProductionPlans).toHaveBeenCalledExactlyOnceWith("producer-1");
-    expect(screen.queryByRole("combobox")).toBeNull();
+    // Sem seletor de agricultor: o escopo vem da rota. (O único combobox da
+    // tela é o "itens por página" da paginação.)
+    expect(screen.queryByRole("combobox", { name: /agricultor|produtor/i })).toBeNull();
   });
 
   it("FARMER: acessando o próprio producerId, vê os planos normalmente", async () => {
@@ -212,6 +214,20 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
       expect(screen.getByRole("button", { name: /Novo plano/i })).toBeTruthy();
     },
   );
+
+  it("ADMIN: sem planos, 'Criar primeiro plano' abre o drawer de criação", async () => {
+    loginAs("ADMIN");
+
+    renderPage();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Criar primeiro plano" }),
+    );
+
+    const drawer = await screen.findByRole("dialog");
+    expect(drawer).toHaveAttribute("data-slot", "sheet-content");
+    expect(drawer.textContent).toContain("Novo plano");
+  });
 
   it("MANAGER: sem planos, vê o estado vazio SEM atalho de criação", async () => {
     loginAs("MANAGER");

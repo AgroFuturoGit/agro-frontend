@@ -5,13 +5,13 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -81,7 +81,7 @@ function validateAll(
   return errors;
 }
 
-export function CommunityFormDialog({
+export function CommunityFormDrawer({
   mode,
   role,
   organizationId,
@@ -227,91 +227,96 @@ export function CommunityFormDialog({
     : "Atualize os dados da comunidade selecionada.";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div aria-live="polite">
-            {formError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-          </div>
-
-          {!isCreate && community && (
-            <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-              <p className="text-xs text-muted-foreground">Organização</p>
-              <p className="font-medium text-foreground">
-                {community.organization.name}
-              </p>
-            </div>
-          )}
-
-          {showOrganizationSelect && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="community-organization">Organização</Label>
-              <Select
-                value={values.organizationId}
-                onValueChange={(value) =>
-                  update("organizationId", value ?? "")
-                }
-                disabled={submitting || loadingOrganizations}
-              >
-                <SelectTrigger id="community-organization" className="w-full">
-                  <SelectValue
-                    placeholder={
-                      loadingOrganizations
-                        ? "Carregando…"
-                        : "Selecione a organização"
-                    }
-                  >
-                    {(value) =>
-                      organizations.find((org) => org.id === value)?.name ??
-                      "Selecione a organização"
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {organizations.map((org) => (
-                    <SelectItem key={org.id} value={org.id}>
-                      {org.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {fieldErrors.organizationId && (
-                <p className="text-sm text-destructive">
-                  {fieldErrors.organizationId}
-                </p>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col overflow-y-auto"
+        >
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div aria-live="polite">
+              {formError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
               )}
             </div>
-          )}
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="community-name">Nome da comunidade</Label>
-            <Input
-              id="community-name"
-              value={values.name}
-              onChange={(e) => update("name", e.target.value)}
-              onBlur={handleNameBlur}
-              disabled={submitting}
-              aria-invalid={Boolean(fieldErrors.name)}
-            />
-            {fieldErrors.name && (
-              <p className="text-sm text-destructive">{fieldErrors.name}</p>
+            {!isCreate && community && (
+              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                <p className="text-xs text-muted-foreground">Organização</p>
+                <p className="font-medium text-foreground">
+                  {community.organization.name}
+                </p>
+              </div>
             )}
+
+            {showOrganizationSelect && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="community-organization">Organização</Label>
+                <Select
+                  value={values.organizationId}
+                  onValueChange={(value) =>
+                    update("organizationId", value ?? "")
+                  }
+                  disabled={submitting || loadingOrganizations}
+                >
+                  <SelectTrigger id="community-organization" className="w-full">
+                    <SelectValue
+                      placeholder={
+                        loadingOrganizations
+                          ? "Carregando…"
+                          : "Selecione a organização"
+                      }
+                    >
+                      {(value) =>
+                        organizations.find((org) => org.id === value)?.name ??
+                        "Selecione a organização"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organizations.map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {fieldErrors.organizationId && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.organizationId}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="community-name">Nome da comunidade</Label>
+              <Input
+                id="community-name"
+                value={values.name}
+                onChange={(e) => update("name", e.target.value)}
+                onBlur={handleNameBlur}
+                disabled={submitting}
+                aria-invalid={Boolean(fieldErrors.name)}
+              />
+              {fieldErrors.name && (
+                <p className="text-sm text-destructive">{fieldErrors.name}</p>
+              )}
+            </div>
           </div>
 
-          <DialogFooter>
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
@@ -332,9 +337,9 @@ export function CommunityFormDialog({
                 "Salvar alterações"
               )}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

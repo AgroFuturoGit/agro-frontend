@@ -5,13 +5,13 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
@@ -52,7 +52,7 @@ function validate(values: FormValues): Record<string, string> {
   return errors;
 }
 
-export function ExecutionFormDialog({
+export function ExecutionFormDrawer({
   mode,
   planId,
   open,
@@ -142,66 +142,71 @@ export function ExecutionFormDialog({
     : "Corrija a quantidade ou a data deste apontamento.";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div aria-live="polite">
-            {formError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col overflow-y-auto"
+        >
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div aria-live="polite">
+              {formError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="execution-yield">Quantidade colhida (t)</Label>
+              <Input
+                id="execution-yield"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                min="0.01"
+                value={values.actualYield}
+                onChange={(e) => update("actualYield", e.target.value)}
+                required
+                disabled={submitting}
+                aria-invalid={Boolean(fieldErrors.actualYield)}
+              />
+              {fieldErrors.actualYield && (
+                <p className="text-sm text-destructive">
+                  {fieldErrors.actualYield}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="execution-date">Data da colheita</Label>
+              <Input
+                id="execution-date"
+                type="date"
+                value={values.harvestDate}
+                onChange={(e) => update("harvestDate", e.target.value)}
+                required
+                disabled={submitting}
+                aria-invalid={Boolean(fieldErrors.harvestDate)}
+              />
+              {fieldErrors.harvestDate && (
+                <p className="text-sm text-destructive">
+                  {fieldErrors.harvestDate}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="execution-yield">Quantidade colhida (t)</Label>
-            <Input
-              id="execution-yield"
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0.01"
-              value={values.actualYield}
-              onChange={(e) => update("actualYield", e.target.value)}
-              required
-              disabled={submitting}
-              aria-invalid={Boolean(fieldErrors.actualYield)}
-            />
-            {fieldErrors.actualYield && (
-              <p className="text-sm text-destructive">
-                {fieldErrors.actualYield}
-              </p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="execution-date">Data da colheita</Label>
-            <Input
-              id="execution-date"
-              type="date"
-              value={values.harvestDate}
-              onChange={(e) => update("harvestDate", e.target.value)}
-              required
-              disabled={submitting}
-              aria-invalid={Boolean(fieldErrors.harvestDate)}
-            />
-            {fieldErrors.harvestDate && (
-              <p className="text-sm text-destructive">
-                {fieldErrors.harvestDate}
-              </p>
-            )}
-          </div>
-
-          <DialogFooter>
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
@@ -222,9 +227,9 @@ export function ExecutionFormDialog({
                 "Salvar alterações"
               )}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

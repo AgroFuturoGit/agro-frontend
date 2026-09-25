@@ -36,6 +36,12 @@ type DataTableProps<TData, TValue> = {
   onClearFilters?: () => void;
   emptyTitle?: string;
   emptyHint?: string;
+  /**
+   * Ação oferecida no estado vazio SEM filtro ativo (ex.: "Criar primeiro
+   * plano"). Com filtro ativo, a ação é sempre "Limpar filtros".
+   */
+  emptyActionLabel?: string;
+  onEmptyAction?: () => void;
   errorHint?: string;
   /**
    * Quando informado, o `DataTable` alterna para um layout de cards em
@@ -57,6 +63,8 @@ export function DataTable<TData, TValue>({
   onClearFilters,
   emptyTitle = "Nenhum registro cadastrado ainda.",
   emptyHint = "",
+  emptyActionLabel,
+  onEmptyAction,
   errorHint = "Tente novamente em alguns instantes.",
   renderMobileCard,
 }: DataTableProps<TData, TValue>) {
@@ -92,8 +100,8 @@ export function DataTable<TData, TValue>({
             : emptyTitle
         }
         hint={hasActiveFilters ? "Tente ajustar ou limpar os filtros." : emptyHint}
-        actionLabel={hasActiveFilters ? "Limpar filtros" : undefined}
-        onAction={hasActiveFilters ? onClearFilters : undefined}
+        actionLabel={hasActiveFilters ? "Limpar filtros" : emptyActionLabel}
+        onAction={hasActiveFilters ? onClearFilters : onEmptyAction}
       />
     );
   }

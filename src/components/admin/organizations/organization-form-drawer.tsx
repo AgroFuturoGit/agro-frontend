@@ -5,13 +5,13 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -93,7 +93,7 @@ function validateAll(
   return errors;
 }
 
-export function OrganizationFormDialog({
+export function OrganizationFormDrawer({
   mode,
   open,
   onOpenChange,
@@ -208,117 +208,122 @@ export function OrganizationFormDialog({
     : "Atualize os dados da organização selecionada.";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div aria-live="polite">
-            {formError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{formError}</span>
-              </div>
-            )}
-          </div>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col overflow-y-auto"
+        >
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div aria-live="polite">
+              {formError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+            </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="organization-name">Nome</Label>
-            <Input
-              id="organization-name"
-              value={values.name}
-              onChange={(e) => update("name", e.target.value)}
-              onBlur={() => handleBlur("name")}
-              required
-              disabled={submitting}
-              aria-invalid={Boolean(fieldErrors.name)}
-            />
-            {fieldErrors.name && (
-              <p className="text-sm text-destructive">{fieldErrors.name}</p>
-            )}
-          </div>
-
-          {isCreate ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="organization-tax-id">CNPJ</Label>
+              <Label htmlFor="organization-name">Nome</Label>
               <Input
-                id="organization-tax-id"
-                value={values.taxId}
-                onChange={(e) => update("taxId", formatCnpj(e.target.value))}
-                onBlur={() => handleBlur("taxId")}
+                id="organization-name"
+                value={values.name}
+                onChange={(e) => update("name", e.target.value)}
+                onBlur={() => handleBlur("name")}
                 required
-                inputMode="numeric"
-                maxLength={18}
-                placeholder="00.000.000/0000-00"
                 disabled={submitting}
-                aria-invalid={Boolean(fieldErrors.taxId)}
+                aria-invalid={Boolean(fieldErrors.name)}
               />
-              {fieldErrors.taxId && (
-                <p className="text-sm text-destructive">
-                  {fieldErrors.taxId}
-                </p>
+              {fieldErrors.name && (
+                <p className="text-sm text-destructive">{fieldErrors.name}</p>
               )}
             </div>
-          ) : (
-            organization && (
-              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                <p className="text-xs text-muted-foreground">CNPJ</p>
-                <p className="font-mono font-medium text-foreground">
-                  {formatCnpj(organization.taxId)}
-                </p>
-              </div>
-            )
-          )}
 
-          {isCreate ? (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="organization-type">Tipo</Label>
-              <Select
-                value={values.type}
-                onValueChange={(value) =>
-                  update("type", (value ?? "") as OrganizationType | "")
-                }
-                disabled={submitting}
-              >
-                <SelectTrigger id="organization-type" className="w-full">
-                  <SelectValue placeholder="Selecione o tipo">
-                    {(value) =>
-                      value
-                        ? ORGANIZATION_TYPE_LABELS[value as OrganizationType]
-                        : "Selecione o tipo"
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {ORGANIZATION_TYPES.map((type) => (
-                    <SelectItem key={type} value={type}>
-                      {ORGANIZATION_TYPE_LABELS[type]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {fieldErrors.type && (
-                <p className="text-sm text-destructive">{fieldErrors.type}</p>
-              )}
-            </div>
-          ) : (
-            organization && (
-              <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
-                <p className="text-xs text-muted-foreground">Tipo</p>
-                <p className="font-medium text-foreground">
-                  {ORGANIZATION_TYPE_LABELS[organization.type]}
-                </p>
+            {isCreate ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="organization-tax-id">CNPJ</Label>
+                <Input
+                  id="organization-tax-id"
+                  value={values.taxId}
+                  onChange={(e) => update("taxId", formatCnpj(e.target.value))}
+                  onBlur={() => handleBlur("taxId")}
+                  required
+                  inputMode="numeric"
+                  maxLength={18}
+                  placeholder="00.000.000/0000-00"
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.taxId)}
+                />
+                {fieldErrors.taxId && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.taxId}
+                  </p>
+                )}
               </div>
-            )
-          )}
+            ) : (
+              organization && (
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                  <p className="text-xs text-muted-foreground">CNPJ</p>
+                  <p className="font-mono font-medium text-foreground">
+                    {formatCnpj(organization.taxId)}
+                  </p>
+                </div>
+              )
+            )}
 
-          <DialogFooter>
+            {isCreate ? (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="organization-type">Tipo</Label>
+                <Select
+                  value={values.type}
+                  onValueChange={(value) =>
+                    update("type", (value ?? "") as OrganizationType | "")
+                  }
+                  disabled={submitting}
+                >
+                  <SelectTrigger id="organization-type" className="w-full">
+                    <SelectValue placeholder="Selecione o tipo">
+                      {(value) =>
+                        value
+                          ? ORGANIZATION_TYPE_LABELS[value as OrganizationType]
+                          : "Selecione o tipo"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ORGANIZATION_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {ORGANIZATION_TYPE_LABELS[type]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {fieldErrors.type && (
+                  <p className="text-sm text-destructive">{fieldErrors.type}</p>
+                )}
+              </div>
+            ) : (
+              organization && (
+                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                  <p className="text-xs text-muted-foreground">Tipo</p>
+                  <p className="font-medium text-foreground">
+                    {ORGANIZATION_TYPE_LABELS[organization.type]}
+                  </p>
+                </div>
+              )
+            )}
+          </div>
+
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
@@ -339,9 +344,9 @@ export function OrganizationFormDialog({
                 "Salvar alterações"
               )}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

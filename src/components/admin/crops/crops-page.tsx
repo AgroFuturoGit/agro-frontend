@@ -28,7 +28,7 @@ import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCrops, type Crop } from "@/lib/crops";
 
-import { CropFormDialog } from "./crop-form-dialog";
+import { CropFormDrawer } from "./crop-form-drawer";
 import { DeleteCropDialog } from "./delete-crop-dialog";
 import { PriorityBadge } from "./priority-badge";
 
@@ -67,7 +67,6 @@ export function CropsPage() {
   });
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
@@ -95,7 +94,6 @@ export function CropsPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
@@ -283,14 +281,14 @@ export function CropsPage() {
 
       <DataTablePagination table={table} />
 
-      <CropFormDialog
+      <CropFormDrawer
         mode="create"
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSaved={refresh}
       />
 
-      <CropFormDialog
+      <CropFormDrawer
         mode="edit"
         crop={editTarget}
         open={editTarget !== null}

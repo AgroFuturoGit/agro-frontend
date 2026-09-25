@@ -31,7 +31,7 @@ import {
 } from "@/lib/harvests";
 
 import { DeleteHarvestDialog } from "./delete-harvest-dialog";
-import { HarvestFormDialog } from "./harvest-form-dialog";
+import { HarvestFormDrawer } from "./harvest-form-drawer";
 
 /**
  * Busca livre escopada ao rótulo, case-insensitive — mesma regra da
@@ -64,7 +64,6 @@ export function HarvestsPage() {
   });
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
@@ -88,7 +87,6 @@ export function HarvestsPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
@@ -252,14 +250,14 @@ export function HarvestsPage() {
 
       <DataTablePagination table={table} />
 
-      <HarvestFormDialog
+      <HarvestFormDrawer
         mode="create"
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSaved={refresh}
       />
 
-      <HarvestFormDialog
+      <HarvestFormDrawer
         mode="edit"
         harvest={editTarget}
         open={editTarget !== null}

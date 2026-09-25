@@ -5,13 +5,13 @@ import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
@@ -76,7 +76,7 @@ function validateAll(values: FormValues): Record<string, string> {
   return errors;
 }
 
-export function HarvestFormDialog({
+export function HarvestFormDrawer({
   mode,
   open,
   onOpenChange,
@@ -181,85 +181,90 @@ export function HarvestFormDialog({
     : "Atualize os dados da safra selecionada.";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="sm:max-w-md">
+        <SheetHeader>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
+        </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div aria-live="polite">
-            {formError && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{formError}</span>
+        <form
+          onSubmit={handleSubmit}
+          className="flex flex-1 flex-col overflow-y-auto"
+        >
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div aria-live="polite">
+              {formError && (
+                <div
+                  role="alert"
+                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="harvest-label">Rótulo</Label>
+              <Input
+                id="harvest-label"
+                value={values.label}
+                onChange={(e) => update("label", e.target.value)}
+                onBlur={() => handleBlur("label")}
+                placeholder="Ex.: Safra 2025/2026"
+                required
+                disabled={submitting}
+                aria-invalid={Boolean(fieldErrors.label)}
+              />
+              {fieldErrors.label && (
+                <p className="text-sm text-destructive">{fieldErrors.label}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="harvest-start-date">Data de início</Label>
+                <Input
+                  id="harvest-start-date"
+                  type="date"
+                  value={values.startDate}
+                  onChange={(e) => update("startDate", e.target.value)}
+                  onBlur={() => handleBlur("startDate")}
+                  required
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.startDate)}
+                />
+                {fieldErrors.startDate && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.startDate}
+                  </p>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="harvest-label">Rótulo</Label>
-            <Input
-              id="harvest-label"
-              value={values.label}
-              onChange={(e) => update("label", e.target.value)}
-              onBlur={() => handleBlur("label")}
-              placeholder="Ex.: Safra 2025/2026"
-              required
-              disabled={submitting}
-              aria-invalid={Boolean(fieldErrors.label)}
-            />
-            {fieldErrors.label && (
-              <p className="text-sm text-destructive">{fieldErrors.label}</p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-4 sm:flex-row">
-            <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="harvest-start-date">Data de início</Label>
-              <Input
-                id="harvest-start-date"
-                type="date"
-                value={values.startDate}
-                onChange={(e) => update("startDate", e.target.value)}
-                onBlur={() => handleBlur("startDate")}
-                required
-                disabled={submitting}
-                aria-invalid={Boolean(fieldErrors.startDate)}
-              />
-              {fieldErrors.startDate && (
-                <p className="text-sm text-destructive">
-                  {fieldErrors.startDate}
-                </p>
-              )}
-            </div>
-
-            <div className="flex flex-1 flex-col gap-2">
-              <Label htmlFor="harvest-end-date">Data de término</Label>
-              <Input
-                id="harvest-end-date"
-                type="date"
-                value={values.endDate}
-                min={values.startDate || undefined}
-                onChange={(e) => update("endDate", e.target.value)}
-                onBlur={() => handleBlur("endDate")}
-                required
-                disabled={submitting}
-                aria-invalid={Boolean(fieldErrors.endDate)}
-              />
-              {fieldErrors.endDate && (
-                <p className="text-sm text-destructive">
-                  {fieldErrors.endDate}
-                </p>
-              )}
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="harvest-end-date">Data de término</Label>
+                <Input
+                  id="harvest-end-date"
+                  type="date"
+                  value={values.endDate}
+                  min={values.startDate || undefined}
+                  onChange={(e) => update("endDate", e.target.value)}
+                  onBlur={() => handleBlur("endDate")}
+                  required
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.endDate)}
+                />
+                {fieldErrors.endDate && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.endDate}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
+          <SheetFooter>
             <Button
               type="button"
               variant="outline"
@@ -280,9 +285,9 @@ export function HarvestFormDialog({
                 "Salvar alterações"
               )}
             </Button>
-          </DialogFooter>
+          </SheetFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

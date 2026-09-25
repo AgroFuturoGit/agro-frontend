@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,35 +14,19 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
 import { formatCpf } from "@/lib/cpf";
 import {
-  parseProducerRegisterFieldErrors,
-  registerProducer,
-  type Community,
-} from "@/lib/communities";
+  parseManagerRegisterFieldErrors,
+  registerManager,
+} from "@/lib/organizations";
 
 type Props = {
+  /** Organização de destino — sem seletor, já contextual à linha clicada. */
+  organizationId: string;
+  organizationName: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Chamado após o cadastro bem-sucedido, para o pai recarregar a lista. */
-  onCreated: () => void;
-  /**
-   * Comunidades já resolvidas e filtradas pela página pai (decisão D2/D3).
-   * Este diálogo NUNCA busca comunidades nem resolve a organização do
-   * usuário logado por conta própria — o backend não impõe escopo
-   * hierárquico, então o escopo é sempre responsabilidade de quem monta
-   * a lista.
-   */
-  communities: Community[];
-  loadingCommunities: boolean;
 };
 
 type FormValues = {
@@ -51,8 +35,6 @@ type FormValues = {
   password: string;
   cpf: string;
   dateOfBirth: string;
-  aliasName: string;
-  communityId: string;
 };
 
 const EMPTY: FormValues = {
@@ -61,17 +43,12 @@ const EMPTY: FormValues = {
   password: "",
   cpf: "",
   dateOfBirth: "",
-  aliasName: "",
-  communityId: "",
 };
 
 function validateField(
   field: keyof FormValues,
   values: FormValues,
 ): string | null {
-  // Único campo opcional do `ProducerRegisterDTO`.
-  if (field === "aliasName") return null;
-
   if (field === "password") {
     if (!values.password) return "Informe a senha";
     if (values.password.length < 8) {
@@ -90,8 +67,6 @@ function validateField(
         return "Informe o CPF";
       case "dateOfBirth":
         return "Informe a data de nascimento";
-      case "communityId":
-        return "Selecione a comunidade do agricultor";
       default:
         return "Campo obrigatório";
     }
@@ -108,17 +83,17 @@ function validateAll(values: FormValues): Record<string, string> {
   return errors;
 }
 
-export function ProducerRegisterDialog({
+export function ManagerRegisterDrawer({
+  organizationId,
+  organizationName,
   open,
   onOpenChange,
-  onCreated,
-  communities,
-  loadingCommunities,
 }: Props) {
   const [values, setValues] = useState<FormValues>(EMPTY);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [registeredName, setRegisteredName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -126,6 +101,7 @@ export function ProducerRegisterDialog({
     setValues(EMPTY);
     setFieldErrors({});
     setFormError(null);
+    setRegisteredName(null);
   }, [open]);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
@@ -162,54 +138,75 @@ export function ProducerRegisterDialog({
 
     setSubmitting(true);
     try {
-      const aliasName = values.aliasName.trim();
-      // `communityId` é path param — nunca vai no corpo.
-      // `isCompliant` não é enviável na criação: o backend crava `true`.
-      await registerProducer(values.communityId, {
+      const result = await registerManager(organizationId, {
         fullName: values.fullName.trim(),
         email: values.email.trim(),
         password: values.password,
         cpf: values.cpf.trim(),
         dateOfBirth: values.dateOfBirth,
-        ...(aliasName ? { aliasName } : {}),
       });
-      onCreated();
-      onOpenChange(false);
+      setRegisteredName(result.user.fullName);
     } catch (err) {
       if (err instanceof ApiError) {
-        const apiFieldErrors = parseProducerRegisterFieldErrors(err.payload);
+        const apiFieldErrors = parseManagerRegisterFieldErrors(err.payload);
         if (Object.keys(apiFieldErrors).length > 0) {
           setFieldErrors(apiFieldErrors);
         }
         setFormError(err.message);
       } else {
-        setFormError("Não foi possível cadastrar o agricultor.");
+        setFormError("Não foi possível cadastrar o gestor.");
       }
     } finally {
       setSubmitting(false);
     }
   }
 
-  const communityPlaceholder = loadingCommunities
-    ? "Carregando…"
-    : communities.length === 0
-      ? "Nenhuma comunidade disponível"
-      : "Selecione a comunidade";
-
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle>Novo agricultor</SheetTitle>
-          <SheetDescription>
-            Cadastre um agricultor vinculado a uma comunidade.
-          </SheetDescription>
-        </SheetHeader>
+        {registeredName ? (
+          <>
+            <SheetHeader>
+              <SheetTitle>Gestor cadastrado</SheetTitle>
+              <SheetDescription>
+                O gestor foi vinculado à organização &quot;{organizationName}
+                &quot;.
+              </SheetDescription>
+            </SheetHeader>
 
-        <form
-          onSubmit={handleSubmit}
-          className="flex flex-1 flex-col overflow-y-auto"
-        >
+            <div className="flex flex-1 flex-col px-4 pb-4">
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400"
+              >
+                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  <strong>{registeredName}</strong> foi cadastrado(a) como
+                  gestor(a) desta organização.
+                </span>
+              </div>
+            </div>
+
+            <SheetFooter>
+              <Button type="button" onClick={() => onOpenChange(false)}>
+                Fechar
+              </Button>
+            </SheetFooter>
+          </>
+        ) : (
+          <>
+            <SheetHeader>
+              <SheetTitle>Novo gestor</SheetTitle>
+              <SheetDescription>
+                Cadastre um gestor vinculado à organização &quot;
+                {organizationName}&quot;.
+              </SheetDescription>
+            </SheetHeader>
+
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-1 flex-col overflow-y-auto"
+            >
               <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
                 <div aria-live="polite">
                   {formError && (
@@ -224,43 +221,9 @@ export function ProducerRegisterDialog({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-community">Comunidade</Label>
-                  <Select
-                    value={values.communityId}
-                    onValueChange={(value) => update("communityId", value ?? "")}
-                    disabled={submitting || loadingCommunities}
-                  >
-                    <SelectTrigger
-                      id="producer-community"
-                      className="w-full"
-                      aria-invalid={Boolean(fieldErrors.communityId)}
-                    >
-                      <SelectValue placeholder={communityPlaceholder}>
-                        {(value) =>
-                          communities.find((item) => item.id === value)?.name ??
-                          communityPlaceholder
-                        }
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {communities.map((community) => (
-                        <SelectItem key={community.id} value={community.id}>
-                          {community.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {fieldErrors.communityId && (
-                    <p className="text-sm text-destructive">
-                      {fieldErrors.communityId}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-full-name">Nome completo</Label>
+                  <Label htmlFor="manager-full-name">Nome completo</Label>
                   <Input
-                    id="producer-full-name"
+                    id="manager-full-name"
                     value={values.fullName}
                     onChange={(e) => update("fullName", e.target.value)}
                     onBlur={() => handleBlur("fullName")}
@@ -277,9 +240,9 @@ export function ProducerRegisterDialog({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-email">E-mail</Label>
+                  <Label htmlFor="manager-email">E-mail</Label>
                   <Input
-                    id="producer-email"
+                    id="manager-email"
                     type="email"
                     value={values.email}
                     onChange={(e) => update("email", e.target.value)}
@@ -297,9 +260,9 @@ export function ProducerRegisterDialog({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-password">Senha</Label>
+                  <Label htmlFor="manager-password">Senha</Label>
                   <Input
-                    id="producer-password"
+                    id="manager-password"
                     type="password"
                     value={values.password}
                     onChange={(e) => update("password", e.target.value)}
@@ -318,9 +281,9 @@ export function ProducerRegisterDialog({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-cpf">CPF</Label>
+                  <Label htmlFor="manager-cpf">CPF</Label>
                   <Input
-                    id="producer-cpf"
+                    id="manager-cpf"
                     value={values.cpf}
                     onChange={(e) => update("cpf", formatCpf(e.target.value))}
                     onBlur={() => handleBlur("cpf")}
@@ -332,16 +295,18 @@ export function ProducerRegisterDialog({
                     aria-invalid={Boolean(fieldErrors.cpf)}
                   />
                   {fieldErrors.cpf && (
-                    <p className="text-sm text-destructive">{fieldErrors.cpf}</p>
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.cpf}
+                    </p>
                   )}
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-date-of-birth">
+                  <Label htmlFor="manager-date-of-birth">
                     Data de nascimento
                   </Label>
                   <Input
-                    id="producer-date-of-birth"
+                    id="manager-date-of-birth"
                     type="date"
                     value={values.dateOfBirth}
                     onChange={(e) => update("dateOfBirth", e.target.value)}
@@ -356,26 +321,6 @@ export function ProducerRegisterDialog({
                     </p>
                   )}
                 </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-alias-name">
-                    Nome de exibição (opcional)
-                  </Label>
-                  <Input
-                    id="producer-alias-name"
-                    value={values.aliasName}
-                    onChange={(e) => update("aliasName", e.target.value)}
-                    onBlur={() => handleBlur("aliasName")}
-                    disabled={submitting}
-                    aria-invalid={Boolean(fieldErrors.aliasName)}
-                  />
-                  {fieldErrors.aliasName && (
-                    <p className="text-sm text-destructive">
-                      {fieldErrors.aliasName}
-                    </p>
-                  )}
-                </div>
-
               </div>
 
               <SheetFooter>
@@ -399,6 +344,8 @@ export function ProducerRegisterDialog({
                 </Button>
               </SheetFooter>
             </form>
+          </>
+        )}
       </SheetContent>
     </Sheet>
   );
