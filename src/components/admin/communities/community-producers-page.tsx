@@ -23,6 +23,7 @@ import { DataTablePagination } from "@/components/data-table/data-table-paginati
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
@@ -32,8 +33,7 @@ import { getMyManager } from "@/lib/managers";
 import { listProducers, type Producer } from "@/lib/producers";
 
 import { DeleteProducerDialog } from "../producers/delete-producer-dialog";
-import { ProducerFormDialog } from "../producers/producer-form-dialog";
-import { ProducerRegisterDialog } from "../producers/producer-register-dialog";
+import { ProducerFormDrawer } from "../producers/producer-form-drawer";
 
 type Props = {
   communityId: string;
@@ -56,6 +56,21 @@ function producersGlobalFilter(
   ].some((value) => value?.toLowerCase().includes(query));
 }
 
+function ComplianceBadge({ isCompliant }: { isCompliant: boolean | null }) {
+  if (isCompliant == null) {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  return isCompliant ? (
+    <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+      Em conformidade
+    </span>
+  ) : (
+    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
+      Pendente
+    </span>
+  );
+}
+
 const columnHelper = createColumnHelper<Producer>();
 
 export function CommunityProducersPage({ communityId }: Props) {
@@ -75,7 +90,9 @@ export function CommunityProducersPage({ communityId }: Props) {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Producer | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Producer | null>(null);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "fullName", desc: false },
+  ]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -83,7 +100,6 @@ export function CommunityProducersPage({ communityId }: Props) {
   });
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
     setRoleResolved(true);
   }, []);
@@ -143,7 +159,6 @@ export function CommunityProducersPage({ communityId }: Props) {
   }, [currentRole, roleResolved, communityId, router]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
@@ -186,19 +201,7 @@ export function CommunityProducersPage({ communityId }: Props) {
       columnHelper.accessor("isCompliant", {
         header: "Conformidade",
         enableSorting: false,
-        cell: (info) => {
-          const value = info.getValue();
-          if (value == null) return <span className="text-muted-foreground">—</span>;
-          return value ? (
-            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-              Em conformidade
-            </span>
-          ) : (
-            <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-600 dark:text-amber-400">
-              Pendente
-            </span>
-          );
-        },
+        cell: (info) => <ComplianceBadge isCompliant={info.getValue()} />,
       }),
     ];
 
@@ -250,6 +253,52 @@ export function CommunityProducersPage({ communityId }: Props) {
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
+
+  function renderMobileCard(row: Row<Producer>) {
+    const producer = row.original;
+    return (
+      <Card className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <Link
+              href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producer.id}`}
+              className="font-medium text-foreground hover:underline"
+            >
+              {producer.user?.fullName ?? producer.aliasName ?? "—"}
+            </Link>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">
+              {producer.user?.cpf ? formatCpf(producer.user.cpf) : "—"}
+            </p>
+            <div className="mt-2">
+              <ComplianceBadge isCompliant={producer.isCompliant} />
+            </div>
+          </div>
+          {canManage && (
+            <div className="flex shrink-0 gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditTarget(producer)}
+              >
+                <Pencil />
+                Editar
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Excluir agricultor"
+                onClick={() => setDeleteTarget(producer)}
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
 
   if (redirecting) {
     return (
@@ -310,21 +359,24 @@ export function CommunityProducersPage({ communityId }: Props) {
         hasActiveFilters={Boolean(table.getState().globalFilter)}
         onClearFilters={() => table.setGlobalFilter("")}
         emptyTitle="Nenhum agricultor cadastrado nesta comunidade ainda."
+        renderMobileCard={renderMobileCard}
       />
 
       <DataTablePagination table={table} />
 
       {canManage && (
-        <ProducerRegisterDialog
+        <ProducerFormDrawer
+          mode="create"
           open={registerOpen}
           onOpenChange={setRegisterOpen}
-          onCreated={refresh}
+          onSaved={refresh}
           communities={community ? [community] : []}
           loadingCommunities={community === null}
         />
       )}
 
-      <ProducerFormDialog
+      <ProducerFormDrawer
+        mode="edit"
         producer={editTarget}
         open={editTarget !== null}
         onOpenChange={(open) => {

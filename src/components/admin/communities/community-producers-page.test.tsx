@@ -6,6 +6,7 @@ import { CommunityProducersPage } from "@/components/admin/communities/community
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { getMyManager, type Manager } from "@/lib/managers";
 import { listProducers, type Producer } from "@/lib/producers";
 import type { Organization } from "@/lib/organizations";
@@ -35,6 +36,8 @@ vi.mock("@/lib/managers", async () => {
     await vi.importActual<typeof import("@/lib/managers")>("@/lib/managers");
   return { ...actual, getMyManager: vi.fn() };
 });
+
+vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: vi.fn(() => false) }));
 
 vi.mock("@/lib/auth", async () => {
   const actual =
@@ -260,5 +263,52 @@ describe("CommunityProducersPage — tabela de dados", () => {
 
     expect(screen.getByText("Produtor 11")).toBeTruthy();
     expect(screen.queryByText("Produtor 01")).toBeNull();
+  });
+});
+
+describe("CommunityProducersPage — ordenação e layout mobile", () => {
+  afterEach(() => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it("lista os agricultores em ordem alfabética por nome por padrão", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([
+      {
+        ...PRODUCER_ALFA,
+        id: "producer-c",
+        user: { ...PRODUCER_ALFA.user!, fullName: "Carlos Costa" },
+      },
+      PRODUCER_ALFA,
+      {
+        ...PRODUCER_ALFA,
+        id: "producer-b",
+        user: { ...PRODUCER_ALFA.user!, fullName: "Bruno Silva" },
+      },
+    ]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+    await screen.findByText("Ana Alves");
+
+    const names = screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => row.querySelectorAll("td")[0]?.textContent);
+    expect(names).toEqual(["Ana Alves", "Bruno Silva", "Carlos Costa"]);
+  });
+
+  it("em viewport mobile renderiza cards com as ações, sem <table>", async () => {
+    loginAs("ADMIN");
+    vi.mocked(useIsMobile).mockReturnValue(true);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    expect(await screen.findByText("Ana Alves")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Em conformidade")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Editar" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Excluir agricultor" }),
+    ).toBeTruthy();
   });
 });

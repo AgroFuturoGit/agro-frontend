@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import {
   cleanup,
   fireEvent,
@@ -7,19 +8,22 @@ import {
   waitFor,
 } from "@testing-library/react";
 
-import { ProducerRegisterDialog } from "@/components/admin/producers/producer-register-dialog";
+import { ProducerFormDrawer } from "@/components/admin/producers/producer-form-drawer";
 import {
   parseProducerRegisterFieldErrors,
   registerProducer,
   type Community,
 } from "@/lib/communities";
-import type { Producer } from "@/lib/producers";
+import { updateProducer, type Producer } from "@/lib/producers";
 
 // Nenhum acesso de rede real — o cliente de API do domínio é mockado
 // por completo (o `apiRequest` nunca chega a ser alcançado).
 vi.mock("@/lib/communities", () => ({
   registerProducer: vi.fn(),
   parseProducerRegisterFieldErrors: vi.fn(() => ({})),
+}));
+vi.mock("@/lib/producers", () => ({
+  updateProducer: vi.fn(),
 }));
 
 const COMMUNITIES: Community[] = [
@@ -63,14 +67,15 @@ const REGISTERED_PRODUCER: Producer = {
 };
 
 function renderDialog(
-  onCreated: () => void = () => {},
+  onSaved: () => void = () => {},
   onOpenChange: (open: boolean) => void = () => {},
 ) {
   return render(
-    <ProducerRegisterDialog
+    <ProducerFormDrawer
+      mode="create"
       open
       onOpenChange={onOpenChange}
-      onCreated={onCreated}
+      onSaved={onSaved}
       communities={COMMUNITIES}
       loadingCommunities={false}
     />,
@@ -116,18 +121,18 @@ function submitForm() {
   fireEvent.submit(form as HTMLFormElement);
 }
 
-describe("ProducerRegisterDialog — cadastro por comunidade (spec.md §5)", () => {
+describe("ProducerFormDrawer — cadastro por comunidade (spec.md §5)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
   });
 
-  it("submit válido chama registerProducer(communityId, payload) e dispara onCreated", async () => {
+  it("submit válido chama registerProducer(communityId, payload) e dispara onSaved", async () => {
     vi.mocked(registerProducer).mockResolvedValue(REGISTERED_PRODUCER);
-    const onCreated = vi.fn();
+    const onSaved = vi.fn();
     const onOpenChange = vi.fn();
 
-    renderDialog(onCreated, onOpenChange);
+    renderDialog(onSaved, onOpenChange);
 
     await screen.findByLabelText("Nome completo");
     fillTextFields();
@@ -147,9 +152,8 @@ describe("ProducerRegisterDialog — cadastro por comunidade (spec.md §5)", () 
         aliasName: "Zé do Milho",
       }),
     );
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
     expect(onOpenChange).toHaveBeenCalledWith(false);
-    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("renderiza o cadastro em uma barra lateral", async () => {
@@ -193,7 +197,7 @@ describe("ProducerRegisterDialog — cadastro por comunidade (spec.md §5)", () 
   });
 });
 
-describe("ProducerRegisterDialog — erros de servidor (gap #5 do QA de F02)", () => {
+describe("ProducerFormDrawer — erros de servidor (gap #5 do QA de F02)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -234,9 +238,9 @@ describe("ProducerRegisterDialog — erros de servidor (gap #5 do QA de F02)", (
       }),
     );
     vi.mocked(parseProducerRegisterFieldErrors).mockReturnValue({});
-    const onCreated = vi.fn();
+    const onSaved = vi.fn();
 
-    renderDialog(onCreated);
+    renderDialog(onSaved);
 
     await screen.findByLabelText("Nome completo");
     fillTextFields();
@@ -246,9 +250,94 @@ describe("ProducerRegisterDialog — erros de servidor (gap #5 do QA de F02)", (
 
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Erro interno do servidor");
-    // O diálogo não avança para o painel de sucesso nem notifica o pai.
-    expect(onCreated).not.toHaveBeenCalled();
-    expect(screen.queryByRole("status")).toBeNull();
+    // O drawer continua aberto e não notifica o pai.
+    expect(onSaved).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Nome completo")).toBeTruthy();
+  });
+});
+
+const EXISTING_PRODUCER: Producer = {
+  ...REGISTERED_PRODUCER,
+  isCompliant: false,
+};
+
+function renderEditDrawer(
+  onSaved: () => void = () => {},
+  onOpenChange: (open: boolean) => void = () => {},
+) {
+  return render(
+    <ProducerFormDrawer
+      mode="edit"
+      producer={EXISTING_PRODUCER}
+      open
+      onOpenChange={onOpenChange}
+      onSaved={onSaved}
+    />,
+  );
+}
+
+describe("ProducerFormDrawer — edição", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("mostra os dados do usuário e a comunidade como somente leitura", async () => {
+    renderEditDrawer();
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveAttribute("data-slot", "sheet-content");
+    expect(dialog).toHaveAttribute("data-side", "right");
+
+    expect(screen.getByLabelText("Comunidade")).toHaveValue("Comunidade Alfa");
+    expect(screen.getByLabelText("Comunidade")).toBeDisabled();
+    expect(screen.getByLabelText("Nome completo")).toHaveValue("José da Silva");
+    expect(screen.getByLabelText("Nome completo")).toBeDisabled();
+    expect(screen.getByLabelText("E-mail")).toBeDisabled();
+    expect(screen.getByLabelText("CPF")).toHaveValue("123.456.789-01");
+    expect(screen.getByLabelText("CPF")).toBeDisabled();
+    expect(screen.queryByLabelText("Senha")).toBeNull();
+  });
+
+  it("salva apelido e conformidade via updateProducer e fecha o drawer", async () => {
+    vi.mocked(updateProducer).mockResolvedValue(EXISTING_PRODUCER);
+    const onSaved = vi.fn();
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+
+    renderEditDrawer(onSaved, onOpenChange);
+
+    const alias = await screen.findByLabelText("Nome de exibição (opcional)");
+    await user.clear(alias);
+    await user.type(alias, "Seu Zé");
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    await waitFor(() => {
+      expect(updateProducer).toHaveBeenCalledWith("producer-1", {
+        aliasName: "Seu Zé",
+        isCompliant: true,
+      });
+      expect(onSaved).toHaveBeenCalledTimes(1);
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+    expect(registerProducer).not.toHaveBeenCalled();
+  });
+
+  it("apelido vazio é enviado como null", async () => {
+    vi.mocked(updateProducer).mockResolvedValue(EXISTING_PRODUCER);
+    const user = userEvent.setup();
+
+    renderEditDrawer();
+
+    await user.clear(await screen.findByLabelText("Nome de exibição (opcional)"));
+    await user.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    await waitFor(() =>
+      expect(updateProducer).toHaveBeenCalledWith("producer-1", {
+        aliasName: null,
+        isCompliant: false,
+      }),
+    );
   });
 });
