@@ -51,6 +51,7 @@ type TestHostProps = {
   data?: Item[];
   isLoading?: boolean;
   hasError?: boolean;
+  errorHint?: string;
   onRetry?: () => void;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
@@ -200,6 +201,16 @@ describe("DataTable — os três estados de DataTableStatus", () => {
 
     await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("erro: usa o errorHint informado no lugar da dica padrão", () => {
+    render(
+      <TestHost data={[]} hasError errorHint="Falha de rede ao buscar os dados." />,
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("Falha de rede ao buscar os dados.");
+    expect(alert.textContent).not.toContain("Tente novamente em alguns instantes.");
   });
 
   it("vazio sem filtro ativo: role='status', mensagem de 'nenhum registro' e nenhuma ação", () => {
