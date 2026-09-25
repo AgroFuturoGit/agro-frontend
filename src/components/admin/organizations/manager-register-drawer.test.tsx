@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import { ManagerRegisterDialog } from "@/components/admin/organizations/manager-register-dialog";
+import { ManagerRegisterDrawer } from "@/components/admin/organizations/manager-register-drawer";
 import {
   parseManagerRegisterFieldErrors,
   registerManager,
@@ -35,7 +35,7 @@ const REGISTERED_MANAGER: Manager = {
 
 function renderDialog() {
   return render(
-    <ManagerRegisterDialog
+    <ManagerRegisterDrawer
       organizationId="org-1"
       organizationName="Cooperativa Alfa"
       open
@@ -69,7 +69,7 @@ function submitForm() {
   fireEvent.submit(form as HTMLFormElement);
 }
 
-describe("ManagerRegisterDialog — validação mínima do cadastro de Manager (spec.md §5)", () => {
+describe("ManagerRegisterDrawer — validação mínima do cadastro de Manager (spec.md §5)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -117,7 +117,7 @@ describe("ManagerRegisterDialog — validação mínima do cadastro de Manager (
   });
 });
 
-describe("ManagerRegisterDialog — erro de servidor com campo específico (gap #5 do QA)", () => {
+describe("ManagerRegisterDrawer — erro de servidor com campo específico (gap #5 do QA)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();

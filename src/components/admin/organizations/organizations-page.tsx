@@ -28,7 +28,7 @@ import {
 import { getMyProducer, type Producer } from "@/lib/producers";
 import { getMyAssignedProducers } from "@/lib/technicians";
 
-import { ManagerRegisterDialog } from "./manager-register-dialog";
+import { ManagerRegisterDrawer } from "./manager-register-drawer";
 import { OrganizationFormDrawer } from "./organization-form-drawer";
 
 /**
@@ -450,7 +450,7 @@ export function OrganizationsPage() {
           />
 
           {managerTarget && (
-            <ManagerRegisterDialog
+            <ManagerRegisterDrawer
               organizationId={managerTarget.id}
               organizationName={managerTarget.name}
               open={managerTarget !== null}
