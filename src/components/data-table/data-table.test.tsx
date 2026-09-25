@@ -52,6 +52,8 @@ type TestHostProps = {
   isLoading?: boolean;
   hasError?: boolean;
   errorHint?: string;
+  emptyActionLabel?: string;
+  onEmptyAction?: () => void;
   onRetry?: () => void;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
@@ -211,6 +213,36 @@ describe("DataTable — os três estados de DataTableStatus", () => {
     const alert = screen.getByRole("alert");
     expect(alert.textContent).toContain("Falha de rede ao buscar os dados.");
     expect(alert.textContent).not.toContain("Tente novamente em alguns instantes.");
+  });
+
+  it("vazio sem filtro ativo: oferece a ação de vazio quando informada", async () => {
+    const user = userEvent.setup();
+    const onEmptyAction = vi.fn();
+    render(
+      <TestHost
+        data={[]}
+        emptyActionLabel="Criar primeiro item"
+        onEmptyAction={onEmptyAction}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Criar primeiro item" }));
+    expect(onEmptyAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("vazio com filtro ativo: a ação de vazio dá lugar a 'Limpar filtros'", () => {
+    render(
+      <TestHost
+        data={[]}
+        hasActiveFilters
+        onClearFilters={() => {}}
+        emptyActionLabel="Criar primeiro item"
+        onEmptyAction={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Limpar filtros" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Criar primeiro item" })).toBeNull();
   });
 
   it("vazio sem filtro ativo: role='status', mensagem de 'nenhum registro' e nenhuma ação", () => {
