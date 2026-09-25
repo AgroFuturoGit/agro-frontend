@@ -53,7 +53,15 @@ const NAV_ITEMS: NavItem[] = [
     // FARMER são redirecionados automaticamente, nunca escolhem pela UI.
   },
   { href: "/admin/safras", label: "Safras", icon: Sprout },
-  { href: "/admin/relatorios", label: "Relatórios", icon: BarChart3 },
+  {
+    href: "/admin/relatorios",
+    label: "Relatórios",
+    icon: BarChart3,
+    // A tela é montada a partir de `GET /farmers/me`, que o backend só
+    // libera para FARMER (`hasRole('FARMER')` em `FarmerController`). As
+    // demais roles não têm caminho de dados para ela e recebiam 403.
+    roles: ["FARMER"],
+  },
 ];
 
 export function SidebarNav() {

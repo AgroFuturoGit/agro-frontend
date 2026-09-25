@@ -17,17 +17,12 @@ const ADMIN_OR_MANAGER_PREFIXES = ["/admin/usuarios"];
 // de produção agora vive só sob `/admin/organizacoes/.../produtores/...`.
 const FARMER_ONLY_PREFIXES = ["/admin/relatorios"];
 
-// Este grupo era exclusivo de FARMER. Agora ADMIN, MANAGER e TECHNICIAN
-// também precisam consultar relatórios, então o grupo libera as 4 roles
-// válidas — na prática a checagem abaixo não bloqueia mais ninguém, mas ela
-// é mantida explícita (junto da constante) para documentar o grupo e servir
-// de ponto de extensão caso a restrição volte a existir.
-const FARMER_GROUP_ALLOWED_ROLES: Role[] = [
-  "ADMIN",
-  "MANAGER",
-  "TECHNICIAN",
-  "FARMER",
-];
+// Relatórios só funcionam para FARMER: a tela depende de `GET /farmers/me`,
+// que o backend restringe a `hasRole('FARMER')`. ADMIN, MANAGER e TECHNICIAN
+// chegavam à tela e recebiam 403 — o proxy agora os devolve a `/admin`. Se
+// o backend ganhar um caminho de dados de relatório para outras roles, basta
+// incluí-las aqui (e no item da sidebar).
+const FARMER_GROUP_ALLOWED_ROLES: Role[] = ["FARMER"];
 
 function matchesAny(pathname: string, prefixes: string[]) {
   return prefixes.some(
