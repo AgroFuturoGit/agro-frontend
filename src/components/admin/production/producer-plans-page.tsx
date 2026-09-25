@@ -1,22 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowRight, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type ColumnFiltersState,
+  type PaginationState,
+  type Row,
+  type SortingState,
+} from "@tanstack/react-table";
 
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
@@ -42,6 +51,26 @@ type BreadcrumbNames = {
   communityName: string;
   producerLabel: string;
 };
+
+function cropLabel(plan: ProductionPlan): string {
+  return plan.crop ? `${plan.crop.name} — ${plan.crop.variety}` : "";
+}
+
+/** Busca livre por cultivo, variedade ou safra, case-insensitive. */
+function plansGlobalFilter(
+  row: Row<ProductionPlan>,
+  _columnId: string,
+  filterValue: string,
+) {
+  const query = filterValue.trim().toLowerCase();
+  if (!query) return true;
+  const plan = row.original;
+  return [cropLabel(plan), plan.harvest?.label].some((value) =>
+    value?.toLowerCase().includes(query),
+  );
+}
+
+const columnHelper = createColumnHelper<ProductionPlan>();
 
 export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   const router = useRouter();
@@ -74,8 +103,15 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     null,
   );
 
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
     setRoleResolved(true);
   }, []);
@@ -113,7 +149,6 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   // Mesmo conjunto de roles da escrita em geral; mantido como constante
   // própria porque é o gate citado nos testes desta tela.
   const canDelete = canWrite;
-  const columnCount = canWrite ? 6 : 5;
 
   const runGuard = useCallback(async () => {
     if (!roleResolved) return;
@@ -150,7 +185,6 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   }, [roleResolved, currentRole, producerId, router]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     runGuard();
   }, [runGuard]);
 
@@ -209,9 +243,197 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   }, [guardPassed, producerId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
+
+  const planHref = useCallback(
+    (plan: ProductionPlan) =>
+      `/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producerId}/planos/${plan.id}`,
+    [orgId, communityId, producerId],
+  );
+
+  const harvestOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          plans
+            .map((plan) => plan.harvest?.label)
+            .filter((label): label is string => Boolean(label)),
+        ),
+      )
+        .sort((a, b) => a.localeCompare(b))
+        .map((label) => ({ value: label, label })),
+    [plans],
+  );
+
+  const columns = useMemo(() => {
+    const baseColumns = [
+      columnHelper.accessor((plan) => cropLabel(plan), {
+        id: "crop",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Cultivo" disabled={loading} />
+        ),
+        cell: ({ row }) => (
+          <Link
+            href={planHref(row.original)}
+            className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
+          >
+            {cropLabel(row.original) || "—"}
+            <ArrowRight className="size-3.5 text-muted-foreground" />
+          </Link>
+        ),
+      }),
+      columnHelper.accessor((plan) => plan.harvest?.label ?? "", {
+        id: "harvest",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Safra" disabled={loading} />
+        ),
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue() || "—"}</span>
+        ),
+        filterFn: (row, columnId, filterValue) =>
+          !filterValue || row.getValue(columnId) === filterValue,
+      }),
+      columnHelper.accessor("plantedArea", {
+        header: ({ column }) => (
+          <div className="flex justify-end">
+            <DataTableColumnHeader column={column} title="Área (ha)" disabled={loading} />
+          </div>
+        ),
+        cell: (info) => (
+          <span className="block text-right tabular-nums">
+            {formatNumber(info.getValue())}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("expectedYield", {
+        header: ({ column }) => (
+          <div className="flex justify-end">
+            <DataTableColumnHeader column={column} title="Previsto (t)" disabled={loading} />
+          </div>
+        ),
+        cell: (info) => (
+          <span className="block text-right tabular-nums">
+            {formatNumber(info.getValue())}
+          </span>
+        ),
+      }),
+      // ISO `YYYY-MM-DD`: a comparação lexicográfica já ordena por data.
+      columnHelper.accessor((plan) => plan.plannedPlantingDate ?? "", {
+        id: "plannedPlantingDate",
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="Plantio" disabled={loading} />
+        ),
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">
+            {formatPlanDate(row.original.plannedPlantingDate)}
+          </span>
+        ),
+      }),
+    ];
+
+    const actionsColumn = columnHelper.display({
+      id: "actions",
+      header: "Ações",
+      cell: ({ row }) => (
+        <div className="inline-flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Editar plano"
+            onClick={() => setEditTarget(row.original)}
+          >
+            <Pencil />
+          </Button>
+          {canDelete && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Excluir plano"
+              onClick={() => setDeleteTarget(row.original)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 />
+            </Button>
+          )}
+        </div>
+      ),
+    });
+
+    return (canWrite ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
+      ProductionPlan,
+      unknown
+    >[];
+  }, [canWrite, canDelete, loading, planHref]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: plans,
+    columns,
+    state: { sorting, columnFilters, globalFilter, pagination },
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: setPagination,
+    globalFilterFn: plansGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  function renderMobileCard(row: Row<ProductionPlan>) {
+    const plan = row.original;
+    return (
+      <Card className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <Link
+              href={planHref(plan)}
+              className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
+            >
+              {cropLabel(plan) || "—"}
+              <ArrowRight className="size-3.5 text-muted-foreground" />
+            </Link>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {plan.harvest?.label ?? "—"} · Plantio{" "}
+              {formatPlanDate(plan.plannedPlantingDate)}
+            </p>
+            <p className="mt-1 text-sm tabular-nums">
+              {formatNumber(plan.plantedArea)} ha ·{" "}
+              {formatNumber(plan.expectedYield)} t previstas
+            </p>
+          </div>
+          {canWrite && (
+            <div className="flex shrink-0 gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditTarget(plan)}
+              >
+                <Pencil />
+                Editar
+              </Button>
+              {canDelete && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Excluir plano"
+                  onClick={() => setDeleteTarget(plan)}
+                >
+                  <Trash2 />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
 
   if (redirecting) {
     return (
@@ -280,128 +502,34 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         )}
       </div>
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => refresh()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
-      )}
+      <DataTableToolbar
+        table={table}
+        searchPlaceholder="Buscar por cultivo ou safra…"
+        filters={[{ columnId: "harvest", label: "Safra", options: harvestOptions }]}
+      />
 
-      <Card className="py-0">
-        <Table>
-          <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Cultivo</TableHead>
-              <TableHead>Safra</TableHead>
-              <TableHead className="text-right">Área (ha)</TableHead>
-              <TableHead className="text-right">Previsto (t)</TableHead>
-              <TableHead>Plantio</TableHead>
-              {canWrite && (
-                <TableHead className="w-[1%] text-right">Ações</TableHead>
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody className="[&_td]:h-12 [&_td]:px-4">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, idx) => (
-                <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: columnCount }).map((__, cidx) => (
-                    <TableCell key={cidx}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : plans.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columnCount} className="py-12 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Nenhum plano de produção cadastrado ainda.
-                  </p>
-                  {canWrite && (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-4"
-                      onClick={() => setCreateOpen(true)}
-                    >
-                      Criar primeiro plano
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ) : (
-              plans.map((plan) => (
-                <TableRow key={plan.id}>
-                  <TableCell className="font-medium text-foreground">
-                    <Link
-                      href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producerId}/planos/${plan.id}`}
-                      className="inline-flex items-center gap-1 hover:underline"
-                    >
-                      {plan.crop
-                        ? `${plan.crop.name} — ${plan.crop.variety}`
-                        : "—"}
-                      <ArrowRight className="size-3.5 text-muted-foreground" />
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {plan.harvest?.label ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(plan.plantedArea)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(plan.expectedYield)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatPlanDate(plan.plannedPlantingDate)}
-                  </TableCell>
-                  {canWrite && (
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Editar plano"
-                          onClick={() => setEditTarget(plan)}
-                        >
-                          <Pencil />
-                        </Button>
-                        {canDelete && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Excluir plano"
-                            onClick={() => setDeleteTarget(plan)}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            <Trash2 />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+      <DataTable
+        table={table}
+        columns={columns}
+        isLoading={loading}
+        hasError={Boolean(error)}
+        onRetry={refresh}
+        errorHint={error ?? undefined}
+        hasActiveFilters={
+          Boolean(table.getState().globalFilter) ||
+          table.getState().columnFilters.length > 0
+        }
+        onClearFilters={() => {
+          table.setGlobalFilter("");
+          table.resetColumnFilters();
+        }}
+        emptyTitle="Nenhum plano de produção cadastrado ainda."
+        emptyActionLabel={canWrite ? "Criar primeiro plano" : undefined}
+        onEmptyAction={canWrite ? () => setCreateOpen(true) : undefined}
+        renderMobileCard={renderMobileCard}
+      />
+
+      <DataTablePagination table={table} />
 
       {canWrite && guardPassed && (
         <PlanFormDrawer

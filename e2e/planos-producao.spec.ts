@@ -204,7 +204,9 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     await expect(page.getByRole("cell", { name: "Safra 2026" })).toBeVisible();
 
     // Sem seletor de produtor — o escopo vem inteiramente da URL.
-    await expect(page.getByRole("combobox")).toHaveCount(0);
+    await expect(
+      page.getByRole("combobox", { name: /agricultor|produtor/i }),
+    ).toHaveCount(0);
 
     expect(planRequests).toHaveLength(1);
     expect(planRequests[0]).toContain(
@@ -282,7 +284,9 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
 
     // Proibição explícita: o FARMER não vê seletor de produtor nem lista
     // GET /farmers.
-    await expect(page.getByRole("combobox")).toHaveCount(0);
+    await expect(
+      page.getByRole("combobox", { name: /agricultor|produtor/i }),
+    ).toHaveCount(0);
     expect(listProducersRequests).toHaveLength(0);
 
     // Sem regressão do fluxo do próprio produtor.
