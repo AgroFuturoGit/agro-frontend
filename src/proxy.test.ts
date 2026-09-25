@@ -16,9 +16,9 @@ import { proxy, resolveAccess } from "@/proxy";
  *
  * | Role / Cookie          | /admin/perfis        | /admin/usuarios      | /admin/relatorios | /admin, /admin/culturas, /admin/safras, /admin/organizacoes (e aninhadas) |
  * |-------------------------|----------------------|-----------------------|--------------------|------------------------------------------------------------------------------|
- * | ADMIN                   | permitido            | permitido             | permitido          | permitido                                                                     |
- * | MANAGER                  | redirect /admin      | permitido             | permitido          | permitido (guarda de ownership é client-side, não no proxy)                  |
- * | TECHNICIAN               | redirect /admin      | redirect /admin       | permitido          | permitido                                                                     |
+ * | ADMIN                   | permitido            | permitido             | redirect /admin    | permitido                                                                     |
+ * | MANAGER                  | redirect /admin      | permitido             | redirect /admin    | permitido (guarda de ownership é client-side, não no proxy)                  |
+ * | TECHNICIAN               | redirect /admin      | redirect /admin       | redirect /admin    | permitido                                                                     |
  * | FARMER                 | redirect /admin      | redirect /admin       | permitido          | permitido (resolução/guarda são client-side)                                 |
  * | ausente (undefined)      | redirect /login      | redirect /login       | redirect /login    | redirect /login                                                               |
  * | corrompida ("HACKER")    | redirect /login      | redirect /login       | redirect /login    | redirect /login                                                               |
@@ -66,19 +66,19 @@ const VALID_ROLE_MATRIX: Record<string, Record<string, Expectation>> = {
   ADMIN: {
     "/admin/perfis": NEXT,
     "/admin/usuarios": NEXT,
-    "/admin/relatorios": NEXT,
+    "/admin/relatorios": REDIRECT_ADMIN,
     "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": NEXT,
   },
   MANAGER: {
     "/admin/perfis": REDIRECT_ADMIN,
     "/admin/usuarios": NEXT,
-    "/admin/relatorios": NEXT,
+    "/admin/relatorios": REDIRECT_ADMIN,
     "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": NEXT,
   },
   TECHNICIAN: {
     "/admin/perfis": REDIRECT_ADMIN,
     "/admin/usuarios": REDIRECT_ADMIN,
-    "/admin/relatorios": NEXT,
+    "/admin/relatorios": REDIRECT_ADMIN,
     "/admin, /admin/culturas, /admin/safras, /admin/organizacoes": NEXT,
   },
   FARMER: {

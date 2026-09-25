@@ -37,14 +37,10 @@ export function ReportsPage() {
   // produtores/{producerId}/planos/{planId}`), já que
   // `/admin/cultivos/{planId}` não existe mais.
   //
-  // ATENÇÃO — esta tela só funciona para FARMER: `refresh()` chama
-  // `getMyProducer()` (`GET /farmers/me`, `hasRole('FARMER')`) sem branch por
-  // role, mas NADA restringe o acesso até aqui: `sidebar-nav.tsx` renderiza
-  // "Relatórios" para as 4 roles e `proxy.ts` deixa as 4 passarem
-  // (`FARMER_GROUP_ALLOWED_ROLES` contém todas). Logo ADMIN/MANAGER/
-  // TECHNICIAN chegam na tela e recebem 403, vendo só o alerta de erro.
-  // Gap pré-existente e conhecido — o fix exige decidir entre gatear a
-  // navegação para FARMER ou dar um caminho de dados às outras roles.
+  // Esta tela só funciona para FARMER: `refresh()` chama `getMyProducer()`
+  // (`GET /farmers/me`, `hasRole('FARMER')`). Por isso o item "Relatórios"
+  // da sidebar e o grupo `/admin/relatorios` do `proxy.ts` são restritos a
+  // FARMER — as demais roles recebiam 403.
   const [producer, setProducer] = useState<Producer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -64,13 +64,32 @@ describe("SidebarNav — RBAC de navegação", () => {
   });
 
   it.each(["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"] as const)(
-    "exibe 'Organizações' e 'Relatórios' para role=%s (ponto de entrada único da hierarquia)",
+    "exibe 'Organizações' para role=%s (ponto de entrada único da hierarquia)",
     async (role) => {
       mockRole(role);
       renderSidebarNav();
 
       expect(await screen.findByText("Organizações")).toBeTruthy();
-      expect(screen.getByText("Relatórios")).toBeTruthy();
+    },
+  );
+
+  // "Relatórios" depende de `GET /farmers/me` (`hasRole('FARMER')` no
+  // backend): só aparece para quem consegue carregar a tela.
+  it("exibe 'Relatórios' para role=FARMER", async () => {
+    mockRole("FARMER");
+    renderSidebarNav();
+
+    expect(await screen.findByText("Relatórios")).toBeTruthy();
+  });
+
+  it.each(["ADMIN", "MANAGER", "TECHNICIAN"] as const)(
+    "não exibe 'Relatórios' para role=%s (sem acesso no backend)",
+    async (role) => {
+      mockRole(role);
+      renderSidebarNav();
+
+      await screen.findByText("Organizações");
+      expect(screen.queryByText("Relatórios")).toBeNull();
     },
   );
 
