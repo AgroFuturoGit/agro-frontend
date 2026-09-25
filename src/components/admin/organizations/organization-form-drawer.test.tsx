@@ -7,7 +7,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 
-import { OrganizationFormDialog } from "@/components/admin/organizations/organization-form-dialog";
+import { OrganizationFormDrawer } from "@/components/admin/organizations/organization-form-drawer";
 import {
   createOrganization,
   parseOrganizationFieldErrors,
@@ -36,7 +36,7 @@ function renderDialog(
   organization: Organization | null = null,
 ) {
   return render(
-    <OrganizationFormDialog
+    <OrganizationFormDrawer
       mode={mode}
       open
       onOpenChange={() => {}}
@@ -46,7 +46,7 @@ function renderDialog(
   );
 }
 
-describe("OrganizationFormDialog — imutabilidade de type/taxId em modo edição (spec.md §5, Task 01-01)", () => {
+describe("OrganizationFormDrawer — imutabilidade de type/taxId em modo edição (spec.md §5, Task 01-01)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -108,7 +108,7 @@ describe("OrganizationFormDialog — imutabilidade de type/taxId em modo ediçã
   });
 });
 
-describe("OrganizationFormDialog — submit de sucesso (gaps QA #3)", () => {
+describe("OrganizationFormDrawer — submit de sucesso (gaps QA #3)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -165,7 +165,7 @@ describe("OrganizationFormDialog — submit de sucesso (gaps QA #3)", () => {
   });
 });
 
-describe("OrganizationFormDialog — erro de servidor com campo específico (gap #5 do QA)", () => {
+describe("OrganizationFormDrawer — erro de servidor com campo específico (gap #5 do QA)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();

@@ -23,7 +23,7 @@ import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
 import { getOrganization, type Organization } from "@/lib/organizations";
 
-import { CommunityFormDialog } from "../communities/community-form-dialog";
+import { CommunityFormDrawer } from "../communities/community-form-drawer";
 
 type Props = {
   orgId: string;
@@ -263,7 +263,7 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
       </Card>
 
       {canManage && currentRole && (
-        <CommunityFormDialog
+        <CommunityFormDrawer
           mode={dialogMode}
           role={currentRole}
           organizationId={orgId}

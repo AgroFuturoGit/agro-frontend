@@ -33,7 +33,7 @@ import {
 
 import { ComparisonSummary } from "./comparison-summary";
 import { DeleteExecutionDialog } from "./delete-execution-dialog";
-import { ExecutionFormDialog } from "./execution-form-dialog";
+import { ExecutionFormDrawer } from "./execution-form-drawer";
 
 type Props = {
   orgId: string;
@@ -374,7 +374,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
       {canWrite && (
         <>
-          <ExecutionFormDialog
+          <ExecutionFormDrawer
             mode="create"
             planId={planId}
             open={createOpen}
@@ -382,7 +382,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             onSaved={refresh}
           />
 
-          <ExecutionFormDialog
+          <ExecutionFormDrawer
             mode="edit"
             planId={planId}
             execution={editTarget}

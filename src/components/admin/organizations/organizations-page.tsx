@@ -29,7 +29,7 @@ import { getMyProducer, type Producer } from "@/lib/producers";
 import { getMyAssignedProducers } from "@/lib/technicians";
 
 import { ManagerRegisterDialog } from "./manager-register-dialog";
-import { OrganizationFormDialog } from "./organization-form-dialog";
+import { OrganizationFormDrawer } from "./organization-form-drawer";
 
 /**
  * `/admin/organizacoes` é o único ponto de entrada da hierarquia
@@ -432,14 +432,14 @@ export function OrganizationsPage() {
 
       {canManage && (
         <>
-          <OrganizationFormDialog
+          <OrganizationFormDrawer
             mode="create"
             open={createOpen}
             onOpenChange={setCreateOpen}
             onSaved={resolveAndLoad}
           />
 
-          <OrganizationFormDialog
+          <OrganizationFormDrawer
             mode="edit"
             organization={editTarget}
             open={editTarget !== null}

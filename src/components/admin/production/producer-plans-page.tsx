@@ -29,7 +29,7 @@ import {
 } from "@/lib/production";
 
 import { DeletePlanDialog } from "./delete-plan-dialog";
-import { PlanFormDialog } from "./plan-form-dialog";
+import { PlanFormDrawer } from "./plan-form-drawer";
 
 type Props = {
   orgId: string;
@@ -404,7 +404,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       </Card>
 
       {canWrite && guardPassed && (
-        <PlanFormDialog
+        <PlanFormDrawer
           mode="create"
           producerId={producerId}
           open={createOpen}
@@ -414,7 +414,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       )}
 
       {canWrite && guardPassed && (
-        <PlanFormDialog
+        <PlanFormDrawer
           mode="edit"
           producerId={producerId}
           plan={editTarget}

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import { CommunityFormDialog } from "@/components/admin/communities/community-form-dialog";
+import { CommunityFormDrawer } from "@/components/admin/communities/community-form-drawer";
 import {
   createCommunity,
   parseCommunityFieldErrors,
@@ -50,7 +50,7 @@ function renderDialog({
   vi.mocked(listOrganizations).mockResolvedValue(ORGANIZATIONS);
 
   return render(
-    <CommunityFormDialog
+    <CommunityFormDrawer
       mode={mode}
       role={role}
       organizationId={organizationId}
@@ -62,7 +62,7 @@ function renderDialog({
   );
 }
 
-describe("CommunityFormDialog — resolução de organização por role (spec.md §5, decisão D3)", () => {
+describe("CommunityFormDrawer — resolução de organização por role (spec.md §5, decisão D3)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -129,7 +129,7 @@ describe("CommunityFormDialog — resolução de organização por role (spec.md
   });
 });
 
-describe("CommunityFormDialog — submit de sucesso (gaps QA #4)", () => {
+describe("CommunityFormDrawer — submit de sucesso (gaps QA #4)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
@@ -173,7 +173,7 @@ describe("CommunityFormDialog — submit de sucesso (gaps QA #4)", () => {
   });
 });
 
-describe("CommunityFormDialog — erro de servidor com campo específico (gap #5 do QA)", () => {
+describe("CommunityFormDrawer — erro de servidor com campo específico (gap #5 do QA)", () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
