@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 
 import { PlanDetail } from "@/components/admin/production/plan-detail";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
@@ -27,6 +28,8 @@ import {
 // `producer-plans-page.test.tsx`). O resto do módulo é preservado via
 // `importActual` porque a tela e os diálogos usam outros exports
 // (`formatNumber`, `formatPlanDate`, escrita de apontamento, tipos).
+vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: vi.fn(() => false) }));
+
 vi.mock("@/lib/production", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/production")>(
@@ -383,5 +386,58 @@ describe("PlanDetail — erro de API e recuperação", () => {
     expect(alert.textContent).toContain(
       "Não foi possível carregar o plano de produção.",
     );
+  });
+});
+
+describe("PlanDetail — tabela de apontamentos", () => {
+  afterEach(() => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it("lista os apontamentos do mais recente para o mais antigo", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue([
+      { ...EXECUTIONS[0], id: "execution-a", harvestDate: "2026-04-02", actualYield: 5 },
+      { ...EXECUTIONS[0], id: "execution-b", harvestDate: "2026-06-20", actualYield: 7 },
+      EXECUTIONS[0],
+    ]);
+
+    renderPlanDetail();
+
+    await screen.findByText("20/06/2026");
+    const dates = screen
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => row.querySelectorAll("td")[0]?.textContent);
+    expect(dates).toEqual(["20/06/2026", "10/05/2026", "02/04/2026"]);
+  });
+
+  it("sem apontamentos, 'Registrar primeira colheita' abre o drawer", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue([]);
+
+    renderPlanDetail();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Registrar primeira colheita" }),
+    );
+
+    const drawer = await screen.findByRole("dialog");
+    expect(drawer).toHaveAttribute("data-slot", "sheet-content");
+    expect(drawer.textContent).toContain("Novo apontamento");
+  });
+
+  it("em viewport mobile renderiza cards, sem <table>", async () => {
+    loginAs("FARMER");
+    vi.mocked(useIsMobile).mockReturnValue(true);
+
+    renderPlanDetail();
+
+    expect(await screen.findByText("10/05/2026")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByRole("button", { name: "Editar" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Excluir apontamento" }),
+    ).toBeTruthy();
   });
 });

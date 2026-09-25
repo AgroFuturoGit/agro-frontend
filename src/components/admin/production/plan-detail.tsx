@@ -1,21 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+  type SortingState,
+} from "@tanstack/react-table";
 
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
@@ -48,6 +54,8 @@ type BreadcrumbNames = {
   producerLabel: string;
 };
 
+const columnHelper = createColumnHelper<ProductionExecution>();
+
 export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [names, setNames] = useState<BreadcrumbNames | null>(null);
@@ -65,8 +73,16 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     null,
   );
 
+  // Mais recente primeiro — mesma ordem da tabela manual anterior.
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "harvestDate", desc: true },
+  ]);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
+
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
@@ -149,7 +165,6 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   // Mesmo conjunto de roles da escrita em geral; mantido como constante
   // própria porque é o gate citado nos testes desta tela.
   const canDelete = canWrite;
-  const columnCount = canWrite ? 3 : 2;
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -175,13 +190,134 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   }, [planId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
-  const sortedExecutions = [...executions].sort((a, b) =>
-    (b.harvestDate ?? "").localeCompare(a.harvestDate ?? ""),
-  );
+  const columns = useMemo(() => {
+    const baseColumns = [
+      // ISO `YYYY-MM-DD`: a comparação lexicográfica já ordena por data.
+      columnHelper.accessor((execution) => execution.harvestDate ?? "", {
+        id: "harvestDate",
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title="Data da colheita"
+            disabled={loading}
+          />
+        ),
+        cell: ({ row }) => (
+          <span className="font-medium text-foreground">
+            {formatPlanDate(row.original.harvestDate)}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("actualYield", {
+        header: ({ column }) => (
+          <div className="flex justify-end">
+            <DataTableColumnHeader
+              column={column}
+              title="Quantidade (t)"
+              disabled={loading}
+            />
+          </div>
+        ),
+        cell: (info) => (
+          <span className="block text-right tabular-nums">
+            {formatNumber(info.getValue())}
+          </span>
+        ),
+      }),
+    ];
+
+    const actionsColumn = columnHelper.display({
+      id: "actions",
+      header: "Ações",
+      cell: ({ row }) => (
+        <div className="inline-flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Editar apontamento"
+            onClick={() => setEditTarget(row.original)}
+          >
+            <Pencil />
+          </Button>
+          {canDelete && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Excluir apontamento"
+              onClick={() => setDeleteTarget(row.original)}
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 />
+            </Button>
+          )}
+        </div>
+      ),
+    });
+
+    return (canWrite ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
+      ProductionExecution,
+      unknown
+    >[];
+  }, [canWrite, canDelete, loading]);
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: executions,
+    columns,
+    state: { sorting, pagination },
+    onSortingChange: setSorting,
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  function renderMobileCard(row: Row<ProductionExecution>) {
+    const execution = row.original;
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground">
+              {formatPlanDate(execution.harvestDate)}
+            </p>
+            <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+              {formatNumber(execution.actualYield)} t colhidas
+            </p>
+          </div>
+          {canWrite && (
+            <div className="flex shrink-0 gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditTarget(execution)}
+              >
+                <Pencil />
+                Editar
+              </Button>
+              {canDelete && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Excluir apontamento"
+                  onClick={() => setDeleteTarget(execution)}
+                >
+                  <Trash2 />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
 
   const backToPlansHref = `/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producerId}`;
 
@@ -288,88 +424,24 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           )}
         </div>
 
-        <Card className="py-0">
-          <Table>
-            <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Data da colheita</TableHead>
-                <TableHead className="text-right">Quantidade (t)</TableHead>
-                {canWrite && (
-                  <TableHead className="w-[1%] text-right">Ações</TableHead>
-                )}
-              </TableRow>
-            </TableHeader>
-            <TableBody className="[&_td]:h-12 [&_td]:px-4">
-              {loading ? (
-                Array.from({ length: 3 }).map((_, idx) => (
-                  <TableRow key={`skeleton-${idx}`}>
-                    {Array.from({ length: columnCount }).map((__, cidx) => (
-                      <TableCell key={cidx}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : sortedExecutions.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={columnCount} className="py-12 text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Nenhum apontamento registrado ainda.
-                    </p>
-                    {canWrite && plan && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="mt-4"
-                        onClick={() => setCreateOpen(true)}
-                      >
-                        Registrar primeira colheita
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedExecutions.map((execution) => (
-                  <TableRow key={execution.id}>
-                    <TableCell className="font-medium text-foreground">
-                      {formatPlanDate(execution.harvestDate)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(execution.actualYield)}
-                    </TableCell>
-                    {canWrite && (
-                      <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label="Editar apontamento"
-                            onClick={() => setEditTarget(execution)}
-                          >
-                            <Pencil />
-                          </Button>
-                          {canDelete && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label="Excluir apontamento"
-                              onClick={() => setDeleteTarget(execution)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+        {/*
+          Erro de carregamento é da tela inteira (plano, comparativo e
+          apontamentos vêm juntos) e já aparece no alerta do topo — por isso
+          o DataTable não recebe `hasError`.
+        */}
+        <DataTable
+          table={table}
+          columns={columns}
+          isLoading={loading}
+          emptyTitle="Nenhum apontamento registrado ainda."
+          emptyActionLabel={
+            canWrite && plan ? "Registrar primeira colheita" : undefined
+          }
+          onEmptyAction={canWrite && plan ? () => setCreateOpen(true) : undefined}
+          renderMobileCard={renderMobileCard}
+        />
+
+        <DataTablePagination table={table} />
       </div>
 
       {canWrite && (
