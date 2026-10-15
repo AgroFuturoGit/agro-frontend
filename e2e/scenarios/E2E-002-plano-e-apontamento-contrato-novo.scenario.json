@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "id": "E2E-002",
+  "title": "Criar plano com meta calculada e registrar apontamento em caixas",
+  "description": "Agricultor cria um plano de uma cultura BOX (20 kg, 1500 kg/ha), confere a meta calculada em kg, registra 12 caixas e vê 240 kg com status Pendente.",
+  "feature_slug": "alinhar-contrato-producao-agricultural-core",
+  "ac_refs": [
+    "AC-009",
+    "AC-010",
+    "AC-012",
+    "AC-013",
+    "AC-015",
+    "AC-017"
+  ],
+  "priority": "P0",
+  "tags": [
+    "planos",
+    "apontamentos",
+    "contrato-backend"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "FARMER",
+        "credentials_env": {
+          "email": "E2E_FARMER_EMAIL",
+          "password": "E2E_FARMER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Cultura 'Tomate E2E' (BOX, 20 kg, 1500 kg/ha) e uma safra cadastradas",
+      "Agricultor E2E_FARMER_EMAIL existente e sem plano para essa cultura",
+      "Cultura 'Cultura Legada E2E — Sem Dados' sem produtividade cadastrada (para a variante validation_error)",
+      "Safra 'Safra 2026' cadastrada"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_FARMER_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "Senha",
+        "exact": true
+      },
+      "value": "${env:E2E_FARMER_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    },
+    {
+      "action": "goto",
+      "value": "/admin/organizacoes"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Plano de 2,5 ha gera meta de 3.750 kg; 12 caixas viram 240 kg e ficam Pendentes",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Novo plano"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Safra"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "Safra 2026",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Cultivo"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "Tomate E2E — Italiano"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Área plantada (ha)"
+          },
+          "value": "2.5"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "link",
+            "name": "Tomate E2E — Italiano"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Novo apontamento"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Quantidade colhida (caixas)"
+          },
+          "value": "12"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Data da colheita"
+          },
+          "value": "2026-05-10"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "12 caixas",
+            "exact": true
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Pendente",
+            "exact": true
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Somente apontamentos validados contam no realizado."
+          }
+        }
+      ]
+    },
+    {
+      "name": "validation_error",
+      "title": "Cultura sem produtividade bloqueia a criação do plano",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Novo plano"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Cultivo"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "Cultura Legada E2E — Sem Dados"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Esta cultura não tem produtividade esperada. Complete o cadastro da cultura antes de criar o plano."
+          }
+        },
+        {
+          "expect": "disabled",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "forbidden": "O gating por role das ações de escrita não mudou e é coberto por plan-detail.test.tsx e producer-plans-page.test.tsx.",
+    "empty_state": "O estado vazio de planos e apontamentos não foi alterado."
+  }
+}

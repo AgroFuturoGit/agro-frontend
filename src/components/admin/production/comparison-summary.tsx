@@ -56,7 +56,7 @@ type Props = {
   unit?: string;
 };
 
-export function ComparisonSummary({ comparison, unit = "t" }: Props) {
+export function ComparisonSummary({ comparison, unit = "kg" }: Props) {
   const { expectedYield, totalActualYield, difference, percentageRealized } =
     comparison;
   const remaining = difference < 0 ? Math.abs(difference) : 0;

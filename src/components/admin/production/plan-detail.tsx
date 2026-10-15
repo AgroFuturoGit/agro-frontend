@@ -25,8 +25,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
+import { unitLabel } from "@/lib/crops";
 import { getMyProducer, listProducers } from "@/lib/producers";
 import {
+  PLAN_STATUS_LABELS,
   formatNumber,
   formatPlanDate,
   getProductionComparison,
@@ -40,6 +42,7 @@ import {
 import { ComparisonSummary } from "./comparison-summary";
 import { DeleteExecutionDialog } from "./delete-execution-dialog";
 import { ExecutionFormDrawer } from "./execution-form-drawer";
+import { ExecutionStatusBadge } from "./execution-status-badge";
 
 type Props = {
   orgId: string;
@@ -56,6 +59,13 @@ type BreadcrumbNames = {
 
 const columnHelper = createColumnHelper<ProductionExecution>();
 
+// Apontamento já revisado não se edita nem se exclui: o PUT preserva o
+// status quando o corpo não o envia, então mudar a quantidade de um
+// VALIDATED alteraria o realizado sem nova validação (CR-003).
+function isReviewed(execution: ProductionExecution) {
+  return execution.status === "VALIDATED" || execution.status === "REJECTED";
+}
+
 export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [names, setNames] = useState<BreadcrumbNames | null>(null);
@@ -68,14 +78,16 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<ProductionExecution | null>(null);
+  const [editTarget, setEditTarget] = useState<ProductionExecution | null>(
+    null,
+  );
   const [deleteTarget, setDeleteTarget] = useState<ProductionExecution | null>(
     null,
   );
 
   // Mais recente primeiro — mesma ordem da tabela manual anterior.
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "harvestDate", desc: true },
+    { id: "harvestedAt", desc: true },
   ]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -193,11 +205,18 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     refresh();
   }, [refresh]);
 
+  const cropUnit = plan?.crop?.unit ?? null;
+  const formatQuantity = useCallback(
+    (quantity: number) =>
+      `${formatNumber(quantity)} ${unitLabel(cropUnit, quantity)}`,
+    [cropUnit],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       // ISO `YYYY-MM-DD`: a comparação lexicográfica já ordena por data.
-      columnHelper.accessor((execution) => execution.harvestDate ?? "", {
-        id: "harvestDate",
+      columnHelper.accessor((execution) => execution.harvestedAt ?? "", {
+        id: "harvestedAt",
         header: ({ column }) => (
           <DataTableColumnHeader
             column={column}
@@ -207,16 +226,32 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         ),
         cell: ({ row }) => (
           <span className="font-medium text-foreground">
-            {formatPlanDate(row.original.harvestDate)}
+            {formatPlanDate(row.original.harvestedAt)}
           </span>
         ),
       }),
-      columnHelper.accessor("actualYield", {
+      columnHelper.accessor("quantity", {
         header: ({ column }) => (
           <div className="flex justify-end">
             <DataTableColumnHeader
               column={column}
-              title="Quantidade (t)"
+              title="Quantidade"
+              disabled={loading}
+            />
+          </div>
+        ),
+        cell: ({ row }) => (
+          <span className="block text-right tabular-nums">
+            {formatQuantity(row.original.quantity)}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("quantityKg", {
+        header: ({ column }) => (
+          <div className="flex justify-end">
+            <DataTableColumnHeader
+              column={column}
+              title="Peso (kg)"
               disabled={loading}
             />
           </div>
@@ -227,43 +262,51 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           </span>
         ),
       }),
+      columnHelper.accessor((execution) => execution.status ?? "", {
+        id: "status",
+        header: "Status",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <ExecutionStatusBadge status={row.original.status} />
+        ),
+      }),
     ];
 
     const actionsColumn = columnHelper.display({
       id: "actions",
       header: "Ações",
-      cell: ({ row }) => (
-        <div className="inline-flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Editar apontamento"
-            onClick={() => setEditTarget(row.original)}
-          >
-            <Pencil />
-          </Button>
-          {canDelete && (
+      cell: ({ row }) =>
+        isReviewed(row.original) ? null : (
+          <div className="inline-flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Excluir apontamento"
-              onClick={() => setDeleteTarget(row.original)}
-              className="text-destructive hover:text-destructive"
+              aria-label="Editar apontamento"
+              onClick={() => setEditTarget(row.original)}
             >
-              <Trash2 />
+              <Pencil />
             </Button>
-          )}
-        </div>
-      ),
+            {canDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Excluir apontamento"
+                onClick={() => setDeleteTarget(row.original)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 />
+              </Button>
+            )}
+          </div>
+        ),
     });
 
-    return (canWrite ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
-      ProductionExecution,
-      unknown
-    >[];
-  }, [canWrite, canDelete, loading]);
+    return (
+      canWrite ? [...baseColumns, actionsColumn] : baseColumns
+    ) as ColumnDef<ProductionExecution, unknown>[];
+  }, [canWrite, canDelete, loading, formatQuantity]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -284,13 +327,17 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="font-medium text-foreground">
-              {formatPlanDate(execution.harvestDate)}
+              {formatPlanDate(execution.harvestedAt)}
             </p>
             <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-              {formatNumber(execution.actualYield)} t colhidas
+              {formatQuantity(execution.quantity)} ·{" "}
+              {formatNumber(execution.quantityKg)} kg
             </p>
+            <div className="mt-1">
+              <ExecutionStatusBadge status={execution.status} />
+            </div>
           </div>
-          {canWrite && (
+          {canWrite && !isReviewed(execution) && (
             <div className="flex shrink-0 gap-1">
               <Button
                 type="button"
@@ -375,6 +422,15 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               Safra {plan.harvest?.label ?? "—"} · Área{" "}
               {formatNumber(plan.plantedArea)} ha · Plantio{" "}
               {formatPlanDate(plan.plannedPlantingDate)}
+              {plan.status && <> · {PLAN_STATUS_LABELS[plan.status]}</>}
+              {(plan.expectedHarvestStart || plan.expectedHarvestEnd) && (
+                <>
+                  {" "}
+                  · Colheita prevista{" "}
+                  {formatPlanDate(plan.expectedHarvestStart)} a{" "}
+                  {formatPlanDate(plan.expectedHarvestEnd)}
+                </>
+              )}
             </p>
           )}
         </div>
@@ -413,7 +469,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               Apontamentos de colheita
             </h3>
             <p className="text-sm text-muted-foreground">
-              Histórico diário do que foi colhido em campo.
+              Histórico diário do que foi colhido em campo. Somente apontamentos
+              validados contam no realizado.
             </p>
           </div>
           {canWrite && plan && (
@@ -437,7 +494,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           emptyActionLabel={
             canWrite && plan ? "Registrar primeira colheita" : undefined
           }
-          onEmptyAction={canWrite && plan ? () => setCreateOpen(true) : undefined}
+          onEmptyAction={
+            canWrite && plan ? () => setCreateOpen(true) : undefined
+          }
           renderMobileCard={renderMobileCard}
         />
 
@@ -449,6 +508,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           <ExecutionFormDrawer
             mode="create"
             planId={planId}
+            crop={plan?.crop ?? null}
             open={createOpen}
             onOpenChange={setCreateOpen}
             onSaved={refresh}
@@ -457,6 +517,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           <ExecutionFormDrawer
             mode="edit"
             planId={planId}
+            crop={plan?.crop ?? null}
             execution={editTarget}
             open={editTarget !== null}
             onOpenChange={(open) => {
@@ -470,6 +531,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       {canDelete && (
         <DeleteExecutionDialog
           execution={deleteTarget}
+          unit={cropUnit}
           open={deleteTarget !== null}
           onOpenChange={(open) => {
             if (!open) setDeleteTarget(null);

@@ -196,6 +196,12 @@ test.describe("/admin/culturas — DataTable genérico", () => {
 
     await page.getByLabel("Nome da cultura").fill(NEW_CROP.name);
     await page.getByLabel("Variedade").fill(NEW_CROP.variety);
+    // Campos agronômicos obrigatórios desde o alinhamento ao agricultural-core.
+    await page.getByLabel("Produtividade esperada (kg/ha)").fill("3000");
+    await page.getByRole("combobox", { name: "Tipo de colheita" }).click();
+    await page.getByRole("option", { name: "Colheita única" }).click();
+    await page.getByRole("combobox", { name: "Unidade" }).click();
+    await page.getByRole("option", { name: "Quilograma (kg)" }).click();
 
     // Lista recarregada (`GET /crops` pós-criação) já inclui a nova
     // cultura — mock atualizado antes de submeter, no início do array para

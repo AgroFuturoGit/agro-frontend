@@ -15,17 +15,24 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
+import { unitFactorKg, unitLabel, type Crop } from "@/lib/crops";
 import {
   createProductionExecution,
+  formatNumber,
   updateProductionExecution,
   type ProductionExecution,
 } from "@/lib/production";
+
+export const MISSING_UNIT_WEIGHT_MESSAGE =
+  "Cadastre o peso da unidade na cultura antes de registrar apontamentos";
 
 type Mode = "create" | "edit";
 
 type Props = {
   mode: Mode;
   planId: string;
+  /** Cultura do plano: define a unidade e o fator de conversão para kg. */
+  crop: Crop | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
@@ -33,28 +40,36 @@ type Props = {
 };
 
 type FormValues = {
-  actualYield: string;
-  harvestDate: string;
+  quantity: string;
+  harvestedAt: string;
+  notes: string;
 };
 
 const EMPTY: FormValues = {
-  actualYield: "",
-  harvestDate: "",
+  quantity: "",
+  harvestedAt: "",
+  notes: "",
 };
 
 function validate(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
-  const value = Number(values.actualYield);
-  if (!values.actualYield || !Number.isFinite(value) || value <= 0) {
-    errors.actualYield = "Informe uma quantidade maior que zero";
+  const value = Number(values.quantity);
+  if (!values.quantity || !Number.isFinite(value) || value <= 0) {
+    errors.quantity = "Informe uma quantidade maior que zero";
   }
-  if (!values.harvestDate) errors.harvestDate = "Informe a data da colheita";
+  if (!values.harvestedAt) errors.harvestedAt = "Informe a data da colheita";
   return errors;
+}
+
+/** Arredonda a 2 casas para evitar ruído de ponto flutuante (ex.: 0.1 × 3). */
+function toKg(quantity: number, factor: number): number {
+  return Math.round(quantity * factor * 100) / 100;
 }
 
 export function ExecutionFormDrawer({
   mode,
   planId,
+  crop,
   open,
   onOpenChange,
   onSaved,
@@ -73,8 +88,9 @@ export function ExecutionFormDrawer({
     setFieldErrors({});
     if (mode === "edit" && execution) {
       setValues({
-        actualYield: String(execution.actualYield ?? ""),
-        harvestDate: execution.harvestDate ?? "",
+        quantity: String(execution.quantity ?? ""),
+        harvestedAt: execution.harvestedAt ?? "",
+        notes: execution.notes ?? "",
       });
     } else {
       setValues(EMPTY);
@@ -85,10 +101,20 @@ export function ExecutionFormDrawer({
     if (isCreate) return true;
     if (!execution) return false;
     return (
-      values.actualYield !== String(execution.actualYield ?? "") ||
-      values.harvestDate !== (execution.harvestDate ?? "")
+      values.quantity !== String(execution.quantity ?? "") ||
+      values.harvestedAt !== (execution.harvestedAt ?? "") ||
+      values.notes !== (execution.notes ?? "")
     );
   }, [isCreate, values, execution]);
+
+  const factor = unitFactorKg(crop);
+  const blocked = factor === null;
+  const quantityNumber = Number(values.quantity);
+  const previewKg =
+    factor !== null && values.quantity && Number.isFinite(quantityNumber) && quantityNumber > 0
+      ? toKg(quantityNumber, factor)
+      : null;
+  const unitText = unitLabel(crop?.unit ?? null, 2);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -106,6 +132,8 @@ export function ExecutionFormDrawer({
     event.preventDefault();
     setFormError(null);
 
+    if (factor === null) return;
+
     const errors = validate(values);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -114,9 +142,19 @@ export function ExecutionFormDrawer({
 
     setSubmitting(true);
     try {
+      const quantity = Number(values.quantity);
+      // Se a quantidade não mudou na edição, preserva o kg já gravado (a
+      // unidade da cultura pode ter mudado depois do apontamento).
+      const quantityKg =
+        !isCreate && execution && quantity === execution.quantity
+          ? execution.quantityKg
+          : toKg(quantity, factor);
+      // Nunca envia status/validatedBy/validatedAt: a validação não é do front.
       const payload = {
-        actualYield: Number(values.actualYield),
-        harvestDate: values.harvestDate,
+        quantity,
+        quantityKg,
+        harvestedAt: values.harvestedAt,
+        notes: values.notes.trim() || null,
       };
       if (isCreate) {
         await createProductionExecution(planId, payload);
@@ -138,8 +176,8 @@ export function ExecutionFormDrawer({
 
   const title = isCreate ? "Novo apontamento" : "Editar apontamento";
   const description = isCreate
-    ? "Registre a fração colhida e a data do trator em campo."
-    : "Corrija a quantidade ou a data deste apontamento.";
+    ? "Registre a quantidade colhida na unidade da cultura e a data da colheita."
+    : "Corrija a quantidade, a data ou as observações deste apontamento.";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -150,6 +188,7 @@ export function ExecutionFormDrawer({
         </SheetHeader>
 
         <form
+          noValidate
           onSubmit={handleSubmit}
           className="flex flex-1 flex-col overflow-y-auto"
         >
@@ -166,25 +205,46 @@ export function ExecutionFormDrawer({
               )}
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="execution-yield">Quantidade colhida (t)</Label>
-              <Input
-                id="execution-yield"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0.01"
-                value={values.actualYield}
-                onChange={(e) => update("actualYield", e.target.value)}
-                required
-                disabled={submitting}
-                aria-invalid={Boolean(fieldErrors.actualYield)}
-              />
-              {fieldErrors.actualYield && (
-                <p className="text-sm text-destructive">
-                  {fieldErrors.actualYield}
-                </p>
-              )}
+            {blocked && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{MISSING_UNIT_WEIGHT_MESSAGE}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="execution-quantity">
+                  Quantidade colhida ({unitText})
+                </Label>
+                <Input
+                  id="execution-quantity"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0.01"
+                  value={values.quantity}
+                  onChange={(e) => update("quantity", e.target.value)}
+                  required
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.quantity)}
+                />
+                {fieldErrors.quantity && (
+                  <p className="text-sm text-destructive">{fieldErrors.quantity}</p>
+                )}
+              </div>
+
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="execution-quantity-kg">Peso em kg</Label>
+                <Input
+                  id="execution-quantity-kg"
+                  readOnly
+                  value={previewKg === null ? "—" : `${formatNumber(previewKg)} kg`}
+                />
+              </div>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -192,17 +252,25 @@ export function ExecutionFormDrawer({
               <Input
                 id="execution-date"
                 type="date"
-                value={values.harvestDate}
-                onChange={(e) => update("harvestDate", e.target.value)}
+                value={values.harvestedAt}
+                onChange={(e) => update("harvestedAt", e.target.value)}
                 required
                 disabled={submitting}
-                aria-invalid={Boolean(fieldErrors.harvestDate)}
+                aria-invalid={Boolean(fieldErrors.harvestedAt)}
               />
-              {fieldErrors.harvestDate && (
-                <p className="text-sm text-destructive">
-                  {fieldErrors.harvestDate}
-                </p>
+              {fieldErrors.harvestedAt && (
+                <p className="text-sm text-destructive">{fieldErrors.harvestedAt}</p>
               )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="execution-notes">Observações</Label>
+              <Input
+                id="execution-notes"
+                value={values.notes}
+                onChange={(e) => update("notes", e.target.value)}
+                disabled={submitting}
+              />
             </div>
           </div>
 
@@ -215,7 +283,7 @@ export function ExecutionFormDrawer({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={submitting || !isDirty}>
+            <Button type="submit" disabled={submitting || !isDirty || blocked}>
               {submitting ? (
                 <>
                   <Loader2 className="animate-spin" />
