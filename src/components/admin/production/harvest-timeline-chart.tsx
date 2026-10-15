@@ -23,6 +23,7 @@ import type { ProductionExecution, ProductionPlan } from "@/lib/production";
 import {
   buildChartSummary,
   buildHarvestChartOption,
+  MIN_POINT_WIDTH,
   type ChartColors,
 } from "./harvest-timeline-option";
 
@@ -171,6 +172,10 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   });
 
   const themeVersion = useThemeVersion(containerRef, !isEmpty);
+  // Quantos pontos cabem na largura atual. Quando muda (girar o celular,
+  // recolher a sidebar), a option é refeita para ligar/desligar o dataZoom.
+  const [pointCapacity, setPointCapacity] = useState(0);
+  const appliedCapacityRef = useRef<number | null>(null);
 
   // BR-015: init no mount, resize via ResizeObserver, dispose no unmount.
   useEffect(() => {
@@ -178,7 +183,11 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
     if (isEmpty || !container) return;
     const chart = init(container, undefined, { renderer: "canvas" });
     chartRef.current = chart;
-    const observer = new ResizeObserver(() => chart.resize());
+    const observer = new ResizeObserver(() => {
+      chart.resize();
+      const capacity = Math.floor(container.clientWidth / MIN_POINT_WIDTH);
+      if (capacity !== appliedCapacityRef.current) setPointCapacity(capacity);
+    });
     observer.observe(container);
     return () => {
       observer.disconnect();
@@ -198,7 +207,8 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
       ariaLabel,
     });
     chart.setOption(option, true);
-  }, [isEmpty, timeline, plan.expectedYield, ariaLabel, themeVersion]);
+    appliedCapacityRef.current = Math.floor(container.clientWidth / MIN_POINT_WIDTH);
+  }, [isEmpty, timeline, plan.expectedYield, ariaLabel, themeVersion, pointCapacity]);
 
   if (isEmpty) {
     return (

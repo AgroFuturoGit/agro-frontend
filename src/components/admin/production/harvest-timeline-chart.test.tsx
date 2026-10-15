@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 import { ContinuousHarvestChart } from "@/components/admin/production/harvest-timeline-chart";
 import type { Crop } from "@/lib/crops";
@@ -195,6 +195,25 @@ describe("ContinuousHarvestChart", () => {
 
     unmount();
     expect(chart.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("CR-001: ao estreitar o contêiner, recalcula a option e liga o dataZoom; resize sem mudar a capacidade não refaz a option", () => {
+    let width = 800;
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => width);
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    expect(chart.setOption).toHaveBeenCalledTimes(1);
+    expect(chart.setOption.mock.calls[0][0].dataZoom).toBeUndefined();
+
+    width = 790; // mesma capacidade (16 pontos de 48 px): só redimensiona
+    act(() => resizeCallback?.());
+    expect(chart.resize).toHaveBeenCalledTimes(1);
+    expect(chart.setOption).toHaveBeenCalledTimes(1);
+
+    width = 200; // cabem 4 dos 9 pontos
+    act(() => resizeCallback?.());
+    expect(chart.setOption).toHaveBeenCalledTimes(2);
+    const zoom = chart.setOption.mock.calls[1][0].dataZoom;
+    expect(zoom.map((d: { type: string }) => d.type)).toEqual(["inside", "slider"]);
   });
 
   it("estado vazio não inicializa o ECharts", () => {

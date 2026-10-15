@@ -171,27 +171,26 @@ export function buildHarvestChartOption(
     }
     validated = Math.round(validated * 100) / 100;
     pending = Math.round(pending * 100) / 100;
-    categories = ["Previsto", "Realizado"];
-    rows = [
-      { title: "Previsto", expected: input.expectedYield, validated: 0, pending: 0 },
-      { title: "Realizado", expected: null, validated, pending },
-    ];
+    // Sem meta (> 0) não há o que prever: só a categoria Realizado, coerente
+    // com o resumo acessível, que nesse caso não cita o previsto.
+    const hasExpected = input.expectedYield > 0;
+    const realized = { title: "Realizado", expected: null, validated, pending };
+    const actualSlot = (value: number) => (hasExpected ? [null, value] : [value]);
+    categories = hasExpected ? ["Previsto", "Realizado"] : ["Realizado"];
+    rows = hasExpected
+      ? [
+          { title: "Previsto", expected: input.expectedYield, validated: 0, pending: 0 },
+          realized,
+        ]
+      : [realized];
     series = [
-      {
-        name: "Previsto",
-        type: "bar",
-        stack: "total",
-        barMaxWidth: 72,
-        ...barStyle(colors.expected),
-        data: [input.expectedYield, null],
-      },
       {
         name: "Validado",
         type: "bar",
         stack: "total",
         barMaxWidth: 72,
         ...barStyle(colors.validated),
-        data: [null, validated],
+        data: actualSlot(validated),
       },
       {
         name: "Pendente",
@@ -199,10 +198,21 @@ export function buildHarvestChartOption(
         stack: "total",
         barMaxWidth: 72,
         ...barStyle(colors.pending),
-        data: [null, pending],
+        data: actualSlot(pending),
       },
     ];
-    legend = ["Previsto", "Validado", "Pendente"];
+    legend = ["Validado", "Pendente"];
+    if (hasExpected) {
+      series.unshift({
+        name: "Previsto",
+        type: "bar",
+        stack: "total",
+        barMaxWidth: 72,
+        ...barStyle(colors.expected),
+        data: [input.expectedYield, null],
+      });
+      legend = ["Previsto", ...legend];
+    }
   }
 
   // BR-010: navegação por dataZoom quando os pontos não cabem.

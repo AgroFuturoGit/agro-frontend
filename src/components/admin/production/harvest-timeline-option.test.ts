@@ -92,6 +92,21 @@ describe("buildHarvestChartOption", () => {
     expect(option.dataZoom).toBeUndefined();
   });
 
+  it("CR-006: colheita única sem meta mostra só o Realizado, sem barra nem legenda de Previsto", () => {
+    const tl = timeline({
+      harvestType: "SINGLE",
+      hasExpectedWindow: false,
+      points: [point("2026-05-04", null, 100, 30)],
+    });
+    const option = build(tl, { expectedYield: 0 });
+    expect(option.xAxis.data).toEqual(["Realizado"]);
+    const series = option.series as AnyOption[];
+    expect(series.map((s) => s.name)).toEqual(["Validado", "Pendente"]);
+    expect(series[0].data).toEqual([100]);
+    expect(series[1].data).toEqual([30]);
+    expect(option.legend.data).toEqual(["Validado", "Pendente"]);
+  });
+
   it("UNIT-014: dataZoom inside+slider só quando há mais pontos do que cabem; janela final", () => {
     const points = Array.from({ length: 30 }, (_, i) =>
       point(`2026-${String(1 + Math.floor(i / 4)).padStart(2, "0")}-${String(1 + (i % 4) * 7).padStart(2, "0")}`, 10),
