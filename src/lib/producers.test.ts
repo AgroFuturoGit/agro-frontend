@@ -4,6 +4,7 @@ import {
   deleteProducer,
   getMyProducer,
   listProducers,
+  producerDisplayName,
   updateProducer,
   type ProducerUpdatePayload,
 } from "@/lib/producers";
@@ -22,15 +23,32 @@ const RAW_ORGANIZATION = {
   type: "COOP",
 };
 
+// Resposta no contrato do `FarmerResponseDTO` (Feature 5.2): sem campo de nome de exibição.
 const RAW_PRODUCER = {
   id: "prod-1",
-  aliasName: "Sítio Boa Esperança",
+  fullName: "João Produtor",
+  cpf: "52998224725",
+  dateOfBirth: "1985-03-22",
+  motherName: "Maria Produtora",
+  origin: "Assentamento",
+  educationLevel: "Ensino médio",
+  phone: "82999990000",
+  localName: "Sítio Boa Esperança",
+  street: "Estrada Velha, 10",
+  city: "Maceió",
+  state: "AL",
+  ibgeCode: "2704302",
+  latitude: -9.66,
+  longitude: -35.73,
   isCompliant: true,
+  registrationSource: "TECHNICIAN",
+  createdAt: "2026-10-01T10:00:00",
+  updatedAt: "2026-10-02T10:00:00",
   user: {
     id: "usr-1",
     fullName: "João Produtor",
     email: "joao@agro.com",
-    cpf: "55566677788",
+    cpf: "52998224725",
   },
   community: {
     id: "com-1",
@@ -39,22 +57,7 @@ const RAW_PRODUCER = {
   },
 };
 
-const MAPPED_PRODUCER = {
-  id: "prod-1",
-  aliasName: "Sítio Boa Esperança",
-  isCompliant: true,
-  user: {
-    id: "usr-1",
-    fullName: "João Produtor",
-    email: "joao@agro.com",
-    cpf: "55566677788",
-  },
-  community: {
-    id: "com-1",
-    name: "Comunidade Boa Vista",
-    organization: RAW_ORGANIZATION,
-  },
-};
+const MAPPED_PRODUCER = { ...RAW_PRODUCER };
 
 beforeEach(() => {
   apiRequestMock.mockReset();
@@ -85,25 +88,43 @@ describe("getMyProducer", () => {
     });
 
     await expect(getMyProducer()).resolves.toEqual({
-      id: "prod-1",
-      aliasName: "Sítio Boa Esperança",
-      isCompliant: true,
+      ...MAPPED_PRODUCER,
       user: null,
       community: null,
     });
   });
 
-  it("normaliza aliasName e isCompliant ausentes para null", async () => {
-    apiRequestMock.mockResolvedValue({
-      ...RAW_PRODUCER,
-      aliasName: null,
-      isCompliant: null,
-    });
+  it("UNIT-001: lê todos os campos do FarmerResponseDTO e não expõe campo de nome de exibição", async () => {
+    apiRequestMock.mockResolvedValue(RAW_PRODUCER);
 
     const producer = await getMyProducer();
 
-    expect(producer.aliasName).toBeNull();
-    expect(producer.isCompliant).toBeNull();
+    expect(producer.localName).toBe("Sítio Boa Esperança");
+    expect(producer.cpf).toBe("52998224725");
+    expect(producer.dateOfBirth).toBe("1985-03-22");
+    expect(producer.latitude).toBe(-9.66);
+    expect(producer.registrationSource).toBe("TECHNICIAN");
+    expect(Object.keys(producer).some((key) => /alias/i.test(key))).toBe(false);
+  });
+
+  it("normaliza campos ausentes ou nulos para null", async () => {
+    apiRequestMock.mockResolvedValue({ id: "prod-9" });
+
+    const producer = await getMyProducer();
+
+    expect(producer).toMatchObject({
+      id: "prod-9",
+      fullName: null,
+      cpf: null,
+      dateOfBirth: null,
+      localName: null,
+      latitude: null,
+      longitude: null,
+      isCompliant: null,
+      registrationSource: null,
+      user: null,
+      community: null,
+    });
   });
 
   it("preserva os ids como string (nunca number)", async () => {
@@ -191,11 +212,15 @@ describe("listProducers", () => {
 
 describe("updateProducer", () => {
   const payload: ProducerUpdatePayload = {
-    aliasName: "Novo apelido",
+    fullName: "Novo Nome",
+    localName: "Novo endereço",
+    phone: "",
+    latitude: -9.5,
+    longitude: -35.7,
     isCompliant: false,
   };
 
-  it("chama apiRequest com PUT /farmers/{id} e o payload", async () => {
+  it("chama apiRequest com PUT /farmers/{id} e o payload, sem cpf", async () => {
     apiRequestMock.mockResolvedValue(RAW_PRODUCER);
 
     await updateProducer("prod-1", payload);
@@ -204,20 +229,42 @@ describe("updateProducer", () => {
       "/farmers/prod-1",
       { method: "PUT", body: payload },
     );
+    expect(apiRequestMock.mock.calls[0][1]).not.toHaveProperty("body.cpf");
   });
 
   it("retorna o Producer mapeado", async () => {
     apiRequestMock.mockResolvedValue({
       ...RAW_PRODUCER,
-      aliasName: "Novo apelido",
+      localName: "Novo endereço",
       isCompliant: false,
     });
 
     await expect(updateProducer("prod-1", payload)).resolves.toEqual({
       ...MAPPED_PRODUCER,
-      aliasName: "Novo apelido",
+      localName: "Novo endereço",
       isCompliant: false,
     });
+  });
+});
+
+describe("producerDisplayName (BR-001)", () => {
+  it("usa o nome do agricultor", () => {
+    expect(
+      producerDisplayName({ fullName: "Ana", user: { fullName: "Outra" } }),
+    ).toBe("Ana");
+  });
+
+  it("cai para o nome do usuário quando o do agricultor é vazio", () => {
+    expect(
+      producerDisplayName({ fullName: " ", user: { fullName: "Outra" } }),
+    ).toBe("Outra");
+  });
+
+  it("cai para 'Agricultor' sem nenhum nome", () => {
+    expect(producerDisplayName({ fullName: null, user: null })).toBe(
+      "Agricultor",
+    );
+    expect(producerDisplayName(null)).toBe("Agricultor");
   });
 });
 

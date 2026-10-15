@@ -29,13 +29,6 @@ import { listUsers, ROLE_LABELS, ROLES, type User } from "@/lib/users";
 import { DeleteUserDialog } from "./delete-user-dialog";
 import { UserFormDrawer } from "./user-form-drawer";
 
-function formatDate(value: string | null): string {
-  if (!value) return "—";
-  const [year, month, day] = value.split("-");
-  if (!year || !month || !day) return value;
-  return `${day}/${month}/${year}`;
-}
-
 /**
  * Busca livre escopada a nome/e-mail/CPF, case-insensitive — regra de
  * negócio de `domain.md`.
@@ -47,7 +40,7 @@ function usersGlobalFilter(row: Row<User>, _columnId: string, filterValue: strin
   return (
     u.fullName.toLowerCase().includes(q) ||
     u.email.toLowerCase().includes(q) ||
-    u.cpf.includes(q)
+    (u.cpf ?? "").includes(q)
   );
 }
 
@@ -121,7 +114,7 @@ export function UsersPage() {
         enableSorting: false,
         cell: (info) => (
           <span className="font-mono text-xs text-muted-foreground">
-            {formatCpf(info.getValue())}
+            {info.getValue() ? formatCpf(info.getValue() as string) : "—"}
           </span>
         ),
       }),
@@ -132,16 +125,6 @@ export function UsersPage() {
         cell: (info) => ROLE_LABELS[info.getValue() as Role] ?? info.getValue(),
         filterFn: (row, columnId, filterValue) =>
           !filterValue || row.getValue(columnId) === filterValue,
-      }),
-      columnHelper.accessor("dateOfBirth", {
-        header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="Nascimento" disabled={loading} />
-        ),
-        cell: (info) => (
-          <span className="text-muted-foreground">
-            {formatDate(info.getValue())}
-          </span>
-        ),
       }),
     ];
 

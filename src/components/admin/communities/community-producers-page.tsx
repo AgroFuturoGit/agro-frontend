@@ -30,7 +30,7 @@ import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
 import { formatCpf } from "@/lib/cpf";
 import { getMyManager } from "@/lib/managers";
-import { listProducers, type Producer } from "@/lib/producers";
+import { listProducers, type Producer, producerDisplayName } from "@/lib/producers";
 
 import { DeleteProducerDialog } from "../producers/delete-producer-dialog";
 import { ProducerFormDrawer } from "../producers/producer-form-drawer";
@@ -38,6 +38,10 @@ import { ProducerFormDrawer } from "../producers/producer-form-drawer";
 type Props = {
   communityId: string;
 };
+
+function producerCpf(producer: Producer): string | null {
+  return producer.cpf ?? producer.user?.cpf ?? null;
+}
 
 function producersGlobalFilter(
   row: Row<Producer>,
@@ -51,8 +55,9 @@ function producersGlobalFilter(
   return [
     producer.user?.fullName,
     producer.user?.email,
-    producer.user?.cpf,
-    producer.aliasName,
+    producerCpf(producer),
+    producer.fullName,
+    producer.localName,
   ].some((value) => value?.toLowerCase().includes(query));
 }
 
@@ -167,7 +172,7 @@ export function CommunityProducersPage({ communityId }: Props) {
 
   const columns = useMemo(() => {
     const baseColumns = [
-      columnHelper.accessor((producer) => producer.user?.fullName ?? producer.aliasName ?? "", {
+      columnHelper.accessor((producer) => producerDisplayName(producer, ""), {
         id: "fullName",
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
@@ -177,22 +182,24 @@ export function CommunityProducersPage({ communityId }: Props) {
             href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${row.original.id}`}
             className="font-medium text-foreground hover:underline"
           >
-            {row.original.user?.fullName ?? row.original.aliasName ?? "—"}
+            {producerDisplayName(row.original, "—")}
           </Link>
         ),
       }),
-      columnHelper.accessor((producer) => producer.user?.cpf ?? "", {
+      columnHelper.accessor((producer) => producer.cpf ?? producer.user?.cpf ?? "", {
         id: "cpf",
         header: "CPF",
         enableSorting: false,
         cell: ({ row }) => (
           <span className="font-mono text-xs text-muted-foreground">
-            {row.original.user?.cpf ? formatCpf(row.original.user.cpf) : "—"}
+            {producerCpf(row.original)
+              ? formatCpf(producerCpf(row.original) as string)
+              : "—"}
           </span>
         ),
       }),
-      columnHelper.accessor("aliasName", {
-        header: "Apelido",
+      columnHelper.accessor("localName", {
+        header: "Endereço/Nome local",
         enableSorting: false,
         cell: (info) => (
           <span className="text-muted-foreground">{info.getValue() ?? "—"}</span>
@@ -264,10 +271,10 @@ export function CommunityProducersPage({ communityId }: Props) {
               href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producer.id}`}
               className="font-medium text-foreground hover:underline"
             >
-              {producer.user?.fullName ?? producer.aliasName ?? "—"}
+              {producerDisplayName(producer, "—")}
             </Link>
             <p className="mt-1 font-mono text-xs text-muted-foreground">
-              {producer.user?.cpf ? formatCpf(producer.user.cpf) : "—"}
+              {producerCpf(producer) ? formatCpf(producerCpf(producer) as string) : "—"}
             </p>
             <div className="mt-2">
               <ComplianceBadge isCompliant={producer.isCompliant} />
@@ -346,7 +353,7 @@ export function CommunityProducersPage({ communityId }: Props) {
 
       <DataTableToolbar
         table={table}
-        searchPlaceholder="Buscar por nome, e-mail, CPF ou apelido…"
+        searchPlaceholder="Buscar por nome, e-mail, CPF ou nome local…"
       />
 
       <DataTable

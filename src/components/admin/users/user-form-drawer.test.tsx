@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UserFormDrawer } from "@/components/admin/users/user-form-drawer";
-import { adminUpdateUser, type User } from "@/lib/users";
+import { createTechnician } from "@/lib/technicians";
+import { adminUpdateUser, registerUser, type User } from "@/lib/users";
 
 // Nenhum acesso de rede real: `registerUser`/`adminUpdateUser` são
 // mockados, o resto do módulo (ROLE_LABELS, ROLES, CREATABLE_ROLES) é
@@ -19,6 +20,11 @@ vi.mock("@/lib/users", async () => {
     adminUpdateUser: vi.fn(),
   };
 });
+
+vi.mock("@/lib/technicians", () => ({
+  TECHNICIAN_REGISTRATION_TYPES: ["CREA", "CFT", "CFTA"],
+  createTechnician: vi.fn(),
+}));
 
 // `readUserFromStorage` real acessa `localStorage` global, indisponível
 // neste ambiente jsdom/Vitest (mesma causa raiz contornada em
@@ -37,7 +43,6 @@ const USER: User = {
   email: "ana@agro.com",
   cpf: "11122233344",
   role: "TECHNICIAN",
-  dateOfBirth: "1990-01-01",
 };
 
 /**
@@ -84,13 +89,181 @@ describe("UserFormDrawer — modo create", () => {
   });
 });
 
+const VALID_CPF = "529.982.247-25";
+
+function highlightedOption(): HTMLElement {
+  const highlighted = screen
+    .getAllByRole("option")
+    .find((option) => option.getAttribute("data-highlighted") !== null);
+  expect(highlighted).toBeTruthy();
+  return highlighted as HTMLElement;
+}
+
+/** Escolhe uma opção do `Select` navegando pelo teclado (ver `openRoleSelect`). */
+async function selectOption(triggerLabel: string, optionLabel: string) {
+  const trigger = screen.getByLabelText(triggerLabel);
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  fireEvent.keyUp(trigger, { key: "ArrowDown" });
+
+  const target = await screen.findByRole("option", { name: optionLabel });
+  const options = screen.getAllByRole("option");
+  const from = options.indexOf(highlightedOption());
+  const to = options.indexOf(target);
+  const key = to > from ? "ArrowDown" : "ArrowUp";
+  for (let step = 0; step < Math.abs(to - from); step += 1) {
+    const current = highlightedOption();
+    fireEvent.keyDown(current, { key });
+    fireEvent.keyUp(current, { key });
+  }
+  const active = document.activeElement as HTMLElement;
+  fireEvent.keyDown(active, { key: "Enter" });
+  fireEvent.keyUp(active, { key: "Enter" });
+}
+
+async function pickRole(label: string) {
+  await selectOption("Papel", label);
+}
+
+function fillBase() {
+  fireEvent.change(screen.getByLabelText("Nome completo"), {
+    target: { value: "Tânia Técnica" },
+  });
+  fireEvent.change(screen.getByLabelText("E-mail"), {
+    target: { value: "tania@agro.com" },
+  });
+  fireEvent.change(screen.getByLabelText("Senha"), {
+    target: { value: "Senha@123" },
+  });
+}
+
+function submit() {
+  fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+}
+
+describe("UserFormDrawer — criação por perfil (BR-007/BR-008)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("UNIT-007: não pede data de nascimento e o CPF do Administrador é opcional", () => {
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    expect(screen.queryByLabelText("Data de nascimento")).toBeNull();
+    expect(screen.getByLabelText("CPF (opcional)")).not.toBeRequired();
+    expect(screen.queryByLabelText("Tipo de registro")).toBeNull();
+  });
+
+  it("UNIT-006: Administrador sem CPF chama registerUser sem cpf nem dateOfBirth", async () => {
+    vi.mocked(registerUser).mockResolvedValue({ ...USER, role: "ADMIN" });
+    const onSaved = vi.fn();
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={onSaved} />,
+    );
+
+    fillBase();
+    submit();
+
+    await waitFor(() =>
+      expect(registerUser).toHaveBeenCalledExactlyOnceWith({
+        fullName: "Tânia Técnica",
+        email: "tania@agro.com",
+        password: "Senha@123",
+        role: "ADMIN",
+      }),
+    );
+    expect(createTechnician).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+  });
+
+  it("UNIT-006: Técnico mostra CPF obrigatório e campos de registro e chama createTechnician", async () => {
+    vi.mocked(createTechnician).mockResolvedValue({
+      id: "t1",
+      user: null,
+      registrationType: "CREA",
+      registrationNumber: "123",
+      specialty: "Agronomia",
+    });
+    const onSaved = vi.fn();
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={onSaved} />,
+    );
+
+    await pickRole("Técnico");
+    expect(await screen.findByLabelText("Tipo de registro")).toBeTruthy();
+    expect(screen.getByLabelText("CPF")).toBeRequired();
+    fillBase();
+    fireEvent.change(screen.getByLabelText("CPF"), { target: { value: VALID_CPF } });
+    fireEvent.change(screen.getByLabelText("Número do registro"), {
+      target: { value: "123" },
+    });
+    fireEvent.change(screen.getByLabelText("Especialidade"), {
+      target: { value: "Agronomia" },
+    });
+    await selectOption("Tipo de registro", "CREA");
+    submit();
+
+    await waitFor(() =>
+      expect(createTechnician).toHaveBeenCalledExactlyOnceWith({
+        fullName: "Tânia Técnica",
+        email: "tania@agro.com",
+        password: "Senha@123",
+        cpf: VALID_CPF,
+        registrationType: "CREA",
+        registrationNumber: "123",
+        specialty: "Agronomia",
+      }),
+    );
+    expect(registerUser).not.toHaveBeenCalled();
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+  });
+
+  it("UNIT-007: Técnico sem CPF ou com número sem tipo não chama a API", async () => {
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    await pickRole("Técnico");
+    await screen.findByLabelText("Tipo de registro");
+    fillBase();
+    fireEvent.change(screen.getByLabelText("Número do registro"), {
+      target: { value: "123" },
+    });
+    submit();
+
+    expect(await screen.findByText("Informe o CPF")).toBeTruthy();
+    expect(screen.getByText("Informe o tipo do registro")).toBeTruthy();
+    expect(createTechnician).not.toHaveBeenCalled();
+    expect(registerUser).not.toHaveBeenCalled();
+  });
+
+  it("UNIT-007: Técnico com tipo sem número também é bloqueado", async () => {
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    await pickRole("Técnico");
+    await screen.findByLabelText("Tipo de registro");
+    fillBase();
+    fireEvent.change(screen.getByLabelText("CPF"), { target: { value: VALID_CPF } });
+    await selectOption("Tipo de registro", "CFT");
+    submit();
+
+    expect(await screen.findByText("Informe o número do registro")).toBeTruthy();
+    expect(createTechnician).not.toHaveBeenCalled();
+  });
+});
+
 describe("UserFormDrawer — modo edit", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
   });
 
-  it("modo edit: email e cpf ficam readOnly/disabled; Select de papel lista as 4 ROLES", async () => {
+  it("modo edit: email e cpf ficam readOnly/disabled; Select de papel só oferece o papel atual e ADMIN", async () => {
     render(
       <UserFormDrawer mode="edit" user={USER} open onOpenChange={() => {}} onSaved={() => {}} />,
     );
@@ -105,15 +278,37 @@ describe("UserFormDrawer — modo edit", () => {
     openRoleSelect();
 
     const options = await screen.findAllByRole("option");
+    // USER é TECHNICIAN: o papel atual continua e ADMIN é o único destino.
     expect(options.map((o) => o.textContent)).toEqual([
       "Administrador",
-      "Gerente",
       "Técnico",
-      "Agricultor",
     ]);
+    expect(
+      screen.getByText(
+        "Técnicos, gestores e agricultores têm cadastro próprio; para mudar para esses perfis, crie um novo cadastro.",
+      ),
+    ).toBeTruthy();
   });
 
-  it("modo edit: submeter chama adminUpdateUser com fullName/dateOfBirth/role, sem email/cpf", async () => {
+  it("modo edit: ADMIN não vê TECHNICIAN, FARMER nem MANAGER como destino", async () => {
+    render(
+      <UserFormDrawer
+        mode="edit"
+        user={{ ...USER, role: "ADMIN" }}
+        open
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+    await screen.findByLabelText("E-mail");
+
+    openRoleSelect();
+
+    const options = await screen.findAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual(["Administrador"]);
+  });
+
+  it("modo edit: submeter chama adminUpdateUser só com fullName/role, sem email/cpf/dateOfBirth", async () => {
     const user = userEvent.setup();
     vi.mocked(adminUpdateUser).mockResolvedValue({
       ...USER,
@@ -133,7 +328,6 @@ describe("UserFormDrawer — modo edit", () => {
     await waitFor(() => {
       expect(adminUpdateUser).toHaveBeenCalledWith("u1", {
         fullName: "Ana Souza Silva",
-        dateOfBirth: "1990-01-01",
         role: "TECHNICIAN",
       });
       expect(onSaved).toHaveBeenCalledTimes(1);

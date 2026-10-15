@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UsersPage } from "@/components/admin/users/users-page";
 import type { AuthUser } from "@/lib/auth";
-import { listUsers } from "@/lib/users";
+import { listUsers, type User } from "@/lib/users";
 
 // Nenhum acesso de rede real: `listUsers` é mockado, o resto do módulo
 // (ROLE_LABELS, ROLES, CREATABLE_ROLES, registerUser, adminUpdateUser,
@@ -30,14 +30,13 @@ vi.mock("@/lib/auth", async () => {
   return { ...actual, readUserFromStorage: vi.fn() };
 });
 
-const USERS: AuthUser[] = [
+const USERS: User[] = [
   {
     id: "user-1",
     fullName: "Ana Souza",
     email: "ana@agro.com",
     cpf: "11122233344",
     role: "ADMIN",
-    dateOfBirth: "1990-01-15",
   },
   {
     id: "user-2",
@@ -45,7 +44,6 @@ const USERS: AuthUser[] = [
     email: "bruno@agro.com",
     cpf: "22233344455",
     role: "TECHNICIAN",
-    dateOfBirth: "1988-05-20",
   },
   {
     id: "user-3",
@@ -53,7 +51,6 @@ const USERS: AuthUser[] = [
     email: "carla@agro.com",
     cpf: "33344455566",
     role: "MANAGER",
-    dateOfBirth: "1995-11-02",
   },
 ];
 
@@ -73,7 +70,7 @@ async function mockRole(role: AuthUser["role"] | null) {
   );
 }
 
-async function mockUsers(users: AuthUser[]) {
+async function mockUsers(users: User[]) {
   vi.mocked(listUsers).mockResolvedValue(users);
 }
 
@@ -146,6 +143,15 @@ describe("UsersPage — RBAC", () => {
     expect(screen.getByRole("columnheader", { name: "Ações" })).toBeTruthy();
   });
 
+  it("UNIT-007: a tabela não tem a coluna de nascimento", async () => {
+    await mockRole("ADMIN");
+    await mockUsers(USERS);
+
+    await renderUsersPage();
+
+    expect(screen.queryByRole("columnheader", { name: /Nascimento/ })).toBeNull();
+  });
+
   it("role=MANAGER: não exibe 'Novo usuário' nem coluna 'Ações'", async () => {
     await mockRole("MANAGER");
     await mockUsers(USERS);
@@ -184,6 +190,23 @@ describe("UsersPage — busca livre", () => {
     cleanup();
     vi.restoreAllMocks();
     vi.useRealTimers();
+  });
+
+  it("usuário sem CPF (opcional para Administrador) não quebra a busca e mostra '—'", async () => {
+    await mockRole("ADMIN");
+    await mockUsers([{ ...USERS[0], cpf: null }, ...USERS.slice(1)]);
+
+    await renderUsersPage();
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.type(screen.getByPlaceholderText("Buscar por nome, e-mail ou CPF…"), "123");
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => expect(screen.queryByText(USERS[0].fullName)).toBeNull());
   });
 
   it("digitar um nome no campo de busca filtra a lista após o debounce", async () => {

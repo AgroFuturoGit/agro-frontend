@@ -23,7 +23,12 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
 import { persistSession, readUserFromStorage, type Role } from "@/lib/auth";
-import { formatCpf } from "@/lib/cpf";
+import { formatCpf, isValidCpf } from "@/lib/cpf";
+import {
+  TECHNICIAN_REGISTRATION_TYPES,
+  createTechnician,
+  type TechnicianRegistrationType,
+} from "@/lib/technicians";
 import {
   CREATABLE_ROLES,
   ROLE_LABELS,
@@ -34,6 +39,9 @@ import {
 } from "@/lib/users";
 
 type Mode = "create" | "edit";
+
+/** Papéis que podem ser destino de troca: não exigem perfil/cadastro próprio. */
+const ROLES_WITHOUT_OWN_PROFILE: Role[] = ["ADMIN"];
 
 type Props = {
   mode: Mode;
@@ -48,7 +56,9 @@ const EMPTY = {
   email: "",
   password: "",
   cpf: "",
-  dateOfBirth: "",
+  registrationType: "" as TechnicianRegistrationType | "",
+  registrationNumber: "",
+  specialty: "",
   role: "ADMIN" as Role,
 };
 
@@ -62,18 +72,19 @@ export function UserFormDrawer({
   const [values, setValues] = useState(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
+    setFieldErrors({});
     if (mode === "edit" && user) {
       setValues({
         ...EMPTY,
         fullName: user.fullName,
         email: user.email,
-        cpf: user.cpf,
-        dateOfBirth: user.dateOfBirth ?? "",
+        cpf: user.cpf ?? "",
         role: user.role,
       });
     } else {
@@ -86,26 +97,74 @@ export function UserFormDrawer({
     value: (typeof values)[K],
   ) {
     setValues((prev) => ({ ...prev, [key]: value }));
+    if (fieldErrors[key]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
+  }
+
+  const isTechnician = mode === "create" && values.role === "TECHNICIAN";
+
+  function validate(): Record<string, string> {
+    const errors: Record<string, string> = {};
+    if (mode !== "create") return errors;
+    const cpf = values.cpf.trim();
+    if (isTechnician && !cpf) errors.cpf = "Informe o CPF";
+    else if (cpf && !isValidCpf(cpf)) errors.cpf = "CPF inválido";
+    if (isTechnician) {
+      const hasType = Boolean(values.registrationType);
+      const hasNumber = Boolean(values.registrationNumber.trim());
+      if (hasType && !hasNumber) {
+        errors.registrationNumber = "Informe o número do registro";
+      }
+      if (hasNumber && !hasType) {
+        errors.registrationType = "Informe o tipo do registro";
+      }
+    }
+    return errors;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    const clientErrors = validate();
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      return;
+    }
     setSubmitting(true);
     try {
-      if (mode === "create") {
-        await registerUser({
+      if (mode === "create" && isTechnician) {
+        // Cria usuário e perfil de técnico; `POST /users/register` com
+        // TECHNICIAN deixaria o usuário sem perfil (404 em /technicians/me).
+        const registrationNumber = values.registrationNumber.trim();
+        const specialty = values.specialty.trim();
+        await createTechnician({
           fullName: values.fullName.trim(),
           email: values.email.trim(),
           password: values.password,
           cpf: values.cpf.trim(),
-          dateOfBirth: values.dateOfBirth,
+          ...(values.registrationType
+            ? { registrationType: values.registrationType }
+            : {}),
+          ...(registrationNumber ? { registrationNumber } : {}),
+          ...(specialty ? { specialty } : {}),
+        });
+      } else if (mode === "create") {
+        const cpf = values.cpf.trim();
+        await registerUser({
+          fullName: values.fullName.trim(),
+          email: values.email.trim(),
+          password: values.password,
+          ...(cpf ? { cpf } : {}),
           role: values.role,
         });
       } else if (user) {
         const updated = await adminUpdateUser(user.id, {
           fullName: values.fullName.trim(),
-          dateOfBirth: values.dateOfBirth,
           role: values.role,
         });
         const stored = readUserFromStorage();
@@ -118,7 +177,11 @@ export function UserFormDrawer({
           if (token) {
             persistSession({
               token: decodeURIComponent(token),
-              userResponseDTO: { ...stored, ...updated },
+              userResponseDTO: {
+                ...stored,
+                ...updated,
+                cpf: updated.cpf ?? stored.cpf,
+              },
             });
           }
         }
@@ -137,6 +200,13 @@ export function UserFormDrawer({
   }
 
   const isCreate = mode === "create";
+  // Na edição, o papel só troca para os que não exigem cadastro próprio
+  // (hoje só ADMIN); o papel atual do usuário continua listado.
+  const roleOptions = isCreate
+    ? CREATABLE_ROLES
+    : ROLES.filter(
+        (role) => role === user?.role || ROLES_WITHOUT_OWN_PROFILE.includes(role),
+      );
   const title = isCreate ? "Novo usuário" : "Editar usuário";
   const description = isCreate
     ? "Cadastre um novo usuário do sistema."
@@ -207,17 +277,23 @@ export function UserFormDrawer({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="cpf">CPF</Label>
+                  <Label htmlFor="cpf">
+                    {isTechnician ? "CPF" : "CPF (opcional)"}
+                  </Label>
                   <Input
                     id="cpf"
                     value={values.cpf}
                     onChange={(e) => update("cpf", formatCpf(e.target.value))}
-                    required
+                    required={isTechnician}
                     inputMode="numeric"
                     maxLength={14}
                     placeholder="000.000.000-00"
                     disabled={submitting}
+                    aria-invalid={Boolean(fieldErrors.cpf)}
                   />
+                  {fieldErrors.cpf && (
+                    <p className="text-sm text-destructive">{fieldErrors.cpf}</p>
+                  )}
                 </div>
               </>
             ) : (
@@ -245,18 +321,6 @@ export function UserFormDrawer({
             )}
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="dateOfBirth">Data de nascimento</Label>
-              <Input
-                id="dateOfBirth"
-                type="date"
-                value={values.dateOfBirth}
-                onChange={(e) => update("dateOfBirth", e.target.value)}
-                required
-                disabled={submitting}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
               <Label htmlFor="role">Papel</Label>
               <Select
                 value={values.role}
@@ -270,20 +334,86 @@ export function UserFormDrawer({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {(isCreate ? CREATABLE_ROLES : ROLES).map((role) => (
+                  {roleOptions.map((role) => (
                     <SelectItem key={role} value={role}>
                       {ROLE_LABELS[role]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {isCreate && (
-                <p className="text-xs text-muted-foreground">
-                  Gestores e Agricultores não são criados aqui — use os fluxos de
-                  Organização e Comunidade.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                {isCreate
+                  ? "Gestores e Agricultores não são criados aqui — use os fluxos de Organização e Comunidade."
+                  : "Técnicos, gestores e agricultores têm cadastro próprio; para mudar para esses perfis, crie um novo cadastro."}
+              </p>
             </div>
+
+            {isTechnician && (
+              <>
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="registrationType">Tipo de registro</Label>
+                  <Select
+                    value={values.registrationType || "NONE"}
+                    onValueChange={(v) =>
+                      update(
+                        "registrationType",
+                        v === "NONE" ? "" : (v as TechnicianRegistrationType),
+                      )
+                    }
+                    disabled={submitting}
+                  >
+                    <SelectTrigger
+                      id="registrationType"
+                      className="w-full"
+                      aria-invalid={Boolean(fieldErrors.registrationType)}
+                    >
+                      <SelectValue placeholder="Não informar">
+                        {(v) => (v && v !== "NONE" ? v : "Não informar")}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">Não informar</SelectItem>
+                      {TECHNICIAN_REGISTRATION_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {fieldErrors.registrationType && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.registrationType}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="registrationNumber">Número do registro</Label>
+                  <Input
+                    id="registrationNumber"
+                    value={values.registrationNumber}
+                    onChange={(e) => update("registrationNumber", e.target.value)}
+                    disabled={submitting}
+                    aria-invalid={Boolean(fieldErrors.registrationNumber)}
+                  />
+                  {fieldErrors.registrationNumber && (
+                    <p className="text-sm text-destructive">
+                      {fieldErrors.registrationNumber}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <Label htmlFor="specialty">Especialidade</Label>
+                  <Input
+                    id="specialty"
+                    value={values.specialty}
+                    onChange={(e) => update("specialty", e.target.value)}
+                    disabled={submitting}
+                  />
+                </div>
+              </>
+            )}
           </div>
 
           <SheetFooter>

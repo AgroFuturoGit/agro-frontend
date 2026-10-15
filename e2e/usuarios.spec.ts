@@ -263,12 +263,14 @@ test.describe("/admin/usuarios — DataTable genérico", () => {
       id: "u-new",
       fullName: "Novo Usuário Teste",
       email: "novo.usuario@example.com",
-      cpf: "10000000099",
+      cpf: "52998224725",
       role: "ADMIN",
-      dateOfBirth: "2000-01-01",
+      dateOfBirth: null,
     };
+    let registerBody: Record<string, unknown> | null = null;
 
     await page.route("**/users/register", async (route) => {
+      registerBody = route.request().postDataJSON() as Record<string, unknown>;
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -290,7 +292,7 @@ test.describe("/admin/usuarios — DataTable genérico", () => {
     await page.getByLabel("E-mail").fill(NEW_USER.email);
     await page.getByLabel("Senha").fill("senha1234");
     await page.getByLabel("CPF").fill(NEW_USER.cpf);
-    await page.getByLabel("Data de nascimento").fill(NEW_USER.dateOfBirth as string);
+    await expect(page.getByLabel("Data de nascimento")).toHaveCount(0);
     // Papel já vem "Administrador" (default `ADMIN` do formulário) —
     // corresponde ao papel do `NEW_USER`, nenhuma seleção extra necessária.
 
@@ -304,5 +306,65 @@ test.describe("/admin/usuarios — DataTable genérico", () => {
 
     await expect(drawer).toHaveCount(0);
     await expect(page.getByText(NEW_USER.fullName)).toBeVisible();
+    expect(registerBody).not.toHaveProperty("dateOfBirth");
+  });
+
+  test("criar usuário Técnico chama POST /technicians (cria também o perfil) e nunca /users/register", async ({
+    page,
+  }) => {
+    await loginAs(page, "ADMIN", ADMIN_USER);
+    await mockUsersList(page);
+
+    let technicianBody: Record<string, unknown> | null = null;
+    let usedGenericRoute = false;
+
+    await page.route("**/users/register", async (route) => {
+      usedGenericRoute = true;
+      await route.fulfill({ status: 500, body: "{}" });
+    });
+    await page.route("**/technicians", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      technicianBody = route.request().postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({ id: "t-new", user: null }),
+      });
+    });
+
+    await page.goto("/admin/usuarios");
+    await expect(page.getByText("Ana Beatriz Costa")).toBeVisible();
+    await page.getByRole("button", { name: "Novo usuário" }).click();
+
+    const drawer = page.locator('[data-slot="sheet-content"]');
+    await expect(drawer).toBeVisible();
+
+    await drawer.getByRole("combobox", { name: "Papel" }).click();
+    await page.getByRole("option", { name: "Técnico" }).click();
+
+    await drawer.getByLabel("Nome completo").fill("Tânia Técnica");
+    await drawer.getByLabel("E-mail").fill("tania.tecnica@example.com");
+    await drawer.getByLabel("Senha").fill("senha1234");
+    await drawer.getByLabel("CPF").fill("52998224725");
+    await drawer.getByRole("combobox", { name: "Tipo de registro" }).click();
+    await page.getByRole("option", { name: "CREA" }).click();
+    await drawer.getByLabel("Número do registro").fill("12345");
+    await drawer.getByLabel("Especialidade").fill("Agronomia");
+
+    await drawer.getByRole("button", { name: "Cadastrar" }).click();
+    await expect(drawer).toHaveCount(0);
+
+    expect(usedGenericRoute).toBe(false);
+    expect(technicianBody).toMatchObject({
+      fullName: "Tânia Técnica",
+      email: "tania.tecnica@example.com",
+      cpf: "529.982.247-25",
+      registrationType: "CREA",
+      registrationNumber: "12345",
+      specialty: "Agronomia",
+    });
   });
 });

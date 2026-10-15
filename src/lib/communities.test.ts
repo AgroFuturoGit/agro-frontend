@@ -166,27 +166,41 @@ describe("deleteCommunity", () => {
 });
 
 describe("registerProducer", () => {
+  // `FarmerRegisterDTO`: só enviamos os campos preenchidos.
   const payload: ProducerRegisterPayload = {
     fullName: "João Produtor",
+    cpf: "52998224725",
     email: "joao@agro.com",
     password: "Senha@123",
-    cpf: "55566677788",
     dateOfBirth: "1985-03-22",
+    localName: "Sítio Boa Esperança",
+    state: "AL",
+    latitude: -9.66,
+    longitude: -35.73,
   };
 
-  it("chama apiRequest com o path hierárquico e método POST", async () => {
-    apiRequestMock.mockResolvedValue({
-      id: "prod-1",
-      aliasName: null,
-      isCompliant: null,
-      user: {
-        id: "usr-2",
-        fullName: "João Produtor",
-        email: "joao@agro.com",
-        cpf: "55566677788",
-      },
-      community: { id: "com-1", name: "Comunidade Boa Vista" },
-    });
+  const RAW_RESPONSE = {
+    id: "prod-1",
+    fullName: "João Produtor",
+    cpf: "52998224725",
+    dateOfBirth: "1985-03-22",
+    localName: "Sítio Boa Esperança",
+    state: "AL",
+    latitude: -9.66,
+    longitude: -35.73,
+    isCompliant: null,
+    registrationSource: "MANAGER",
+    user: {
+      id: "usr-2",
+      fullName: "João Produtor",
+      email: "joao@agro.com",
+      cpf: "52998224725",
+    },
+    community: { id: "com-1", name: "Comunidade Boa Vista" },
+  };
+
+  it("UNIT-003: POST no path hierárquico com o FarmerRegisterDTO e mapeia a resposta", async () => {
+    apiRequestMock.mockResolvedValue(RAW_RESPONSE);
 
     const producer = await registerProducer("com-1", payload);
 
@@ -197,28 +211,22 @@ describe("registerProducer", () => {
         body: payload,
       },
     );
-    expect(producer).toEqual({
+    expect(producer).toMatchObject({
       id: "prod-1",
-      aliasName: null,
-      isCompliant: null,
-      user: {
-        id: "usr-2",
-        fullName: "João Produtor",
-        email: "joao@agro.com",
-        cpf: "55566677788",
-      },
-      // O DTO de resposta do registro não é usado como fonte da organização
-      // em nenhum fluxo — `registerProducer` sempre normaliza para `null`
-      // (ver `src/lib/communities.ts`).
+      fullName: "João Produtor",
+      localName: "Sítio Boa Esperança",
+      latitude: -9.66,
+      registrationSource: "MANAGER",
+      motherName: null,
+      user: { id: "usr-2", email: "joao@agro.com" },
       community: { id: "com-1", name: "Comunidade Boa Vista", organization: null },
     });
+    expect(Object.keys(producer).some((key) => /alias/i.test(key))).toBe(false);
   });
 
   it("normaliza user e community ausentes para null", async () => {
     apiRequestMock.mockResolvedValue({
       id: "prod-2",
-      aliasName: null,
-      isCompliant: null,
       user: null,
       community: null,
     });

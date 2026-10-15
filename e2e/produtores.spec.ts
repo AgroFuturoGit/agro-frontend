@@ -177,7 +177,9 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
       registerBody = request.postDataJSON() as Record<string, unknown>;
       const created = {
         id: "eeeeeeee-0000-0000-0000-000000000001",
-        aliasName: "Joãozinho",
+        fullName: producerName,
+        cpf: "52998224725",
+        localName: "Sítio Boa Vista",
         isCompliant: true,
         user: {
           id: "ffffffff-0000-0000-0000-000000000001",
@@ -217,9 +219,13 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     await dialog.getByLabel("Nome completo").fill(producerName);
     await dialog.getByLabel("E-mail").fill("joao.mata@example.com");
     await dialog.getByLabel("Senha").fill("SenhaForte123");
-    await dialog.getByLabel("CPF").fill("12345678909");
+    await dialog.getByLabel("CPF").fill("52998224725");
     await dialog.getByLabel("Data de nascimento").fill("1988-03-15");
-    await dialog.getByLabel("Nome de exibição (opcional)").fill("Joãozinho");
+    await dialog.getByLabel("Endereço/Nome local").fill("Sítio Boa Vista");
+    await dialog.getByLabel("Cidade").fill("Maceió");
+    await dialog.getByLabel("UF").fill("al");
+    await dialog.getByLabel("Latitude").fill("-9.66");
+    await dialog.getByLabel("Longitude").fill("-35.73");
 
     await dialog.getByRole("button", { name: "Cadastrar" }).click();
     await expect(dialog).toBeHidden();
@@ -228,9 +234,15 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     expect(registerBody).toMatchObject({
       fullName: producerName,
       email: "joao.mata@example.com",
+      cpf: "529.982.247-25",
       dateOfBirth: "1988-03-15",
-      aliasName: "Joãozinho",
+      localName: "Sítio Boa Vista",
+      city: "Maceió",
+      state: "AL",
+      latitude: -9.66,
+      longitude: -35.73,
     });
+    expect(registerBody).not.toHaveProperty("aliasName");
 
     await expect(page.getByRole("cell", { name: producerName })).toBeVisible();
   });
@@ -258,7 +270,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
 
     const producerA = {
       id: "eeeeeeee-0000-0000-0000-00000000000a",
-      aliasName: null,
+      fullName: "Ana Serrana",
       isCompliant: true,
       user: {
         id: "ffffffff-0000-0000-0000-00000000000a",
@@ -270,7 +282,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     };
     const producerB = {
       id: "eeeeeeee-0000-0000-0000-00000000000b",
-      aliasName: null,
+      fullName: "Bruno do Vale",
       isCompliant: false,
       user: {
         id: "ffffffff-0000-0000-0000-00000000000b",

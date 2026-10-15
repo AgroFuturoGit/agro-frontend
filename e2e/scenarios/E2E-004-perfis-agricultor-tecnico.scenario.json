@@ -1,0 +1,360 @@
+{
+  "schema_version": 1,
+  "id": "E2E-004",
+  "title": "Perfis de técnico e agricultor alinhados ao contrato da Feature 5.2",
+  "description": "O administrador cria um técnico pela tela de Usuários (que passa a criar também o perfil de técnico) e cadastra e edita um agricultor com nome local, endereço e GPS, conferindo que os dados voltam do back.",
+  "feature_slug": "alinhar-perfis-farmer-technician",
+  "ac_refs": [
+    "AC-007",
+    "AC-009"
+  ],
+  "priority": "P0",
+  "tags": [
+    "usuarios",
+    "tecnico",
+    "agricultor"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Comunidade existente cujo caminho é informado em E2E_COMMUNITY_PATH (por exemplo /admin/organizacoes/{org}/comunidades/{comunidade}) e cujo nome é E2E_COMMUNITY_NAME",
+      "E-mails e CPFs válidos e inéditos em E2E_TECH_EMAIL, E2E_TECH_CPF, E2E_FARMER_EMAIL e E2E_FARMER_CPF; senhas em E2E_TECH_PASSWORD e E2E_FARMER_PASSWORD; nomes em E2E_TECH_NAME e E2E_FARMER_NAME"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_ADMIN_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "css",
+        "value": "#password"
+      },
+      "value": "${env:E2E_ADMIN_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Técnico criado pela tela de Usuários aparece na lista com perfil criado por POST /technicians",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin/usuarios"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Novo usuário"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Papel"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "Técnico"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome completo"
+          },
+          "value": "${env:E2E_TECH_NAME}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_TECH_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_TECH_PASSWORD}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "CPF"
+          },
+          "value": "${env:E2E_TECH_CPF}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Tipo de registro"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "CREA"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Número do registro"
+          },
+          "value": "12345"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Especialidade"
+          },
+          "value": "Agronomia"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Cadastrar"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "${env:E2E_TECH_EMAIL}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agricultor_cadastro_edicao",
+      "title": "Agricultor cadastrado com nome local, endereço e GPS é editado e os dados voltam do back",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "${env:E2E_COMMUNITY_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Novo Agricultor"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Comunidade"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_COMMUNITY_NAME}"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome completo"
+          },
+          "value": "${env:E2E_FARMER_NAME}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_FARMER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#producer-password"
+          },
+          "value": "${env:E2E_FARMER_PASSWORD}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "CPF"
+          },
+          "value": "${env:E2E_FARMER_CPF}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Data de nascimento"
+          },
+          "value": "1980-05-20"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Telefone"
+          },
+          "value": "82999990000"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Endereço/Nome local"
+          },
+          "value": "Sítio Boa Vista E2E"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Cidade"
+          },
+          "value": "Maceió"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "UF"
+          },
+          "value": "AL"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Código IBGE"
+          },
+          "value": "2704302"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Latitude"
+          },
+          "value": "-9.66"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Longitude"
+          },
+          "value": "-35.73"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Cadastrar"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "css",
+            "value": "tr:has-text('${env:E2E_FARMER_NAME}') button[aria-label='Editar agricultor']"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Endereço/Nome local"
+          },
+          "value": "Sítio Editado E2E"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar alterações"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Sítio Editado E2E"
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "As validações de CPF, UF, IBGE, GPS e data são cobertas por producer-form-drawer.test.tsx e user-form-drawer.test.tsx.",
+    "forbidden": "O gating por role não mudou nesta feature; segue coberto por rbac.spec.ts.",
+    "empty_state": "A feature não altera estados vazios."
+  }
+}

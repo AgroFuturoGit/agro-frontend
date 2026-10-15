@@ -26,7 +26,7 @@ import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { unitLabel } from "@/lib/crops";
-import { getMyProducer, listProducers } from "@/lib/producers";
+import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
 import {
   PLAN_STATUS_LABELS,
   formatNumber,
@@ -120,7 +120,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               producer.community?.organization?.name ?? "Organização",
             communityName: producer.community?.name ?? "Comunidade",
             producerLabel:
-              producer.user?.fullName ?? producer.aliasName ?? "Agricultor",
+              producerDisplayName(producer),
           });
           return;
         }
@@ -135,7 +135,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           organizationName: community.organization.name,
           communityName: community.name,
           producerLabel:
-            producer?.user?.fullName ?? producer?.aliasName ?? "Agricultor",
+            producerDisplayName(producer),
         });
       } catch {
         if (active) {

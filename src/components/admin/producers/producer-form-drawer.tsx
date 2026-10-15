@@ -23,13 +23,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
-import { formatCpf } from "@/lib/cpf";
+import { cn } from "@/lib/utils";
+import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
   parseProducerRegisterFieldErrors,
   registerProducer,
   type Community,
+  type ProducerRegisterPayload,
 } from "@/lib/communities";
-import { updateProducer, type Producer } from "@/lib/producers";
+import {
+  producerDisplayName,
+  updateProducer,
+  type Producer,
+  type ProducerUpdatePayload,
+} from "@/lib/producers";
 
 type Mode = "create" | "edit";
 
@@ -57,7 +64,17 @@ type FormValues = {
   password: string;
   cpf: string;
   dateOfBirth: string;
-  aliasName: string;
+  motherName: string;
+  phone: string;
+  educationLevel: string;
+  origin: string;
+  localName: string;
+  street: string;
+  city: string;
+  state: string;
+  ibgeCode: string;
+  latitude: string;
+  longitude: string;
   communityId: string;
 };
 
@@ -67,52 +84,176 @@ const EMPTY: FormValues = {
   password: "",
   cpf: "",
   dateOfBirth: "",
-  aliasName: "",
+  motherName: "",
+  phone: "",
+  educationLevel: "",
+  origin: "",
+  localName: "",
+  street: "",
+  city: "",
+  state: "",
+  ibgeCode: "",
+  latitude: "",
+  longitude: "",
   communityId: "",
 };
+
+/** Campos de texto livre que seguem a regra "vazio = limpa" na edição (BR-005). */
+const TEXT_FIELDS = [
+  "motherName",
+  "phone",
+  "educationLevel",
+  "origin",
+  "localName",
+  "street",
+  "city",
+  "state",
+  "ibgeCode",
+] as const;
+
+const CANNOT_CLEAR_MESSAGE =
+  "Não é possível remover este valor depois de definido; altere para outro valor";
+
+function parseCoordinate(value: string): number | null {
+  const trimmed = value.trim().replace(",", ".");
+  if (!trimmed) return null;
+  const number = Number(trimmed);
+  return Number.isFinite(number) ? number : Number.NaN;
+}
+
+function todayIso(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
 
 function validateField(
   field: keyof FormValues,
   values: FormValues,
+  mode: Mode,
+  original: Producer | null | undefined,
 ): string | null {
-  // Único campo opcional do `ProducerRegisterDTO`.
-  if (field === "aliasName") return null;
-
-  if (field === "password") {
-    if (!values.password) return "Informe a senha";
-    if (values.password.length < 8) {
-      return "A senha deve ter no mínimo 8 caracteres";
+  switch (field) {
+    case "fullName":
+      return values.fullName.trim() ? null : "Informe o nome completo";
+    case "email":
+      if (mode !== "create") return null;
+      return values.email.trim() ? null : "Informe o e-mail";
+    case "password":
+      if (mode !== "create") return null;
+      if (!values.password) return "Informe a senha";
+      if (values.password.length < 8) {
+        return "A senha deve ter no mínimo 8 caracteres";
+      }
+      return null;
+    case "cpf":
+      if (mode !== "create") return null;
+      if (!values.cpf.trim()) return "Informe o CPF";
+      return isValidCpf(values.cpf) ? null : "CPF inválido";
+    case "communityId":
+      if (mode !== "create") return null;
+      return values.communityId ? null : "Selecione a comunidade do agricultor";
+    case "dateOfBirth":
+      if (!values.dateOfBirth) {
+        return mode === "edit" && original?.dateOfBirth
+          ? CANNOT_CLEAR_MESSAGE
+          : null;
+      }
+      return values.dateOfBirth > todayIso()
+        ? "A data de nascimento não pode ser futura"
+        : null;
+    case "state":
+      if (!values.state.trim()) return null;
+      // Valor legado inalterado não trava a edição.
+      if (mode === "edit" && values.state === (original?.state ?? "")) {
+        return null;
+      }
+      return /^[A-Za-z]{2}$/.test(values.state.trim())
+        ? null
+        : "Informe a UF com 2 letras";
+    case "ibgeCode":
+      if (!values.ibgeCode.trim()) return null;
+      if (mode === "edit" && values.ibgeCode === (original?.ibgeCode ?? "")) {
+        return null;
+      }
+      return /^\d{7}$/.test(values.ibgeCode.trim())
+        ? null
+        : "O código IBGE deve ter 7 dígitos";
+    case "latitude":
+    case "longitude": {
+      const isLat = field === "latitude";
+      const limit = isLat ? 90 : 180;
+      const label = isLat ? "A latitude" : "A longitude";
+      const own = parseCoordinate(values[field]);
+      const other = parseCoordinate(values[isLat ? "longitude" : "latitude"]);
+      if (own === null) {
+        if (mode === "edit" && (isLat ? original?.latitude : original?.longitude) != null) {
+          return CANNOT_CLEAR_MESSAGE;
+        }
+        return other !== null && !Number.isNaN(other)
+          ? `Informe ${isLat ? "a latitude" : "a longitude"} junto com ${isLat ? "a longitude" : "a latitude"}`
+          : null;
+      }
+      if (Number.isNaN(own)) return `${label} deve ser um número`;
+      if (own < -limit || own > limit) {
+        return `${label} deve estar entre -${limit} e ${limit}`;
+      }
+      return null;
     }
-    return null;
+    default:
+      return null;
   }
-
-  if (!values[field].trim()) {
-    switch (field) {
-      case "fullName":
-        return "Informe o nome completo";
-      case "email":
-        return "Informe o e-mail";
-      case "cpf":
-        return "Informe o CPF";
-      case "dateOfBirth":
-        return "Informe a data de nascimento";
-      case "communityId":
-        return "Selecione a comunidade do agricultor";
-      default:
-        return "Campo obrigatório";
-    }
-  }
-  return null;
 }
 
-function validateAll(values: FormValues): Record<string, string> {
+function validateAll(
+  values: FormValues,
+  mode: Mode,
+  original: Producer | null | undefined,
+): Record<string, string> {
   const errors: Record<string, string> = {};
   (Object.keys(values) as (keyof FormValues)[]).forEach((field) => {
-    const error = validateField(field, values);
+    const error = validateField(field, values, mode, original);
     if (error) errors[field] = error;
   });
   return errors;
 }
+
+type FieldProps = {
+  id: string;
+  label: string;
+  error?: string;
+  /** Use `sm:col-span-2` para ocupar a linha inteira da grade. */
+  className?: string;
+  children: React.ReactNode;
+};
+
+function Field({ id, label, error, className, children }: FieldProps) {
+  return (
+    <div className={cn("flex min-w-0 flex-col gap-2", className)}>
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {error && <p className="text-sm text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="flex flex-col gap-4 border-t pt-6 first-of-type:border-t-0 first-of-type:pt-0">
+      <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
+const FULL_ROW = "sm:col-span-2";
 
 export function ProducerFormDrawer({
   mode,
@@ -137,10 +278,21 @@ export function ProducerFormDrawer({
     if (mode === "edit" && producer) {
       setValues({
         ...EMPTY,
-        fullName: producer.user?.fullName ?? "",
+        fullName: producerDisplayName(producer, ""),
         email: producer.user?.email ?? "",
-        cpf: producer.user?.cpf ?? "",
-        aliasName: producer.aliasName ?? "",
+        cpf: producer.cpf ?? producer.user?.cpf ?? "",
+        dateOfBirth: producer.dateOfBirth ?? "",
+        motherName: producer.motherName ?? "",
+        phone: producer.phone ?? "",
+        educationLevel: producer.educationLevel ?? "",
+        origin: producer.origin ?? "",
+        localName: producer.localName ?? "",
+        street: producer.street ?? "",
+        city: producer.city ?? "",
+        state: producer.state ?? "",
+        ibgeCode: producer.ibgeCode ?? "",
+        latitude: producer.latitude != null ? String(producer.latitude) : "",
+        longitude: producer.longitude != null ? String(producer.longitude) : "",
         communityId: producer.community?.id ?? "",
       });
       setIsCompliant(producer.isCompliant ?? false);
@@ -163,8 +315,7 @@ export function ProducerFormDrawer({
   }
 
   function handleBlur(field: keyof FormValues) {
-    if (mode !== "create") return;
-    const error = validateField(field, values);
+    const error = validateField(field, values, mode, producer);
     setFieldErrors((prev) => {
       const next = { ...prev };
       if (error) next[field] = error;
@@ -173,37 +324,64 @@ export function ProducerFormDrawer({
     });
   }
 
+  function buildRegisterPayload(): ProducerRegisterPayload {
+    const payload: ProducerRegisterPayload = {
+      fullName: values.fullName.trim(),
+      cpf: values.cpf.trim(),
+      email: values.email.trim(),
+      password: values.password,
+    };
+    if (values.dateOfBirth) payload.dateOfBirth = values.dateOfBirth;
+    for (const field of TEXT_FIELDS) {
+      const value = values[field].trim();
+      if (value) payload[field] = field === "state" ? value.toUpperCase() : value;
+    }
+    const latitude = parseCoordinate(values.latitude);
+    const longitude = parseCoordinate(values.longitude);
+    if (latitude !== null && longitude !== null) {
+      payload.latitude = latitude;
+      payload.longitude = longitude;
+    }
+    return payload;
+  }
+
+  function buildUpdatePayload(original: Producer): ProducerUpdatePayload {
+    const payload: ProducerUpdatePayload = {
+      fullName: values.fullName.trim(),
+      isCompliant,
+      // `null` = manter no back; datas/GPS já definidos não podem ser limpos.
+      dateOfBirth: values.dateOfBirth || null,
+      latitude: parseCoordinate(values.latitude),
+      longitude: parseCoordinate(values.longitude),
+    };
+    for (const field of TEXT_FIELDS) {
+      const value = values[field].trim();
+      const normalized = field === "state" ? value.toUpperCase() : value;
+      // Esvaziar um valor existente envia "" (limpa); campo que já era
+      // vazio continua `null` (mantém).
+      payload[field] = normalized || (original[field] ? "" : null);
+    }
+    return payload;
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
 
-    if (mode === "create") {
-      const clientErrors = validateAll(values);
-      if (Object.keys(clientErrors).length > 0) {
-        setFieldErrors(clientErrors);
-        return;
-      }
+    const clientErrors = validateAll(values, mode, producer);
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      return;
     }
 
     setSubmitting(true);
     try {
-      const aliasName = values.aliasName.trim();
       if (mode === "create") {
         // `communityId` é path param — nunca vai no corpo.
-        // `isCompliant` não é enviável na criação: o backend crava `true`.
-        await registerProducer(values.communityId, {
-          fullName: values.fullName.trim(),
-          email: values.email.trim(),
-          password: values.password,
-          cpf: values.cpf.trim(),
-          dateOfBirth: values.dateOfBirth,
-          ...(aliasName ? { aliasName } : {}),
-        });
+        // `isCompliant` não é enviável na criação.
+        await registerProducer(values.communityId, buildRegisterPayload());
       } else if (producer) {
-        await updateProducer(producer.id, {
-          aliasName: aliasName === "" ? null : aliasName,
-          isCompliant,
-        });
+        await updateProducer(producer.id, buildUpdatePayload(producer));
       }
       onSaved();
       onOpenChange(false);
@@ -242,7 +420,7 @@ export function ProducerFormDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="sm:max-w-md">
+      <SheetContent side="right" className="data-[side=right]:sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
@@ -252,7 +430,7 @@ export function ProducerFormDrawer({
           onSubmit={handleSubmit}
           className="flex flex-1 flex-col overflow-y-auto"
         >
-          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+          <div className="flex flex-1 flex-col gap-6 px-4 pb-6">
             <div aria-live="polite">
               {formError && (
                 <div
@@ -265,10 +443,14 @@ export function ProducerFormDrawer({
               )}
             </div>
 
-            {isCreate ? (
-              <>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-community">Comunidade</Label>
+            <Section title="Comunidade">
+              {isCreate ? (
+                <Field
+                  id="producer-community"
+                  label="Comunidade"
+                  error={fieldErrors.communityId}
+                  className={FULL_ROW}
+                >
                   <Select
                     value={values.communityId}
                     onValueChange={(value) => update("communityId", value ?? "")}
@@ -294,75 +476,44 @@ export function ProducerFormDrawer({
                       ))}
                     </SelectContent>
                   </Select>
-                  {fieldErrors.communityId && (
-                    <p className="text-sm text-destructive">
-                      {fieldErrors.communityId}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-full-name">Nome completo</Label>
+                </Field>
+              ) : (
+                <Field
+                  id="producer-community-readonly"
+                  label="Comunidade"
+                  className={FULL_ROW}
+                >
                   <Input
-                    id="producer-full-name"
-                    value={values.fullName}
-                    onChange={(e) => update("fullName", e.target.value)}
-                    onBlur={() => handleBlur("fullName")}
-                    required
-                    disabled={submitting}
-                    autoComplete="name"
-                    aria-invalid={Boolean(fieldErrors.fullName)}
+                    id="producer-community-readonly"
+                    value={producer?.community?.name ?? "—"}
+                    readOnly
+                    disabled
                   />
-                  {fieldErrors.fullName && (
-                    <p className="text-sm text-destructive">
-                      {fieldErrors.fullName}
-                    </p>
-                  )}
-                </div>
+                </Field>
+              )}
+            </Section>
 
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-email">E-mail</Label>
-                  <Input
-                    id="producer-email"
-                    type="email"
-                    value={values.email}
-                    onChange={(e) => update("email", e.target.value)}
-                    onBlur={() => handleBlur("email")}
-                    required
-                    disabled={submitting}
-                    autoComplete="email"
-                    aria-invalid={Boolean(fieldErrors.email)}
-                  />
-                  {fieldErrors.email && (
-                    <p className="text-sm text-destructive">
-                      {fieldErrors.email}
-                    </p>
-                  )}
-                </div>
+            <Section title="Dados pessoais">
+              <Field
+                id="producer-full-name"
+                label="Nome completo"
+                error={fieldErrors.fullName}
+                className={FULL_ROW}
+              >
+                <Input
+                  id="producer-full-name"
+                  value={values.fullName}
+                  onChange={(e) => update("fullName", e.target.value)}
+                  onBlur={() => handleBlur("fullName")}
+                  required
+                  disabled={submitting}
+                  autoComplete="name"
+                  aria-invalid={Boolean(fieldErrors.fullName)}
+                />
+              </Field>
 
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-password">Senha</Label>
-                  <Input
-                    id="producer-password"
-                    type="password"
-                    value={values.password}
-                    onChange={(e) => update("password", e.target.value)}
-                    onBlur={() => handleBlur("password")}
-                    required
-                    minLength={8}
-                    disabled={submitting}
-                    autoComplete="new-password"
-                    aria-invalid={Boolean(fieldErrors.password)}
-                  />
-                  {fieldErrors.password && (
-                    <p className="text-sm text-destructive">
-                      {fieldErrors.password}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-cpf">CPF</Label>
+              {isCreate ? (
+                <Field id="producer-cpf" label="CPF" error={fieldErrors.cpf}>
                   <Input
                     id="producer-cpf"
                     value={values.cpf}
@@ -375,110 +526,248 @@ export function ProducerFormDrawer({
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.cpf)}
                   />
-                  {fieldErrors.cpf && (
-                    <p className="text-sm text-destructive">{fieldErrors.cpf}</p>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-date-of-birth">
-                    Data de nascimento
-                  </Label>
-                  <Input
-                    id="producer-date-of-birth"
-                    type="date"
-                    value={values.dateOfBirth}
-                    onChange={(e) => update("dateOfBirth", e.target.value)}
-                    onBlur={() => handleBlur("dateOfBirth")}
-                    required
-                    disabled={submitting}
-                    aria-invalid={Boolean(fieldErrors.dateOfBirth)}
-                  />
-                  {fieldErrors.dateOfBirth && (
-                    <p className="text-sm text-destructive">
-                      {fieldErrors.dateOfBirth}
-                    </p>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-community-readonly">Comunidade</Label>
-                  <Input
-                    id="producer-community-readonly"
-                    value={producer?.community?.name ?? "—"}
-                    readOnly
-                    disabled
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-full-name-readonly">
-                    Nome completo
-                  </Label>
-                  <Input
-                    id="producer-full-name-readonly"
-                    value={values.fullName}
-                    readOnly
-                    disabled
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-email-readonly">E-mail</Label>
-                  <Input
-                    id="producer-email-readonly"
-                    value={values.email}
-                    readOnly
-                    disabled
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="producer-cpf-readonly">CPF</Label>
+                </Field>
+              ) : (
+                <Field id="producer-cpf-readonly" label="CPF">
                   <Input
                     id="producer-cpf-readonly"
                     value={formatCpf(values.cpf)}
                     readOnly
                     disabled
                   />
-                </div>
-              </>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="producer-alias-name">
-                Nome de exibição (opcional)
-              </Label>
-              <Input
-                id="producer-alias-name"
-                value={values.aliasName}
-                onChange={(e) => update("aliasName", e.target.value)}
-                disabled={submitting}
-                placeholder="Como o agricultor é conhecido"
-                aria-invalid={Boolean(fieldErrors.aliasName)}
-              />
-              {fieldErrors.aliasName && (
-                <p className="text-sm text-destructive">
-                  {fieldErrors.aliasName}
-                </p>
+                </Field>
               )}
-            </div>
 
-            {!isCreate && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="producer-is-compliant"
-                  checked={isCompliant}
-                  onCheckedChange={(checked) => setIsCompliant(checked === true)}
+              <Field
+                id="producer-date-of-birth"
+                label="Data de nascimento"
+                error={fieldErrors.dateOfBirth}
+              >
+                <Input
+                  id="producer-date-of-birth"
+                  type="date"
+                  value={values.dateOfBirth}
+                  onChange={(e) => update("dateOfBirth", e.target.value)}
+                  onBlur={() => handleBlur("dateOfBirth")}
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.dateOfBirth)}
+                />
+              </Field>
+
+              <Field
+                id="producer-mother-name"
+                label="Nome da mãe"
+                className={FULL_ROW}
+              >
+                <Input
+                  id="producer-mother-name"
+                  value={values.motherName}
+                  onChange={(e) => update("motherName", e.target.value)}
                   disabled={submitting}
                 />
-                <Label htmlFor="producer-is-compliant" className="font-normal">
-                  Agricultor em conformidade
-                </Label>
+              </Field>
+
+              <Field id="producer-phone" label="Telefone">
+                <Input
+                  id="producer-phone"
+                  type="tel"
+                  value={values.phone}
+                  onChange={(e) => update("phone", e.target.value)}
+                  disabled={submitting}
+                  autoComplete="tel"
+                />
+              </Field>
+
+              <Field id="producer-education-level" label="Escolaridade">
+                <Input
+                  id="producer-education-level"
+                  value={values.educationLevel}
+                  onChange={(e) => update("educationLevel", e.target.value)}
+                  disabled={submitting}
+                />
+              </Field>
+
+              <Field id="producer-origin" label="Origem" className={FULL_ROW}>
+                <Input
+                  id="producer-origin"
+                  value={values.origin}
+                  onChange={(e) => update("origin", e.target.value)}
+                  disabled={submitting}
+                />
+              </Field>
+            </Section>
+
+            <Section title="Acesso">
+              {isCreate ? (
+                <>
+                  <Field id="producer-email" label="E-mail" error={fieldErrors.email}>
+                    <Input
+                      id="producer-email"
+                      type="email"
+                      value={values.email}
+                      onChange={(e) => update("email", e.target.value)}
+                      onBlur={() => handleBlur("email")}
+                      required
+                      disabled={submitting}
+                      autoComplete="email"
+                      aria-invalid={Boolean(fieldErrors.email)}
+                    />
+                  </Field>
+
+                  <Field
+                    id="producer-password"
+                    label="Senha"
+                    error={fieldErrors.password}
+                  >
+                    <Input
+                      id="producer-password"
+                      type="password"
+                      value={values.password}
+                      onChange={(e) => update("password", e.target.value)}
+                      onBlur={() => handleBlur("password")}
+                      required
+                      minLength={8}
+                      disabled={submitting}
+                      autoComplete="new-password"
+                      aria-invalid={Boolean(fieldErrors.password)}
+                    />
+                  </Field>
+                </>
+              ) : (
+                <Field
+                  id="producer-email-readonly"
+                  label="E-mail"
+                  className={FULL_ROW}
+                >
+                  <Input
+                    id="producer-email-readonly"
+                    value={values.email}
+                    readOnly
+                    disabled
+                  />
+                </Field>
+              )}
+            </Section>
+
+            <Section title="Endereço">
+              <Field
+                id="producer-local-name"
+                label="Endereço/Nome local"
+                className={FULL_ROW}
+              >
+                <Input
+                  id="producer-local-name"
+                  value={values.localName}
+                  onChange={(e) => update("localName", e.target.value)}
+                  disabled={submitting}
+                  placeholder="Como o local é conhecido"
+                />
+              </Field>
+
+              <Field id="producer-street" label="Rua" className={FULL_ROW}>
+                <Input
+                  id="producer-street"
+                  value={values.street}
+                  onChange={(e) => update("street", e.target.value)}
+                  disabled={submitting}
+                />
+              </Field>
+
+              <div
+                className={cn(
+                  FULL_ROW,
+                  "grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_5rem_9rem]",
+                )}
+              >
+                <Field id="producer-city" label="Cidade">
+                  <Input
+                    id="producer-city"
+                    value={values.city}
+                    onChange={(e) => update("city", e.target.value)}
+                    disabled={submitting}
+                  />
+                </Field>
+
+                <Field id="producer-state" label="UF" error={fieldErrors.state}>
+                  <Input
+                    id="producer-state"
+                    value={values.state}
+                    onChange={(e) => update("state", e.target.value.toUpperCase())}
+                    onBlur={() => handleBlur("state")}
+                    maxLength={2}
+                    placeholder="AL"
+                    disabled={submitting}
+                    aria-invalid={Boolean(fieldErrors.state)}
+                  />
+                </Field>
+
+                <Field
+                  id="producer-ibge-code"
+                  label="Código IBGE"
+                  error={fieldErrors.ibgeCode}
+                >
+                  <Input
+                    id="producer-ibge-code"
+                    value={values.ibgeCode}
+                    onChange={(e) =>
+                      update("ibgeCode", e.target.value.replace(/\D/g, "").slice(0, 7))
+                    }
+                    onBlur={() => handleBlur("ibgeCode")}
+                    inputMode="numeric"
+                    maxLength={7}
+                    placeholder="0000000"
+                    disabled={submitting}
+                    aria-invalid={Boolean(fieldErrors.ibgeCode)}
+                  />
+                </Field>
               </div>
-            )}
+            </Section>
+
+            <Section title="Localização">
+              <Field id="producer-latitude" label="Latitude" error={fieldErrors.latitude}>
+                <Input
+                  id="producer-latitude"
+                  value={values.latitude}
+                  onChange={(e) => update("latitude", e.target.value)}
+                  onBlur={() => handleBlur("latitude")}
+                  inputMode="decimal"
+                  placeholder="-9.665"
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.latitude)}
+                />
+              </Field>
+
+              <Field
+                id="producer-longitude"
+                label="Longitude"
+                error={fieldErrors.longitude}
+              >
+                <Input
+                  id="producer-longitude"
+                  value={values.longitude}
+                  onChange={(e) => update("longitude", e.target.value)}
+                  onBlur={() => handleBlur("longitude")}
+                  inputMode="decimal"
+                  placeholder="-35.735"
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.longitude)}
+                />
+              </Field>
+
+              {!isCreate && (
+                <div className={cn(FULL_ROW, "flex items-center gap-2")}>
+                  <Checkbox
+                    id="producer-is-compliant"
+                    checked={isCompliant}
+                    onCheckedChange={(checked) => setIsCompliant(checked === true)}
+                    disabled={submitting}
+                  />
+                  <Label htmlFor="producer-is-compliant" className="font-normal">
+                    Agricultor em conformidade
+                  </Label>
+                </div>
+              )}
+            </Section>
           </div>
 
           <SheetFooter>

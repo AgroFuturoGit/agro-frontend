@@ -5,28 +5,26 @@ export type User = {
   id: string;
   fullName: string;
   email: string;
-  cpf: string;
+  /** Opcional no back (`UserRegisterDTO`): usuários sem CPF vêm `null`. */
+  cpf: string | null;
   role: Role;
-  dateOfBirth: string | null;
 };
 
 export type UserRegisterPayload = {
   fullName: string;
   email: string;
   password: string;
-  cpf: string;
-  dateOfBirth: string;
+  /** Opcional no `UserRegisterDTO`. */
+  cpf?: string;
   role: Role;
 };
 
 export type UserUpdatePayload = {
   fullName: string;
-  dateOfBirth: string;
 };
 
 export type AdminUserUpdatePayload = {
   fullName: string;
-  dateOfBirth: string;
   role: Role;
 };
 
@@ -40,7 +38,8 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const ROLES: Role[] = ["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"];
 
 /**
- * Perfis que podem ser criados pela rota genérica `POST /users/register`.
+ * Perfis criáveis na tela de Usuários. ADMIN nasce por `POST /users/register`;
+ * TECHNICIAN por `POST /technicians` (cria também o perfil de técnico).
  * MANAGER e FARMER nascem pelos fluxos da hierarquia (Organização e
  * Comunidade) — o backend rejeita a criação genérica desses perfis (400).
  */

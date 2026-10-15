@@ -1,23 +1,47 @@
 import { apiRequest } from "@/lib/api";
 import type { Organization, OrganizationApiResponse } from "@/lib/organizations";
 
-export type Producer = {
+export type RegistrationSource = "SELF" | "TECHNICIAN" | "MANAGER";
+
+type ProducerFields = {
   id: string;
-  aliasName: string | null;
+  /** Nome do próprio agricultor (`FarmerResponseDTO.fullName`). */
+  fullName: string | null;
+  cpf: string | null;
+  /** Data ISO `yyyy-MM-dd`. */
+  dateOfBirth: string | null;
+  motherName: string | null;
+  origin: string | null;
+  educationLevel: string | null;
+  phone: string | null;
+  /** Endereço/Nome local (padrão IBGE). */
+  localName: string | null;
+  street: string | null;
+  city: string | null;
+  state: string | null;
+  ibgeCode: string | null;
+  latitude: number | null;
+  longitude: number | null;
   isCompliant: boolean | null;
+  registrationSource: RegistrationSource | null;
+  createdAt: string | null;
+  updatedAt: string | null;
   user: {
     id: string;
     fullName: string;
     email: string;
     cpf: string;
   } | null;
+};
+
+export type Producer = ProducerFields & {
   community: {
     id: string;
     name: string;
     /**
      * `GET /farmers/me` (e `GET /farmers`/`GET /farmers/{id}`) já
      * devolve o `CommunityResponseDTO` completo, com a organização aninhada
-     * (ver `ProducerResponseDTO.java`). Mapear esse campo evita ter que
+     * (ver `FarmerResponseDTO.java`). Mapear esse campo evita ter que
      * chamar `GET /communities/{id}` (proibido para FARMER,
      * `hasRole('MANAGER') or hasRole('ADMIN')` em `CommunityController`) só
      * para resolver o nome da organização na navegação em cascata.
@@ -26,28 +50,56 @@ export type Producer = {
   } | null;
 };
 
-export type ProducerApiResponse = {
+/** Resposta do back (`FarmerResponseDTO`); campos novos podem faltar. */
+export type ProducerApiResponse = Partial<
+  Omit<ProducerFields, "id" | "user">
+> & {
   id: string;
-  aliasName: string | null;
-  isCompliant: boolean | null;
-  user: {
-    id: string;
-    fullName: string;
-    email: string;
-    cpf: string;
-  } | null;
-  community: {
+  user?: ProducerFields["user"];
+  community?: {
     id: string;
     name: string;
-    organization: OrganizationApiResponse | null;
+    organization?: OrganizationApiResponse | null;
   } | null;
 };
+
+/** BR-001: nome do agricultor, senão o do usuário, senão "Agricultor". */
+export function producerDisplayName(
+  producer:
+    | {
+        fullName?: string | null;
+        user?: { fullName?: string | null } | null;
+      }
+    | null
+    | undefined,
+  fallback = "Agricultor",
+): string {
+  return (
+    producer?.fullName?.trim() || producer?.user?.fullName?.trim() || fallback
+  );
+}
 
 export function mapProducer(raw: ProducerApiResponse): Producer {
   return {
     id: raw.id,
-    aliasName: raw.aliasName ?? null,
+    fullName: raw.fullName ?? null,
+    cpf: raw.cpf ?? null,
+    dateOfBirth: raw.dateOfBirth ?? null,
+    motherName: raw.motherName ?? null,
+    origin: raw.origin ?? null,
+    educationLevel: raw.educationLevel ?? null,
+    phone: raw.phone ?? null,
+    localName: raw.localName ?? null,
+    street: raw.street ?? null,
+    city: raw.city ?? null,
+    state: raw.state ?? null,
+    ibgeCode: raw.ibgeCode ?? null,
+    latitude: raw.latitude ?? null,
+    longitude: raw.longitude ?? null,
     isCompliant: raw.isCompliant ?? null,
+    registrationSource: raw.registrationSource ?? null,
+    createdAt: raw.createdAt ?? null,
+    updatedAt: raw.updatedAt ?? null,
     user: raw.user
       ? {
           id: raw.user.id,
@@ -73,9 +125,25 @@ export function mapProducer(raw: ProducerApiResponse): Producer {
   };
 }
 
+/**
+ * `FarmerUpdateDTO` (`PUT /farmers/{id}`). CPF não é editável e `null`
+ * significa "manter" no back; texto esvaziado vai como `""` (limpa).
+ */
 export type ProducerUpdatePayload = {
-  aliasName: string | null;
-  isCompliant: boolean | null;
+  fullName?: string | null;
+  dateOfBirth?: string | null;
+  motherName?: string | null;
+  origin?: string | null;
+  educationLevel?: string | null;
+  phone?: string | null;
+  localName?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  ibgeCode?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  isCompliant?: boolean | null;
 };
 
 /** Dados do produtor vinculado ao usuário autenticado. */

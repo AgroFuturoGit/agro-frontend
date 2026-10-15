@@ -83,7 +83,8 @@ const COMMUNITY = {
 
 const PRODUCER = {
   id: "cccccccc-2222-0000-0000-000000000001",
-  aliasName: "Zé da Serra",
+  fullName: "José da Silva",
+  localName: "Zé da Serra",
   isCompliant: true,
   user: {
     id: "dddddddd-2222-0000-0000-000000000001",
