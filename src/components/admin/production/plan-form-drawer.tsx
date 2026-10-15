@@ -77,8 +77,28 @@ function computeTarget(area: string, productivity: number | null): number | null
   return parsedArea * productivity;
 }
 
-function validate(values: FormValues, isCreate: boolean): Record<string, string> {
+const CLEARABLE_DATE_FIELDS = [
+  "expectedHarvestStart",
+  "expectedHarvestEnd",
+  "plannedPlantingDate",
+] as const;
+
+function validate(
+  values: FormValues,
+  isCreate: boolean,
+  original: ProductionPlan | null,
+): Record<string, string> {
   const errors: Record<string, string> = {};
+  // No PUT, data null = "manter valor atual": esvaziar o campo não apagaria
+  // nada e o valor antigo voltaria após salvar (CR-002).
+  if (!isCreate && original) {
+    for (const field of CLEARABLE_DATE_FIELDS) {
+      if (original[field] && !values[field]) {
+        errors[field] =
+          "Não é possível remover esta data depois de definida; altere para outra data";
+      }
+    }
+  }
   if (isCreate && !values.harvestId) errors.harvestId = "Selecione a safra";
   if (isCreate && !values.cropId) errors.cropId = "Selecione o cultivo";
   const area = Number(values.plantedArea);
@@ -198,7 +218,7 @@ export function PlanFormDrawer({
     event.preventDefault();
     setFormError(null);
 
-    const errors = validate(values, isCreate);
+    const errors = validate(values, isCreate, plan ?? null);
     if (cropWithoutProductivity) return;
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -451,7 +471,13 @@ export function PlanFormDrawer({
                   value={values.expectedHarvestStart}
                   onChange={(e) => update("expectedHarvestStart", e.target.value)}
                   disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.expectedHarvestStart)}
                 />
+                {fieldErrors.expectedHarvestStart && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.expectedHarvestStart}
+                  </p>
+                )}
               </div>
               <div className="flex flex-1 flex-col gap-2">
                 <Label htmlFor="plan-harvest-end">Fim previsto da colheita</Label>
@@ -479,7 +505,13 @@ export function PlanFormDrawer({
                 value={values.plannedPlantingDate}
                 onChange={(e) => update("plannedPlantingDate", e.target.value)}
                 disabled={submitting}
+                aria-invalid={Boolean(fieldErrors.plannedPlantingDate)}
               />
+              {fieldErrors.plannedPlantingDate && (
+                <p className="text-sm text-destructive">
+                  {fieldErrors.plannedPlantingDate}
+                </p>
+              )}
             </div>
           </div>
 

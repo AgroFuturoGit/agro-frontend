@@ -173,6 +173,23 @@ describe("PlanFormDrawer — janela e status (UNIT-010 / AC-011)", () => {
     expect(updateProductionPlan).not.toHaveBeenCalled();
   });
 
+  it("edição: esvaziar uma data já definida mostra erro e não envia (o PUT trata null como manter)", async () => {
+    renderForm("edit", PLAN);
+    fireEvent.change(await screen.findByLabelText("Início previsto da colheita"), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("Data prevista de plantio"), {
+      target: { value: "" },
+    });
+    submit();
+    expect(
+      await screen.findAllByText(
+        "Não é possível remover esta data depois de definida; altere para outra data",
+      ),
+    ).toHaveLength(2);
+    expect(updateProductionPlan).not.toHaveBeenCalled();
+  });
+
   it("janela é opcional: sem datas a criação não acusa erro", async () => {
     vi.mocked(createProductionPlan).mockResolvedValue(PLAN);
     renderForm("create");
