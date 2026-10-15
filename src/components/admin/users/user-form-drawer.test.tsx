@@ -263,7 +263,7 @@ describe("UserFormDrawer — modo edit", () => {
     vi.restoreAllMocks();
   });
 
-  it("modo edit: email e cpf ficam readOnly/disabled; Select de papel lista as 4 ROLES", async () => {
+  it("modo edit: email e cpf ficam readOnly/disabled; Select de papel só oferece o papel atual e ADMIN", async () => {
     render(
       <UserFormDrawer mode="edit" user={USER} open onOpenChange={() => {}} onSaved={() => {}} />,
     );
@@ -278,12 +278,34 @@ describe("UserFormDrawer — modo edit", () => {
     openRoleSelect();
 
     const options = await screen.findAllByRole("option");
+    // USER é TECHNICIAN: o papel atual continua e ADMIN é o único destino.
     expect(options.map((o) => o.textContent)).toEqual([
       "Administrador",
-      "Gerente",
       "Técnico",
-      "Agricultor",
     ]);
+    expect(
+      screen.getByText(
+        "Técnicos, gestores e agricultores têm cadastro próprio; para mudar para esses perfis, crie um novo cadastro.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("modo edit: ADMIN não vê TECHNICIAN, FARMER nem MANAGER como destino", async () => {
+    render(
+      <UserFormDrawer
+        mode="edit"
+        user={{ ...USER, role: "ADMIN" }}
+        open
+        onOpenChange={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+    await screen.findByLabelText("E-mail");
+
+    openRoleSelect();
+
+    const options = await screen.findAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual(["Administrador"]);
   });
 
   it("modo edit: submeter chama adminUpdateUser só com fullName/role, sem email/cpf/dateOfBirth", async () => {

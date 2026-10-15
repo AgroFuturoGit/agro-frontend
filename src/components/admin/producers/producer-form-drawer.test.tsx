@@ -212,15 +212,32 @@ describe("ProducerFormDrawer — cadastro por comunidade (spec.md §5)", () => {
     );
   });
 
-  it("UNIT-004: mostra as três seções e o rótulo Endereço/Nome local", async () => {
+  it("UNIT-001: mostra as seções tituladas na ordem e o rótulo Endereço/Nome local", async () => {
     renderDialog();
 
     await screen.findByLabelText("Nome completo");
-    for (const title of ["Dados pessoais", "Endereço", "Localização"]) {
-      expect(screen.getByRole("heading", { name: title })).toBeTruthy();
-    }
+    const titles = screen
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+    expect(titles).toEqual([
+      "Comunidade",
+      "Dados pessoais",
+      "Acesso",
+      "Endereço",
+      "Localização",
+    ]);
     expect(screen.getByLabelText("Endereço/Nome local")).toBeTruthy();
-    expect(screen.queryByText(/apelido|Nome de exibição/i)).toBeNull();
+    expect(screen.queryByText(/Nome de exibição/i)).toBeNull();
+  });
+
+  it("UNIT-001: o drawer do agricultor é mais largo e a grade usa duas colunas a partir de sm", async () => {
+    renderDialog();
+
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.className).toContain("data-[side=right]:sm:max-w-2xl");
+    const grid = screen.getByLabelText("CPF").closest(".grid");
+    expect(grid?.className).toContain("grid-cols-1");
+    expect(grid?.className).toContain("sm:grid-cols-2");
   });
 
   it("renderiza o cadastro em uma barra lateral", async () => {
@@ -519,5 +536,50 @@ describe("ProducerFormDrawer — edição", () => {
         }),
       ),
     );
+  });
+});
+
+describe("ProducerFormDrawer — UF/IBGE legados (CR-003)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("UNIT-004: UF e IBGE legados inalterados não bloqueiam o envio", async () => {
+    vi.mocked(updateProducer).mockResolvedValue(EXISTING_PRODUCER);
+    const user = userEvent.setup();
+
+    renderEditWith({
+      ...EXISTING_PRODUCER,
+      state: "Alagoas",
+      ibgeCode: "123",
+    });
+    await user.click(
+      await screen.findByRole("button", { name: "Salvar alterações" }),
+    );
+
+    await waitFor(() =>
+      expect(updateProducer).toHaveBeenCalledWith(
+        "producer-1",
+        expect.objectContaining({ state: "ALAGOAS", ibgeCode: "123" }),
+      ),
+    );
+    expect(screen.queryByText("Informe a UF com 2 letras")).toBeNull();
+  });
+
+  it("UNIT-004: UF alterada para valor inválido continua bloqueada", async () => {
+    const user = userEvent.setup();
+
+    renderEditWith({ ...EXISTING_PRODUCER, state: "Alagoas", ibgeCode: "123" });
+    const state = await screen.findByLabelText("UF");
+    fireEvent.change(state, { target: { value: "A" } });
+    fireEvent.change(screen.getByLabelText("Código IBGE"), {
+      target: { value: "12" },
+    });
+    await user.click(screen.getByRole("button", { name: "Salvar alterações" }));
+
+    expect(await screen.findByText("Informe a UF com 2 letras")).toBeTruthy();
+    expect(screen.getByText("O código IBGE deve ter 7 dígitos")).toBeTruthy();
+    expect(updateProducer).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,6 @@ import { apiRequest } from "@/lib/api";
 import {
   deleteProducer,
   getMyProducer,
-  isValidCpf,
   listProducers,
   producerDisplayName,
   updateProducer,
@@ -24,7 +23,7 @@ const RAW_ORGANIZATION = {
   type: "COOP",
 };
 
-// Resposta no contrato do `FarmerResponseDTO` (Feature 5.2): sem campo de apelido.
+// Resposta no contrato do `FarmerResponseDTO` (Feature 5.2): sem campo de nome de exibição.
 const RAW_PRODUCER = {
   id: "prod-1",
   fullName: "João Produtor",
@@ -95,7 +94,7 @@ describe("getMyProducer", () => {
     });
   });
 
-  it("UNIT-001: lê todos os campos do FarmerResponseDTO e não expõe campo de apelido", async () => {
+  it("UNIT-001: lê todos os campos do FarmerResponseDTO e não expõe campo de nome de exibição", async () => {
     apiRequestMock.mockResolvedValue(RAW_PRODUCER);
 
     const producer = await getMyProducer();
@@ -266,19 +265,6 @@ describe("producerDisplayName (BR-001)", () => {
       "Agricultor",
     );
     expect(producerDisplayName(null)).toBe("Agricultor");
-  });
-});
-
-describe("isValidCpf", () => {
-  it("aceita CPF válido com ou sem máscara", () => {
-    expect(isValidCpf("529.982.247-25")).toBe(true);
-    expect(isValidCpf("52998224725")).toBe(true);
-  });
-
-  it("rejeita dígito verificador errado, repetidos e tamanho errado", () => {
-    expect(isValidCpf("12345678901")).toBe(false);
-    expect(isValidCpf("11111111111")).toBe(false);
-    expect(isValidCpf("123")).toBe(false);
   });
 });
 

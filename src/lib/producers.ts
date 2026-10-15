@@ -79,21 +79,6 @@ export function producerDisplayName(
   );
 }
 
-/** Valida CPF pelos dígitos verificadores (aceita máscara). */
-export function isValidCpf(value: string): boolean {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length !== 11 || /^(\d)\1{10}$/.test(digits)) return false;
-  for (const length of [9, 10]) {
-    let sum = 0;
-    for (let i = 0; i < length; i++) {
-      sum += Number(digits[i]) * (length + 1 - i);
-    }
-    const check = ((sum * 10) % 11) % 10;
-    if (check !== Number(digits[length])) return false;
-  }
-  return true;
-}
-
 export function mapProducer(raw: ProducerApiResponse): Producer {
   return {
     id: raw.id,

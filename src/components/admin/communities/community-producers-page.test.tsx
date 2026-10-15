@@ -264,7 +264,7 @@ describe("CommunityProducersPage — tabela de dados", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await user.type(
-      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou apelido…"),
+      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou nome local…"),
       "bruno@agro.com",
     );
     await act(async () => {
@@ -274,6 +274,40 @@ describe("CommunityProducersPage — tabela de dados", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Bruno Silva")).toBeTruthy();
+      expect(screen.queryByText("Ana Alves")).toBeNull();
+    });
+  });
+
+  it("UNIT-002: agricultor sem user mostra o CPF próprio e é encontrado pela busca por CPF", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([
+      PRODUCER_ALFA,
+      {
+        ...PRODUCER_ALFA,
+        id: "producer-2",
+        fullName: "Carla Sem Usuário",
+        cpf: "52998224725",
+        user: null,
+      },
+    ]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+    await screen.findByText("Carla Sem Usuário");
+    expect(screen.getByText("529.982.247-25")).toBeTruthy();
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    await user.type(
+      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou nome local…"),
+      "52998224725",
+    );
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    vi.useRealTimers();
+
+    await waitFor(() => {
+      expect(screen.getByText("Carla Sem Usuário")).toBeTruthy();
       expect(screen.queryByText("Ana Alves")).toBeNull();
     });
   });

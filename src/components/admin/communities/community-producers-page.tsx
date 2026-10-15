@@ -39,6 +39,10 @@ type Props = {
   communityId: string;
 };
 
+function producerCpf(producer: Producer): string | null {
+  return producer.cpf ?? producer.user?.cpf ?? null;
+}
+
 function producersGlobalFilter(
   row: Row<Producer>,
   _columnId: string,
@@ -51,7 +55,7 @@ function producersGlobalFilter(
   return [
     producer.user?.fullName,
     producer.user?.email,
-    producer.user?.cpf,
+    producerCpf(producer),
     producer.fullName,
     producer.localName,
   ].some((value) => value?.toLowerCase().includes(query));
@@ -182,13 +186,15 @@ export function CommunityProducersPage({ communityId }: Props) {
           </Link>
         ),
       }),
-      columnHelper.accessor((producer) => producer.user?.cpf ?? "", {
+      columnHelper.accessor((producer) => producer.cpf ?? producer.user?.cpf ?? "", {
         id: "cpf",
         header: "CPF",
         enableSorting: false,
         cell: ({ row }) => (
           <span className="font-mono text-xs text-muted-foreground">
-            {row.original.user?.cpf ? formatCpf(row.original.user.cpf) : "—"}
+            {producerCpf(row.original)
+              ? formatCpf(producerCpf(row.original) as string)
+              : "—"}
           </span>
         ),
       }),
@@ -268,7 +274,7 @@ export function CommunityProducersPage({ communityId }: Props) {
               {producerDisplayName(producer, "—")}
             </Link>
             <p className="mt-1 font-mono text-xs text-muted-foreground">
-              {producer.user?.cpf ? formatCpf(producer.user.cpf) : "—"}
+              {producerCpf(producer) ? formatCpf(producerCpf(producer) as string) : "—"}
             </p>
             <div className="mt-2">
               <ComplianceBadge isCompliant={producer.isCompliant} />
@@ -347,7 +353,7 @@ export function CommunityProducersPage({ communityId }: Props) {
 
       <DataTableToolbar
         table={table}
-        searchPlaceholder="Buscar por nome, e-mail, CPF ou apelido…"
+        searchPlaceholder="Buscar por nome, e-mail, CPF ou nome local…"
       />
 
       <DataTable

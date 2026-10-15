@@ -28,7 +28,6 @@ test.describe('E2E-004 Perfis de técnico e agricultor alinhados ao contrato da 
     annotation: [{ type: 'E2E', description: 'E2E-004' }, { type: 'AC', description: 'AC-007' }, { type: 'AC', description: 'AC-009' }, { type: 'user', description: 'ADMIN' }],
   }, async ({ page }) => {
     await page.goto('/login');
-    await page.goto('/login');
     await page.getByLabel('E-mail').fill(env('E2E_ADMIN_EMAIL'));
     await page.locator('#password').fill(env('E2E_ADMIN_PASSWORD'));
     await page.getByRole('button', { name: 'Entrar' }).click();
@@ -54,7 +53,6 @@ test.describe('E2E-004 Perfis de técnico e agricultor alinhados ao contrato da 
     tag: ['@P0', '@usuarios', '@tecnico', '@agricultor'],
     annotation: [{ type: 'E2E', description: 'E2E-004' }, { type: 'AC', description: 'AC-007' }, { type: 'AC', description: 'AC-009' }, { type: 'user', description: 'ADMIN' }],
   }, async ({ page }) => {
-    await page.goto('/login');
     await page.goto('/login');
     await page.getByLabel('E-mail').fill(env('E2E_ADMIN_EMAIL'));
     await page.locator('#password').fill(env('E2E_ADMIN_PASSWORD'));

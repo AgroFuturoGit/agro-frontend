@@ -23,8 +23,7 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
 import { persistSession, readUserFromStorage, type Role } from "@/lib/auth";
-import { formatCpf } from "@/lib/cpf";
-import { isValidCpf } from "@/lib/producers";
+import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
   TECHNICIAN_REGISTRATION_TYPES,
   createTechnician,
@@ -40,6 +39,9 @@ import {
 } from "@/lib/users";
 
 type Mode = "create" | "edit";
+
+/** Papéis que podem ser destino de troca: não exigem perfil/cadastro próprio. */
+const ROLES_WITHOUT_OWN_PROFILE: Role[] = ["ADMIN"];
 
 type Props = {
   mode: Mode;
@@ -198,6 +200,13 @@ export function UserFormDrawer({
   }
 
   const isCreate = mode === "create";
+  // Na edição, o papel só troca para os que não exigem cadastro próprio
+  // (hoje só ADMIN); o papel atual do usuário continua listado.
+  const roleOptions = isCreate
+    ? CREATABLE_ROLES
+    : ROLES.filter(
+        (role) => role === user?.role || ROLES_WITHOUT_OWN_PROFILE.includes(role),
+      );
   const title = isCreate ? "Novo usuário" : "Editar usuário";
   const description = isCreate
     ? "Cadastre um novo usuário do sistema."
@@ -325,19 +334,18 @@ export function UserFormDrawer({
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {(isCreate ? CREATABLE_ROLES : ROLES).map((role) => (
+                  {roleOptions.map((role) => (
                     <SelectItem key={role} value={role}>
                       {ROLE_LABELS[role]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {isCreate && (
-                <p className="text-xs text-muted-foreground">
-                  Gestores e Agricultores não são criados aqui — use os fluxos de
-                  Organização e Comunidade.
-                </p>
-              )}
+              <p className="text-xs text-muted-foreground">
+                {isCreate
+                  ? "Gestores e Agricultores não são criados aqui — use os fluxos de Organização e Comunidade."
+                  : "Técnicos, gestores e agricultores têm cadastro próprio; para mudar para esses perfis, crie um novo cadastro."}
+              </p>
             </div>
 
             {isTechnician && (
