@@ -59,6 +59,13 @@ type BreadcrumbNames = {
 
 const columnHelper = createColumnHelper<ProductionExecution>();
 
+// Apontamento já revisado não se edita nem se exclui: o PUT preserva o
+// status quando o corpo não o envia, então mudar a quantidade de um
+// VALIDATED alteraria o realizado sem nova validação (CR-003).
+function isReviewed(execution: ProductionExecution) {
+  return execution.status === "VALIDATED" || execution.status === "REJECTED";
+}
+
 export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [names, setNames] = useState<BreadcrumbNames | null>(null);
@@ -71,7 +78,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<ProductionExecution | null>(null);
+  const [editTarget, setEditTarget] = useState<ProductionExecution | null>(
+    null,
+  );
   const [deleteTarget, setDeleteTarget] = useState<ProductionExecution | null>(
     null,
   );
@@ -257,44 +266,46 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         id: "status",
         header: "Status",
         enableSorting: false,
-        cell: ({ row }) => <ExecutionStatusBadge status={row.original.status} />,
+        cell: ({ row }) => (
+          <ExecutionStatusBadge status={row.original.status} />
+        ),
       }),
     ];
 
     const actionsColumn = columnHelper.display({
       id: "actions",
       header: "Ações",
-      cell: ({ row }) => (
-        <div className="inline-flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Editar apontamento"
-            onClick={() => setEditTarget(row.original)}
-          >
-            <Pencil />
-          </Button>
-          {canDelete && (
+      cell: ({ row }) =>
+        isReviewed(row.original) ? null : (
+          <div className="inline-flex items-center gap-1">
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
-              aria-label="Excluir apontamento"
-              onClick={() => setDeleteTarget(row.original)}
-              className="text-destructive hover:text-destructive"
+              aria-label="Editar apontamento"
+              onClick={() => setEditTarget(row.original)}
             >
-              <Trash2 />
+              <Pencil />
             </Button>
-          )}
-        </div>
-      ),
+            {canDelete && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Excluir apontamento"
+                onClick={() => setDeleteTarget(row.original)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 />
+              </Button>
+            )}
+          </div>
+        ),
     });
 
-    return (canWrite ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
-      ProductionExecution,
-      unknown
-    >[];
+    return (
+      canWrite ? [...baseColumns, actionsColumn] : baseColumns
+    ) as ColumnDef<ProductionExecution, unknown>[];
   }, [canWrite, canDelete, loading, formatQuantity]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -326,7 +337,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               <ExecutionStatusBadge status={execution.status} />
             </div>
           </div>
-          {canWrite && (
+          {canWrite && !isReviewed(execution) && (
             <div className="flex shrink-0 gap-1">
               <Button
                 type="button"
@@ -415,8 +426,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               {(plan.expectedHarvestStart || plan.expectedHarvestEnd) && (
                 <>
                   {" "}
-                  · Colheita prevista {formatPlanDate(plan.expectedHarvestStart)}{" "}
-                  a {formatPlanDate(plan.expectedHarvestEnd)}
+                  · Colheita prevista{" "}
+                  {formatPlanDate(plan.expectedHarvestStart)} a{" "}
+                  {formatPlanDate(plan.expectedHarvestEnd)}
                 </>
               )}
             </p>
@@ -482,7 +494,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           emptyActionLabel={
             canWrite && plan ? "Registrar primeira colheita" : undefined
           }
-          onEmptyAction={canWrite && plan ? () => setCreateOpen(true) : undefined}
+          onEmptyAction={
+            canWrite && plan ? () => setCreateOpen(true) : undefined
+          }
           renderMobileCard={renderMobileCard}
         />
 

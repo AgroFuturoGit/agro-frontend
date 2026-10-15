@@ -188,6 +188,7 @@ export function ExecutionFormDrawer({
         </SheetHeader>
 
         <form
+          noValidate
           onSubmit={handleSubmit}
           className="flex flex-1 flex-col overflow-y-auto"
         >

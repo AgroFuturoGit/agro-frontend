@@ -483,6 +483,35 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
     ).toBeTruthy();
   });
 
+  it("apontamento validado ou rejeitado não oferece Editar/Excluir; o pendente oferece", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue([
+      EXECUTIONS[0],
+      { ...EXECUTIONS[0], id: "execution-2", harvestedAt: "2026-05-11", status: "VALIDATED" },
+      { ...EXECUTIONS[0], id: "execution-3", harvestedAt: "2026-05-12", status: "REJECTED" },
+    ]);
+
+    renderPlanDetail();
+
+    await screen.findByText("Validado");
+    expect(screen.getAllByRole("button", { name: "Editar apontamento" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Excluir apontamento" })).toHaveLength(1);
+  });
+
+  it("no mobile, o card de apontamento validado também não oferece Editar/Excluir", async () => {
+    loginAs("FARMER");
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    vi.mocked(listProductionExecutions).mockResolvedValue([
+      { ...EXECUTIONS[0], status: "VALIDATED" },
+    ]);
+
+    renderPlanDetail();
+
+    expect(await screen.findByText("Validado")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Excluir apontamento" })).toBeNull();
+  });
+
   it("meta, realizado e diferença aparecem em kg (nunca em t)", async () => {
     loginAs("FARMER");
 
