@@ -49,7 +49,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# pwdev-code framework (local planning state, not project source)
+# arquivos locais de planejamento e ferramentas (fora do código do projeto)
 .claude/
 .planning/
 PRD.md
