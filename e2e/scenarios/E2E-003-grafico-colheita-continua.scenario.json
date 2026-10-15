@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "E2E-003",
+  "title": "Gráfico de colheita contínua no detalhe do plano com tooltip e alternador",
+  "description": "O administrador abre o detalhe de um plano de cultura contínua com janela de colheita e apontamentos, vê o gráfico previsto × realizado entre o resumo e a tabela, lê os valores exatos no tooltip e alterna entre Semana e Mês.",
+  "feature_slug": "grafico-colheita-continua",
+  "ac_refs": [
+    "AC-009",
+    "AC-011",
+    "AC-015"
+  ],
+  "priority": "P0",
+  "tags": [
+    "planos",
+    "grafico",
+    "colheita-continua"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Plano de uma cultura CONTINUOUS com janela de colheita prevista e ao menos um apontamento",
+      "Caminho do detalhe desse plano informado em E2E_CONTINUOUS_PLAN_PATH (por exemplo /admin/organizacoes/{org}/comunidades/{comunidade}/produtores/{agricultor}/planos/{plano})"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "goto",
+      "value": "/login"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_ADMIN_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "css",
+        "value": "#password"
+      },
+      "value": "${env:E2E_ADMIN_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    },
+    {
+      "action": "goto",
+      "value": "${env:E2E_CONTINUOUS_PLAN_PATH}"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Gráfico composto aparece, o tooltip mostra os valores em kg e o alternador troca para Mês",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "hover",
+          "target": {
+            "by": "css",
+            "value": "[role='img'][data-mode='composite']"
+          },
+          "note": "passa o mouse no meio do gráfico para abrir o tooltip"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "css",
+            "value": "[role='img'][data-mode='composite']"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "harvest-chart-tooltip"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Somente validados contam no realizado oficial."
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Mês",
+            "exact": true
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "O gráfico não tem formulário nem entrada do usuário além do alternador Semana/Mês.",
+    "forbidden": "O gating por role não mudou; a leitura do plano é liberada às 4 roles e é coberta por plan-detail.test.tsx.",
+    "empty_state": "Estados vazio e sem janela são cobertos por harvest-timeline-chart.test.tsx."
+  }
+}

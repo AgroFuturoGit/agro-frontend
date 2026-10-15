@@ -403,3 +403,97 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     expect(planListRequests.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", () => {
+  test("ADMIN vê o gráfico composto, alterna Semana/Mês e lê os valores exatos no tooltip", async ({
+    page,
+  }) => {
+    await loginAs(page, "ADMIN", {
+      id: "cccccccc-1111-0000-0000-000000000009",
+      fullName: "Admin E2E",
+      email: "admin@example.com",
+      cpf: "11122233344",
+      role: "ADMIN",
+      dateOfBirth: null,
+    });
+
+    const plan = {
+      ...planFor(PRODUCER_ANA.id, "Berinjela"),
+      id: "plan-continuo-1",
+      plantedArea: 1,
+      expectedProductivity: 1800,
+      expectedHarvestStart: "2026-05-04",
+      expectedHarvestEnd: "2026-06-29",
+    };
+    plan.crop = { ...plan.crop, harvestType: "CONTINUOUS", unit: "KG" };
+
+    const execution = (id: string, harvestedAt: string, kg: number, status: string) => ({
+      id,
+      productionPlanId: plan.id,
+      quantity: kg,
+      quantityKg: kg,
+      harvestedAt,
+      status,
+      notes: null,
+      createdAt: "2026-05-06T10:00:00Z",
+    });
+
+    await page.route(`**/communities/${COMMUNITY_A.id}`, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(COMMUNITY_A) }),
+    );
+    await page.route("**/farmers*", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCER_ANA]) }),
+    );
+    await page.route(`**/production-plans/${plan.id}`, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(plan) }),
+    );
+    await page.route(`**/production-plans/${plan.id}/comparison`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          productionPlanId: plan.id,
+          expectedYield: 1800,
+          totalActualYield: 105,
+          difference: -1695,
+          percentageRealized: 5.83,
+        }),
+      }),
+    );
+    await page.route(`**/production-plans/${plan.id}/executions`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          execution("ex-1", "2026-05-05", 105, "VALIDATED"),
+          execution("ex-2", "2026-06-02", 40, "PENDING"),
+        ]),
+      }),
+    );
+
+    await page.goto(
+      `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}/planos/${plan.id}`,
+    );
+
+    const chart = page.getByRole("img", { name: /^Previsto 1\.800 kg/ });
+    await expect(chart).toBeVisible();
+    await expect(chart).toHaveAttribute("data-mode", "composite");
+    await expect(chart).toHaveAttribute("data-granularity", "WEEK");
+
+    // Tooltip da primeira semana (04/05/2026): valores exatos em kg.
+    // O gráfico é um canvas: o tooltip abre ao passar o mouse sobre o 1º período.
+    await chart.hover({ position: { x: 90, y: 150 } });
+    const tooltip = page.getByTestId("harvest-chart-tooltip");
+    await expect(tooltip).toContainText("Semana de 04/05/2026");
+    await expect(tooltip).toContainText("Previsto: 221,05 kg");
+    await expect(tooltip).toContainText("Validado: 105 kg");
+    await expect(tooltip).toContainText("Pendente: 0 kg");
+
+    await page.getByRole("button", { name: "Mês" }).click();
+    await expect(page.getByRole("img", { name: /^Previsto 1\.800 kg/ })).toHaveAttribute(
+      "data-granularity",
+      "MONTH",
+    );
+    await expect(page.getByRole("button", { name: "Mês" })).toHaveAttribute("aria-pressed", "true");
+  });
+});
