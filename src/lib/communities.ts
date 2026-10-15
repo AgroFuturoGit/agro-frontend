@@ -4,7 +4,11 @@ import {
   type Organization,
   type OrganizationApiResponse,
 } from "@/lib/organizations";
-import type { Producer } from "@/lib/producers";
+import {
+  mapProducer,
+  type Producer,
+  type ProducerApiResponse,
+} from "@/lib/producers";
 
 export type Community = {
   id: string;
@@ -22,29 +26,24 @@ export type CommunityPayload = {
   name: string;
 };
 
+/** `FarmerRegisterDTO`: só `fullName` e `cpf` são obrigatórios no back. */
 export type ProducerRegisterPayload = {
   fullName: string;
-  email: string;
-  password: string;
   cpf: string;
-  dateOfBirth: string;
-  aliasName?: string;
-};
-
-type ProducerRegisterApiResponse = {
-  id: string;
-  aliasName: string | null;
-  isCompliant: boolean | null;
-  user: {
-    id: string;
-    fullName: string;
-    email: string;
-    cpf: string;
-  } | null;
-  community: {
-    id: string;
-    name: string;
-  } | null;
+  email?: string;
+  password?: string;
+  dateOfBirth?: string;
+  motherName?: string;
+  origin?: string;
+  educationLevel?: string;
+  phone?: string;
+  localName?: string;
+  street?: string;
+  city?: string;
+  state?: string;
+  ibgeCode?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 export function mapCommunity(raw: CommunityApiResponse): Community {
@@ -117,36 +116,13 @@ export function registerProducer(
   communityId: string,
   payload: ProducerRegisterPayload,
 ): Promise<Producer> {
-  return apiRequest<ProducerRegisterApiResponse>(
+  return apiRequest<ProducerApiResponse>(
     `/communities/${communityId}/farmers`,
     {
       method: "POST",
       body: payload,
     },
-  ).then((raw) => ({
-    id: raw.id,
-    aliasName: raw.aliasName ?? null,
-    isCompliant: raw.isCompliant ?? null,
-    user: raw.user
-      ? {
-          id: raw.user.id,
-          fullName: raw.user.fullName,
-          email: raw.user.email,
-          cpf: raw.user.cpf,
-        }
-      : null,
-    community: raw.community
-      ? {
-          id: raw.community.id,
-          name: raw.community.name,
-          // O DTO de resposta do registro não é usado como fonte da
-          // organização em nenhum fluxo (só a confirmação de cadastro exibe
-          // o nome da comunidade) — evita depender de um shape que este
-          // endpoint pode não devolver de forma estável.
-          organization: null,
-        }
-      : null,
-  }));
+  ).then(mapProducer);
 }
 
 // Backend retorna erros de validação como: "name: msg"

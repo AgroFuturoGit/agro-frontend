@@ -43,7 +43,7 @@ import {
   type Organization,
   type OrganizationType,
 } from "@/lib/organizations";
-import { getMyProducer, type Producer } from "@/lib/producers";
+import { getMyProducer, type Producer, producerDisplayName } from "@/lib/producers";
 import { getMyAssignedProducers } from "@/lib/technicians";
 
 import { ManagerRegisterDrawer } from "./manager-register-drawer";
@@ -207,8 +207,8 @@ export function OrganizationsPage() {
   const sortedAssignedProducers = useMemo(
     () =>
       [...assignedProducers].sort((a, b) =>
-        (a.user?.fullName ?? a.aliasName ?? "").localeCompare(
-          b.user?.fullName ?? b.aliasName ?? "",
+        producerDisplayName(a, "").localeCompare(
+          producerDisplayName(b, ""),
         ),
       ),
     [assignedProducers],
@@ -450,7 +450,7 @@ export function OrganizationsPage() {
                   const community = producer.community;
                   const organization = community?.organization;
                   const name =
-                    producer.user?.fullName ?? producer.aliasName ?? "—";
+                    producerDisplayName(producer, "—");
 
                   return (
                     <TableRow key={producer.id}>

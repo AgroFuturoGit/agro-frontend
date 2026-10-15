@@ -30,7 +30,7 @@ import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
 import { formatCpf } from "@/lib/cpf";
 import { getMyManager } from "@/lib/managers";
-import { listProducers, type Producer } from "@/lib/producers";
+import { listProducers, type Producer, producerDisplayName } from "@/lib/producers";
 
 import { DeleteProducerDialog } from "../producers/delete-producer-dialog";
 import { ProducerFormDrawer } from "../producers/producer-form-drawer";
@@ -52,7 +52,8 @@ function producersGlobalFilter(
     producer.user?.fullName,
     producer.user?.email,
     producer.user?.cpf,
-    producer.aliasName,
+    producer.fullName,
+    producer.localName,
   ].some((value) => value?.toLowerCase().includes(query));
 }
 
@@ -167,7 +168,7 @@ export function CommunityProducersPage({ communityId }: Props) {
 
   const columns = useMemo(() => {
     const baseColumns = [
-      columnHelper.accessor((producer) => producer.user?.fullName ?? producer.aliasName ?? "", {
+      columnHelper.accessor((producer) => producerDisplayName(producer, ""), {
         id: "fullName",
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
@@ -177,7 +178,7 @@ export function CommunityProducersPage({ communityId }: Props) {
             href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${row.original.id}`}
             className="font-medium text-foreground hover:underline"
           >
-            {row.original.user?.fullName ?? row.original.aliasName ?? "—"}
+            {producerDisplayName(row.original, "—")}
           </Link>
         ),
       }),
@@ -191,8 +192,8 @@ export function CommunityProducersPage({ communityId }: Props) {
           </span>
         ),
       }),
-      columnHelper.accessor("aliasName", {
-        header: "Apelido",
+      columnHelper.accessor("localName", {
+        header: "Endereço/Nome local",
         enableSorting: false,
         cell: (info) => (
           <span className="text-muted-foreground">{info.getValue() ?? "—"}</span>
@@ -264,7 +265,7 @@ export function CommunityProducersPage({ communityId }: Props) {
               href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producer.id}`}
               className="font-medium text-foreground hover:underline"
             >
-              {producer.user?.fullName ?? producer.aliasName ?? "—"}
+              {producerDisplayName(producer, "—")}
             </Link>
             <p className="mt-1 font-mono text-xs text-muted-foreground">
               {producer.user?.cpf ? formatCpf(producer.user.cpf) : "—"}

@@ -86,7 +86,23 @@ const MY_MANAGER: Manager = {
 
 const PRODUCER_ALFA: Producer = {
   id: "producer-1",
-  aliasName: null,
+  fullName: null,
+  cpf: null,
+  dateOfBirth: null,
+  motherName: null,
+  origin: null,
+  educationLevel: null,
+  phone: null,
+  localName: null,
+  street: null,
+  city: null,
+  state: null,
+  ibgeCode: null,
+  latitude: null,
+  longitude: null,
+  registrationSource: null,
+  createdAt: null,
+  updatedAt: null,
   isCompliant: true,
   user: {
     id: "user-1",
@@ -131,6 +147,29 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
     expect(await screen.findByText("Ana Alves")).toBeTruthy();
     expect(listProducers).toHaveBeenCalledExactlyOnceWith("community-alfa");
     expect(screen.getByRole("button", { name: "Novo Agricultor" })).toBeTruthy();
+  });
+
+  it("UNIT-002: usa o nome do agricultor (BR-001), cai para o do usuário e mostra o nome local", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([
+      { ...PRODUCER_ALFA, fullName: "Ana do Sítio", localName: "Sítio Boa Vista" },
+      {
+        ...PRODUCER_ALFA,
+        id: "producer-2",
+        fullName: null,
+        user: { ...PRODUCER_ALFA.user!, id: "user-2", fullName: "Bruno Usuário" },
+      },
+    ]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    expect(await screen.findByText("Ana do Sítio")).toBeTruthy();
+    expect(screen.getByText("Bruno Usuário")).toBeTruthy();
+    expect(screen.queryByText("Ana Alves")).toBeNull();
+    expect(screen.getByText("Sítio Boa Vista")).toBeTruthy();
+    expect(
+      screen.getByRole("columnheader", { name: /Endereço\/Nome local/ }),
+    ).toBeTruthy();
   });
 
   it("MANAGER: comunidade da própria organização é exibida normalmente", async () => {

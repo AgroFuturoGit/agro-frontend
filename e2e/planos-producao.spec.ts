@@ -89,7 +89,7 @@ const COMMUNITY_B = {
 
 const PRODUCER_ANA = {
   id: "eeeeeeee-1111-0000-0000-00000000000a",
-  aliasName: null,
+  fullName: "Ana Serrana",
   isCompliant: true,
   user: {
     id: "ffffffff-1111-0000-0000-00000000000a",
@@ -102,7 +102,7 @@ const PRODUCER_ANA = {
 
 const PRODUCER_BRUNO = {
   id: "eeeeeeee-1111-0000-0000-00000000000b",
-  aliasName: null,
+  fullName: "Bruno do Vale",
   isCompliant: false,
   user: {
     id: "ffffffff-1111-0000-0000-00000000000b",
