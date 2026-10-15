@@ -1,0 +1,323 @@
+{
+  "schema_version": 1,
+  "id": "E2E-001",
+  "title": "Cadastrar e editar cultura sem perder os campos agronômicos",
+  "description": "Admin cria uma cultura com produtividade, tipo de colheita, unidade e peso; depois edita só o nome e confirma que os demais campos continuam preenchidos (o PATCH substitui tudo).",
+  "feature_slug": "alinhar-contrato-producao-agricultural-core",
+  "ac_refs": [
+    "AC-007",
+    "AC-008"
+  ],
+  "priority": "P0",
+  "tags": [
+    "culturas",
+    "contrato-backend"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Nenhuma cultura chamada 'Tomate E2E' cadastrada"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_ADMIN_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "Senha",
+        "exact": true
+      },
+      "value": "${env:E2E_ADMIN_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    },
+    {
+      "action": "goto",
+      "value": "/admin/culturas"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Criar cultura BOX de 20 kg e editar só o nome",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Nova cultura"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome da cultura"
+          },
+          "value": "Tomate E2E"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Variedade"
+          },
+          "value": "Italiano"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Produtividade esperada (kg/ha)"
+          },
+          "value": "1500"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Tipo de colheita"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "Colheita contínua"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Unidade"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "Caixa"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Peso da unidade (kg)"
+          },
+          "value": "20"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "placeholder",
+            "value": "Buscar por nome ou variedade…"
+          },
+          "value": "Tomate E2E"
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 1200,
+          "note": "debounce da busca da tabela"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar cultura"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome da cultura"
+          },
+          "value": "Tomate E2E Editado"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar alterações"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "placeholder",
+            "value": "Buscar por nome ou variedade…"
+          },
+          "value": "Tomate E2E Editado"
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 1200,
+          "note": "debounce da busca da tabela"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar cultura"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "value",
+          "target": {
+            "by": "label",
+            "value": "Nome da cultura"
+          },
+          "value": "Tomate E2E Editado"
+        },
+        {
+          "expect": "value",
+          "target": {
+            "by": "label",
+            "value": "Produtividade esperada (kg/ha)"
+          },
+          "value": "1500"
+        },
+        {
+          "expect": "value",
+          "target": {
+            "by": "label",
+            "value": "Peso da unidade (kg)"
+          },
+          "value": "20"
+        },
+        {
+          "expect": "text",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Unidade"
+          },
+          "value": "Caixa"
+        }
+      ]
+    },
+    {
+      "name": "validation_error",
+      "title": "Enviar cultura sem produtividade, tipo de colheita e unidade",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Nova cultura"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome da cultura"
+          },
+          "value": "Soja E2E"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Variedade"
+          },
+          "value": "Convencional"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Informe uma produtividade maior que zero"
+          }
+        },
+        {
+          "expect": "count",
+          "target": {
+            "by": "css",
+            "value": "p.text-destructive"
+          },
+          "value": 3,
+          "note": "produtividade, tipo de colheita e unidade"
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "forbidden": "A permissão de escrita de culturas não muda neste PR; o RBAC já é coberto por e2e/rbac.spec.ts.",
+    "empty_state": "O estado vazio da listagem de culturas não foi alterado."
+  }
+}

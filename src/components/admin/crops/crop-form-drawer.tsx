@@ -15,12 +15,27 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ApiError } from "@/lib/api";
 import {
+  HARVEST_TYPES,
+  HARVEST_TYPE_LABELS,
+  MEASUREMENT_UNITS,
+  UNIT_NAMES,
   createCrop,
   parseCropFieldErrors,
+  parseHarvestType,
+  parseMeasurementUnit,
   updateCrop,
   type Crop,
+  type CropWritePayload,
+  type MeasurementUnit,
 } from "@/lib/crops";
 
 type Mode = "create" | "edit";
@@ -37,13 +52,43 @@ type FormValues = {
   name: string;
   variety: string;
   isPriority: boolean;
+  cycleDays: string;
+  expectedProductivity: string;
+  harvestType: string;
+  unit: string;
+  unitWeightKg: string;
 };
 
 const EMPTY: FormValues = {
   name: "",
   variety: "",
   isPriority: false,
+  cycleDays: "",
+  expectedProductivity: "",
+  harvestType: "",
+  unit: "",
+  unitWeightKg: "",
 };
+
+/** KG e TON têm peso fixo (1 e 1000); SACK/BOX exigem o peso informado. */
+const FIXED_UNIT_WEIGHT: Partial<Record<MeasurementUnit, string>> = {
+  KG: "1",
+  TON: "1000",
+};
+
+function toFormValues(crop: Crop): FormValues {
+  return {
+    name: crop.name,
+    variety: crop.variety,
+    isPriority: crop.isPriority,
+    cycleDays: crop.cycleDays === null ? "" : String(crop.cycleDays),
+    expectedProductivity:
+      crop.expectedProductivity === null ? "" : String(crop.expectedProductivity),
+    harvestType: crop.harvestType ?? "",
+    unit: crop.unit ?? "",
+    unitWeightKg: crop.unitWeightKg === null ? "" : String(crop.unitWeightKg),
+  };
+}
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) return "—";
@@ -59,28 +104,88 @@ function formatDateTime(value: string | null | undefined): string {
 }
 
 function validateField(field: keyof FormValues, value: FormValues): string | null {
-  if (field === "isPriority") return null;
-  const trimmed = value[field].trim();
-  if (!trimmed) {
-    return field === "name"
-      ? "Informe o nome da cultura"
-      : "Informe a variedade";
+  switch (field) {
+    case "name":
+    case "variety": {
+      const trimmed = value[field].trim();
+      if (trimmed.length < 2) {
+        return field === "name"
+          ? "Informe o nome da cultura"
+          : "Informe a variedade";
+      }
+      return null;
+    }
+    case "cycleDays": {
+      if (!value.cycleDays.trim()) return null; // opcional
+      const days = Number(value.cycleDays);
+      if (!Number.isInteger(days) || days <= 0) {
+        return "Informe um número inteiro de dias maior que zero";
+      }
+      return null;
+    }
+    case "expectedProductivity": {
+      const productivity = Number(value.expectedProductivity);
+      if (
+        !value.expectedProductivity.trim() ||
+        !Number.isFinite(productivity) ||
+        productivity <= 0
+      ) {
+        return "Informe uma produtividade maior que zero";
+      }
+      return null;
+    }
+    case "harvestType":
+      return parseHarvestType(value.harvestType)
+        ? null
+        : "Selecione o tipo de colheita";
+    case "unit":
+      return parseMeasurementUnit(value.unit) ? null : "Selecione a unidade";
+    case "unitWeightKg": {
+      const unit = parseMeasurementUnit(value.unit);
+      if (unit !== "SACK" && unit !== "BOX") return null;
+      const weight = Number(value.unitWeightKg);
+      if (!value.unitWeightKg.trim() || !Number.isFinite(weight) || weight <= 0) {
+        return "Informe o peso da unidade (maior que zero)";
+      }
+      return null;
+    }
+    default:
+      return null;
   }
-  if (trimmed.length < 2) {
-    return field === "name"
-      ? "Informe o nome da cultura"
-      : "Informe a variedade";
-  }
-  return null;
 }
+
+const VALIDATED_FIELDS: (keyof FormValues)[] = [
+  "name",
+  "variety",
+  "cycleDays",
+  "expectedProductivity",
+  "harvestType",
+  "unit",
+  "unitWeightKg",
+];
 
 function validateAll(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
-  const nameError = validateField("name", values);
-  const varietyError = validateField("variety", values);
-  if (nameError) errors.name = nameError;
-  if (varietyError) errors.variety = varietyError;
+  for (const field of VALIDATED_FIELDS) {
+    const error = validateField(field, values);
+    if (error) errors[field] = error;
+  }
   return errors;
+}
+
+function buildPayload(values: FormValues): CropWritePayload {
+  const unit = parseMeasurementUnit(values.unit);
+  const fixedWeight = unit ? FIXED_UNIT_WEIGHT[unit] : undefined;
+  return {
+    name: values.name.trim(),
+    variety: values.variety.trim(),
+    isPriority: values.isPriority,
+    cycleDays: values.cycleDays.trim() ? Number(values.cycleDays) : null,
+    expectedProductivity: Number(values.expectedProductivity),
+    harvestType: parseHarvestType(values.harvestType),
+    unit,
+    unitWeightKg: Number(fixedWeight ?? values.unitWeightKg),
+  };
 }
 
 export function CropFormDrawer({
@@ -102,11 +207,7 @@ export function CropFormDrawer({
     setFormError(null);
     setFieldErrors({});
     if (mode === "edit" && crop) {
-      const next = {
-        name: crop.name,
-        variety: crop.variety,
-        isPriority: crop.isPriority,
-      };
+      const next = toFormValues(crop);
       setValues(next);
       setInitialValues(next);
     } else {
@@ -117,11 +218,13 @@ export function CropFormDrawer({
 
   const isDirty = useMemo(() => {
     if (mode !== "edit") return true;
-    return (
-      values.name.trim() !== initialValues.name.trim() ||
-      values.variety.trim() !== initialValues.variety.trim() ||
-      values.isPriority !== initialValues.isPriority
-    );
+    return (Object.keys(values) as (keyof FormValues)[]).some((key) => {
+      const current = values[key];
+      const initial = initialValues[key];
+      return typeof current === "string" && typeof initial === "string"
+        ? current.trim() !== initial.trim()
+        : current !== initial;
+    });
   }, [mode, values, initialValues]);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
@@ -133,6 +236,29 @@ export function CropFormDrawer({
         return next;
       });
     }
+    if (formError) setFormError(null);
+  }
+
+  function handleUnitChange(next: string) {
+    const unit = parseMeasurementUnit(next);
+    setValues((prev) => {
+      const fixed = unit ? FIXED_UNIT_WEIGHT[unit] : undefined;
+      const prevUnit = parseMeasurementUnit(prev.unit);
+      const prevWasFixed = prevUnit ? FIXED_UNIT_WEIGHT[prevUnit] !== undefined : true;
+      return {
+        ...prev,
+        unit: next,
+        // KG/TON preenchem o peso sozinhos; ao sair de um fixo para
+        // SACK/BOX o campo começa vazio para o usuário informar.
+        unitWeightKg: fixed ?? (prevWasFixed ? "" : prev.unitWeightKg),
+      };
+    });
+    setFieldErrors((prev) => {
+      const nextErrors = { ...prev };
+      delete nextErrors.unit;
+      delete nextErrors.unitWeightKg;
+      return nextErrors;
+    });
     if (formError) setFormError(null);
   }
 
@@ -158,11 +284,8 @@ export function CropFormDrawer({
 
     setSubmitting(true);
     try {
-      const payload = {
-        name: values.name.trim(),
-        variety: values.variety.trim(),
-        isPriority: values.isPriority,
-      };
+      // O PATCH substitui tudo: SEMPRE envia os 8 campos de escrita.
+      const payload = buildPayload(values);
       if (mode === "create") {
         await createCrop(payload);
       } else if (crop) {
@@ -186,6 +309,9 @@ export function CropFormDrawer({
   }
 
   const isCreate = mode === "create";
+  const selectedUnit = parseMeasurementUnit(values.unit);
+  const unitWeightLocked =
+    selectedUnit !== null && FIXED_UNIT_WEIGHT[selectedUnit] !== undefined;
   const title = isCreate ? "Nova cultura" : "Editar cultura";
   const description = isCreate
     ? "Cadastre uma nova cultura agrícola."
@@ -254,6 +380,140 @@ export function CropFormDrawer({
               {fieldErrors.variety && (
                 <p className="text-sm text-destructive">{fieldErrors.variety}</p>
               )}
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="crop-productivity">
+                  Produtividade esperada (kg/ha)
+                </Label>
+                <Input
+                  id="crop-productivity"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0.01"
+                  value={values.expectedProductivity}
+                  onChange={(e) => update("expectedProductivity", e.target.value)}
+                  onBlur={() => handleBlur("expectedProductivity")}
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.expectedProductivity)}
+                />
+                {fieldErrors.expectedProductivity && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.expectedProductivity}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="crop-cycle">Ciclo (dias) — opcional</Label>
+                <Input
+                  id="crop-cycle"
+                  type="number"
+                  inputMode="numeric"
+                  step="1"
+                  min="1"
+                  value={values.cycleDays}
+                  onChange={(e) => update("cycleDays", e.target.value)}
+                  onBlur={() => handleBlur("cycleDays")}
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.cycleDays)}
+                />
+                {fieldErrors.cycleDays && (
+                  <p className="text-sm text-destructive">{fieldErrors.cycleDays}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="crop-harvest-type">Tipo de colheita</Label>
+              <Select
+                value={values.harvestType}
+                onValueChange={(v) => update("harvestType", v ?? "")}
+                disabled={submitting}
+              >
+                <SelectTrigger
+                  id="crop-harvest-type"
+                  className="w-full"
+                  aria-invalid={Boolean(fieldErrors.harvestType)}
+                >
+                  <SelectValue placeholder="Selecione o tipo de colheita">
+                    {(v) => {
+                      const type = parseHarvestType(v);
+                      return type
+                        ? HARVEST_TYPE_LABELS[type]
+                        : "Selecione o tipo de colheita";
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {HARVEST_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {HARVEST_TYPE_LABELS[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {fieldErrors.harvestType && (
+                <p className="text-sm text-destructive">{fieldErrors.harvestType}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="crop-unit">Unidade</Label>
+                <Select
+                  value={values.unit}
+                  onValueChange={(v) => handleUnitChange(v ?? "")}
+                  disabled={submitting}
+                >
+                  <SelectTrigger
+                    id="crop-unit"
+                    className="w-full"
+                    aria-invalid={Boolean(fieldErrors.unit)}
+                  >
+                    <SelectValue placeholder="Selecione a unidade">
+                      {(v) => {
+                        const unit = parseMeasurementUnit(v);
+                        return unit ? UNIT_NAMES[unit] : "Selecione a unidade";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MEASUREMENT_UNITS.map((unit) => (
+                      <SelectItem key={unit} value={unit}>
+                        {UNIT_NAMES[unit]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {fieldErrors.unit && (
+                  <p className="text-sm text-destructive">{fieldErrors.unit}</p>
+                )}
+              </div>
+
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="crop-unit-weight">Peso da unidade (kg)</Label>
+                <Input
+                  id="crop-unit-weight"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0.01"
+                  value={values.unitWeightKg}
+                  onChange={(e) => update("unitWeightKg", e.target.value)}
+                  onBlur={() => handleBlur("unitWeightKg")}
+                  readOnly={unitWeightLocked}
+                  disabled={submitting}
+                  aria-invalid={Boolean(fieldErrors.unitWeightKg)}
+                />
+                {fieldErrors.unitWeightKg && (
+                  <p className="text-sm text-destructive">
+                    {fieldErrors.unitWeightKg}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2">

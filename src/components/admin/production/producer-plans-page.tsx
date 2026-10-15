@@ -31,6 +31,7 @@ import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getMyProducer, listProducers } from "@/lib/producers";
 import {
+  PLAN_STATUS_LABELS,
   formatNumber,
   formatPlanDate,
   listProductionPlans,
@@ -309,12 +310,23 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       columnHelper.accessor("expectedYield", {
         header: ({ column }) => (
           <div className="flex justify-end">
-            <DataTableColumnHeader column={column} title="Previsto (t)" disabled={loading} />
+            <DataTableColumnHeader column={column} title="Meta (kg)" disabled={loading} />
           </div>
         ),
+        // Plano legado sem produtividade => meta 0 => "—".
         cell: (info) => (
           <span className="block text-right tabular-nums">
-            {formatNumber(info.getValue())}
+            {info.getValue() > 0 ? formatNumber(info.getValue()) : "—"}
+          </span>
+        ),
+      }),
+      columnHelper.accessor((plan) => plan.status ?? "", {
+        id: "status",
+        header: "Status",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">
+            {row.original.status ? PLAN_STATUS_LABELS[row.original.status] : "—"}
           </span>
         ),
       }),
@@ -403,7 +415,10 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
             </p>
             <p className="mt-1 text-sm tabular-nums">
               {formatNumber(plan.plantedArea)} ha ·{" "}
-              {formatNumber(plan.expectedYield)} t previstas
+              {plan.expectedYield > 0
+                ? `${formatNumber(plan.expectedYield)} kg de meta`
+                : "Sem meta"}
+              {plan.status && <> · {PLAN_STATUS_LABELS[plan.status]}</>}
             </p>
           </div>
           {canWrite && (

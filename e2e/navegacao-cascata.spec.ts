@@ -100,6 +100,12 @@ const PLAN = {
     id: "ffffffff-2222-0000-0000-000000000001",
     name: "Café",
     variety: "Catuaí",
+    isPriority: false,
+    cycleDays: 240,
+    expectedProductivity: 2500,
+    harvestType: "SINGLE",
+    unit: "SACK",
+    unitWeightKg: 60,
   },
   harvest: {
     id: "00000000-2222-0000-0000-000000000001",
@@ -108,16 +114,19 @@ const PLAN = {
     endDate: "2026-12-31",
   },
   plantedArea: 10,
-  expectedYield: 25,
+  status: "ACTIVE",
+  expectedHarvestStart: "2026-05-01",
+  expectedHarvestEnd: "2026-06-30",
+  expectedProductivity: 2500,
   plannedPlantingDate: "2026-09-01",
   createdAt: "2026-08-01T10:00:00Z",
 };
 
 const COMPARISON = {
   productionPlanId: PLAN.id,
-  expectedYield: 25,
-  totalActualYield: 10,
-  difference: -15,
+  expectedYield: 25000,
+  totalActualYield: 10000,
+  difference: -15000,
   percentageRealized: 40,
 };
 

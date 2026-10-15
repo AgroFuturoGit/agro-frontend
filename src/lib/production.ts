@@ -1,11 +1,29 @@
 import { apiRequest } from "@/lib/api";
+import { mapCrop, type Crop } from "@/lib/crops";
 
 // ----- Tipos de domínio (front) -----
 
-export type PlanCrop = {
-  id: string;
-  name: string;
-  variety: string;
+export type PlanStatus = "PLANNED" | "ACTIVE" | "FINISHED" | "CANCELED";
+export type ExecutionStatus = "PENDING" | "VALIDATED" | "REJECTED";
+
+export const PLAN_STATUSES: PlanStatus[] = [
+  "PLANNED",
+  "ACTIVE",
+  "FINISHED",
+  "CANCELED",
+];
+
+export const PLAN_STATUS_LABELS: Record<PlanStatus, string> = {
+  PLANNED: "Planejado",
+  ACTIVE: "Ativo",
+  FINISHED: "Finalizado",
+  CANCELED: "Cancelado",
+};
+
+export const EXECUTION_STATUS_LABELS: Record<ExecutionStatus, string> = {
+  PENDING: "Pendente",
+  VALIDATED: "Validado",
+  REJECTED: "Rejeitado",
 };
 
 export type PlanHarvest = {
@@ -17,9 +35,15 @@ export type PlanHarvest = {
 
 export type ProductionPlan = {
   id: string;
-  crop: PlanCrop | null;
+  crop: Crop | null;
   harvest: PlanHarvest | null;
   plantedArea: number;
+  status: PlanStatus | null;
+  expectedHarvestStart: string | null;
+  expectedHarvestEnd: string | null;
+  /** Produtividade copiada da cultura na criação (kg/ha, assumido). */
+  expectedProductivity: number | null;
+  /** Meta derivada em kg: `plantedArea × expectedProductivity` (0 se ausente). */
   expectedYield: number;
   plannedPlantingDate: string | null;
   createdAt: string | null;
@@ -28,8 +52,11 @@ export type ProductionPlan = {
 export type ProductionExecution = {
   id: string;
   productionPlanId: string;
-  actualYield: number;
-  harvestDate: string | null;
+  quantity: number;
+  quantityKg: number;
+  harvestedAt: string | null;
+  status: ExecutionStatus | null;
+  notes: string | null;
   createdAt: string | null;
 };
 
@@ -43,30 +70,39 @@ export type ProductionComparison = {
 
 // ----- Payloads -----
 
+// ProductionPlanRegisterDTO — a produtividade é copiada da cultura no back.
 export type ProductionPlanCreatePayload = {
   harvestId: string;
   cropId: string;
   plantedArea: number;
-  expectedYield: number;
+  expectedHarvestStart?: string | null;
+  expectedHarvestEnd?: string | null;
   plannedPlantingDate?: string | null;
 };
 
+// ProductionPlanUpdateDTO — campo null = "manter valor atual".
 export type ProductionPlanUpdatePayload = {
   plantedArea: number;
-  expectedYield: number;
+  status?: PlanStatus | null;
+  expectedHarvestStart?: string | null;
+  expectedHarvestEnd?: string | null;
+  expectedProductivity?: number | null;
   plannedPlantingDate?: string | null;
 };
 
+// Nunca inclui status/validatedBy/validatedAt: a validação não é do front.
 export type ProductionExecutionWritePayload = {
-  actualYield: number;
-  harvestDate: string;
+  quantity: number;
+  quantityKg: number;
+  harvestedAt: string;
+  notes?: string | null;
 };
 
 // ----- Tipos de resposta da API -----
 
 type PlanApiResponse = {
   id: string;
-  crop: { id: string; name: string; variety: string } | null;
+  crop: Parameters<typeof mapCrop>[0] | null;
   harvest: {
     id: string;
     label: string;
@@ -74,7 +110,10 @@ type PlanApiResponse = {
     endDate: string | null;
   } | null;
   plantedArea: number | string;
-  expectedYield: number | string;
+  status?: string | null;
+  expectedHarvestStart?: string | null;
+  expectedHarvestEnd?: string | null;
+  expectedProductivity?: number | string | null;
   plannedPlantingDate: string | null;
   createdAt: string | null;
 };
@@ -82,9 +121,12 @@ type PlanApiResponse = {
 type ExecutionApiResponse = {
   id: string;
   productionPlanId: string;
-  actualYield: number | string;
-  harvestDate: string | null;
-  createdAt: string | null;
+  quantity: number | string;
+  quantityKg: number | string;
+  harvestedAt: string | null;
+  status?: string | null;
+  notes?: string | null;
+  createdAt?: string | null;
 };
 
 type ComparisonApiResponse = {
@@ -101,12 +143,30 @@ function num(value: number | string | null | undefined): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function numOrNull(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parsePlanStatus(value: unknown): PlanStatus | null {
+  return PLAN_STATUSES.includes(value as PlanStatus)
+    ? (value as PlanStatus)
+    : null;
+}
+
+function parseExecutionStatus(value: unknown): ExecutionStatus | null {
+  return value === "PENDING" || value === "VALIDATED" || value === "REJECTED"
+    ? value
+    : null;
+}
+
 function mapPlan(raw: PlanApiResponse): ProductionPlan {
+  const plantedArea = num(raw.plantedArea);
+  const expectedProductivity = numOrNull(raw.expectedProductivity);
   return {
     id: raw.id,
-    crop: raw.crop
-      ? { id: raw.crop.id, name: raw.crop.name, variety: raw.crop.variety }
-      : null,
+    crop: raw.crop ? mapCrop(raw.crop) : null,
     harvest: raw.harvest
       ? {
           id: raw.harvest.id,
@@ -115,8 +175,12 @@ function mapPlan(raw: PlanApiResponse): ProductionPlan {
           endDate: raw.harvest.endDate ?? null,
         }
       : null,
-    plantedArea: num(raw.plantedArea),
-    expectedYield: num(raw.expectedYield),
+    plantedArea,
+    status: parsePlanStatus(raw.status),
+    expectedHarvestStart: raw.expectedHarvestStart ?? null,
+    expectedHarvestEnd: raw.expectedHarvestEnd ?? null,
+    expectedProductivity,
+    expectedYield: plantedArea * (expectedProductivity ?? 0),
     plannedPlantingDate: raw.plannedPlantingDate ?? null,
     createdAt: raw.createdAt ?? null,
   };
@@ -126,8 +190,11 @@ function mapExecution(raw: ExecutionApiResponse): ProductionExecution {
   return {
     id: raw.id,
     productionPlanId: raw.productionPlanId,
-    actualYield: num(raw.actualYield),
-    harvestDate: raw.harvestDate ?? null,
+    quantity: num(raw.quantity),
+    quantityKg: num(raw.quantityKg),
+    harvestedAt: raw.harvestedAt ?? null,
+    status: parseExecutionStatus(raw.status),
+    notes: raw.notes ?? null,
     createdAt: raw.createdAt ?? null,
   };
 }

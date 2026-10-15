@@ -31,12 +31,47 @@ type RawCrop = {
   name: string;
   variety: string;
   isPriority: boolean;
+  cycleDays: number | null;
+  expectedProductivity: number | null;
+  harvestType: "SINGLE" | "CONTINUOUS" | null;
+  unit: "KG" | "TON" | "SACK" | "BOX" | null;
+  unitWeightKg: number | null;
 };
 
 const CROPS: RawCrop[] = [
-  { id: "c-1", name: "Soja", variety: "Convencional", isPriority: true },
-  { id: "c-2", name: "Milho", variety: "Transgênico", isPriority: false },
-  { id: "c-3", name: "Trigo", variety: "Precoce", isPriority: false },
+  {
+    id: "c-1",
+    name: "Soja",
+    variety: "Convencional",
+    isPriority: true,
+    cycleDays: 120,
+    expectedProductivity: 3200,
+    harvestType: "SINGLE",
+    unit: "SACK",
+    unitWeightKg: 60,
+  },
+  {
+    id: "c-2",
+    name: "Milho",
+    variety: "Transgênico",
+    isPriority: false,
+    cycleDays: null,
+    expectedProductivity: 6000,
+    harvestType: "SINGLE",
+    unit: "TON",
+    unitWeightKg: 1000,
+  },
+  {
+    id: "c-3",
+    name: "Trigo",
+    variety: "Precoce",
+    isPriority: false,
+    cycleDays: null,
+    expectedProductivity: null,
+    harvestType: null,
+    unit: null,
+    unitWeightKg: null,
+  },
 ];
 
 async function mockRole(role: Role | null) {
@@ -108,6 +143,19 @@ describe("CropsPage — listagem", () => {
 
     expect(screen.getByText("Milho")).toBeTruthy();
     expect(screen.getByText("Trigo")).toBeTruthy();
+  });
+
+  it("mostra tipo de colheita e unidade, com — para cultura legada sem esses dados", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    expect(screen.getAllByText("Colheita única").length).toBe(2);
+    expect(screen.getByText("Saca")).toBeTruthy();
+    expect(screen.getByText("Tonelada (t)")).toBeTruthy();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(2);
   });
 });
 

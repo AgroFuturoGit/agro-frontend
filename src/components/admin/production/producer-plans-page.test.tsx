@@ -86,7 +86,17 @@ const OTHER_PRODUCER: Producer = {
 const PLANS: ProductionPlan[] = [
   {
     id: "plan-1",
-    crop: { id: "crop-1", name: "Milho", variety: "BRS 1010" },
+    crop: {
+      id: "crop-1",
+      name: "Milho",
+      variety: "BRS 1010",
+      isPriority: false,
+      cycleDays: null,
+      expectedProductivity: 3200,
+      harvestType: "SINGLE",
+      unit: "SACK",
+      unitWeightKg: 60,
+    },
     harvest: {
       id: "harvest-1",
       label: "Safra 2025/2026",
@@ -94,7 +104,11 @@ const PLANS: ProductionPlan[] = [
       endDate: null,
     },
     plantedArea: 12.5,
-    expectedYield: 40,
+    status: "ACTIVE",
+    expectedHarvestStart: null,
+    expectedHarvestEnd: null,
+    expectedProductivity: 3200,
+    expectedYield: 40000,
     plannedPlantingDate: "2026-01-15",
     createdAt: null,
   },
@@ -149,6 +163,19 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     // Sem seletor de agricultor: o escopo vem da rota. (O único combobox da
     // tela é o "itens por página" da paginação.)
     expect(screen.queryByRole("combobox", { name: /agricultor|produtor/i })).toBeNull();
+  });
+
+  it("mostra a meta em kg e o status do plano (UNIT-015 / AC-016)", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    await screen.findByText("Milho — BRS 1010");
+    expect(screen.getByRole("columnheader", { name: /Meta \(kg\)/ })).toBeTruthy();
+    expect(screen.getByText("40.000")).toBeTruthy();
+    expect(screen.getByText("Ativo")).toBeTruthy();
+    expect(screen.queryByRole("columnheader", { name: /\(t\)/ })).toBeNull();
   });
 
   it("FARMER: acessando o próprio producerId, vê os planos normalmente", async () => {

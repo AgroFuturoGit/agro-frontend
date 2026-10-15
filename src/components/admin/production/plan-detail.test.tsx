@@ -71,7 +71,17 @@ vi.mock("@/lib/producers", async () => {
 
 const PLAN: ProductionPlan = {
   id: "plan-1",
-  crop: { id: "crop-1", name: "Milho", variety: "BRS 1010" },
+  crop: {
+    id: "crop-1",
+    name: "Milho",
+    variety: "BRS 1010",
+    isPriority: false,
+    cycleDays: 120,
+    expectedProductivity: 3200,
+    harvestType: "SINGLE",
+    unit: "BOX",
+    unitWeightKg: 20,
+  },
   harvest: {
     id: "harvest-1",
     label: "Safra 2025/2026",
@@ -79,16 +89,20 @@ const PLAN: ProductionPlan = {
     endDate: null,
   },
   plantedArea: 12.5,
-  expectedYield: 40,
+  status: "ACTIVE",
+  expectedHarvestStart: "2026-05-01",
+  expectedHarvestEnd: "2026-06-30",
+  expectedProductivity: 3200,
+  expectedYield: 40000,
   plannedPlantingDate: "2026-01-15",
   createdAt: null,
 };
 
 const COMPARISON: ProductionComparison = {
   productionPlanId: "plan-1",
-  expectedYield: 40,
-  totalActualYield: 18,
-  difference: -22,
+  expectedYield: 40000,
+  totalActualYield: 18000,
+  difference: -22000,
   percentageRealized: 45,
 };
 
@@ -96,8 +110,11 @@ const EXECUTIONS: ProductionExecution[] = [
   {
     id: "execution-1",
     productionPlanId: "plan-1",
-    actualYield: 18,
-    harvestDate: "2026-05-10",
+    quantity: 12,
+    quantityKg: 240,
+    harvestedAt: "2026-05-10",
+    status: "PENDING",
+    notes: null,
     createdAt: null,
   },
 ];
@@ -141,7 +158,7 @@ async function expectPlanIsReadable() {
   ).toBeTruthy();
   expect(screen.getByText(/Safra 2025\/2026/)).toBeTruthy();
   expect(screen.getByText("10/05/2026")).toBeTruthy();
-  expect(screen.getByText("18")).toBeTruthy();
+  expect(screen.getByText("12 caixas")).toBeTruthy();
 }
 
 /** As 4 ações de escrita da tela + a coluna que hospeda duas delas. */
@@ -397,8 +414,8 @@ describe("PlanDetail — tabela de apontamentos", () => {
   it("lista os apontamentos do mais recente para o mais antigo", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue([
-      { ...EXECUTIONS[0], id: "execution-a", harvestDate: "2026-04-02", actualYield: 5 },
-      { ...EXECUTIONS[0], id: "execution-b", harvestDate: "2026-06-20", actualYield: 7 },
+      { ...EXECUTIONS[0], id: "execution-a", harvestedAt: "2026-04-02", quantity: 5, quantityKg: 100 },
+      { ...EXECUTIONS[0], id: "execution-b", harvestedAt: "2026-06-20", quantity: 7, quantityKg: 140 },
       EXECUTIONS[0],
     ]);
 
@@ -439,5 +456,41 @@ describe("PlanDetail — tabela de apontamentos", () => {
     expect(
       screen.getByRole("button", { name: "Excluir apontamento" }),
     ).toBeTruthy();
+  });
+});
+
+describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
+  it("mostra quantidade com unidade, peso em kg, badge de status e o aviso de 'só validados'", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue([
+      EXECUTIONS[0],
+      { ...EXECUTIONS[0], id: "execution-2", harvestedAt: "2026-05-11", quantity: 1, quantityKg: 20, status: "VALIDATED" },
+      { ...EXECUTIONS[0], id: "execution-3", harvestedAt: "2026-05-12", status: "REJECTED" },
+    ]);
+
+    renderPlanDetail();
+
+    await screen.findAllByText("12 caixas");
+    expect(screen.getAllByText("12 caixas")).toHaveLength(2);
+    expect(screen.getByText("1 caixa")).toBeTruthy();
+    expect(screen.getAllByText("240")).toHaveLength(2);
+    expect(screen.getByRole("columnheader", { name: /Peso \(kg\)/ })).toBeTruthy();
+    expect(screen.getByText("Pendente")).toBeTruthy();
+    expect(screen.getByText("Validado")).toBeTruthy();
+    expect(screen.getByText("Rejeitado")).toBeTruthy();
+    expect(
+      screen.getByText(/Somente apontamentos validados contam no realizado/),
+    ).toBeTruthy();
+  });
+
+  it("meta, realizado e diferença aparecem em kg (nunca em t)", async () => {
+    loginAs("FARMER");
+
+    renderPlanDetail();
+
+    expect(await screen.findByText("40.000 kg")).toBeTruthy();
+    expect(screen.getByText("18.000 kg")).toBeTruthy();
+    expect(screen.getByText("-22.000 kg")).toBeTruthy();
+    expect(screen.queryByText(/\d t$/)).toBeNull();
   });
 });

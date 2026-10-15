@@ -14,14 +14,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
+import { unitLabel, type MeasurementUnit } from "@/lib/crops";
 import {
   deleteProductionExecution,
+  formatNumber,
   formatPlanDate,
   type ProductionExecution,
 } from "@/lib/production";
 
 type Props = {
   execution: ProductionExecution | null;
+  /** Unidade da cultura do plano, para exibir a quantidade (ex.: "12 caixas"). */
+  unit?: MeasurementUnit | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDeleted: () => void;
@@ -29,6 +33,7 @@ type Props = {
 
 export function DeleteExecutionDialog({
   execution,
+  unit = null,
   open,
   onOpenChange,
   onDeleted,
@@ -63,8 +68,16 @@ export function DeleteExecutionDialog({
           <AlertDialogDescription>
             Esta ação removerá o apontamento de{" "}
             <span className="font-medium text-foreground">
-              {formatPlanDate(execution?.harvestDate)}
-            </span>{" "}
+              {formatPlanDate(execution?.harvestedAt)}
+            </span>
+            {execution && (
+              <>
+                {" "}
+                (
+                {formatNumber(execution.quantity)}{" "}
+                {unitLabel(unit, execution.quantity)})
+              </>
+            )}{" "}
             do histórico de colheita. Não é possível desfazer.
           </AlertDialogDescription>
         </AlertDialogHeader>

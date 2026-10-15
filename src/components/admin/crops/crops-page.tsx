@@ -26,7 +26,12 @@ import { DataTablePagination } from "@/components/data-table/data-table-paginati
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
-import { listCrops, type Crop } from "@/lib/crops";
+import {
+  HARVEST_TYPE_LABELS,
+  UNIT_NAMES,
+  listCrops,
+  type Crop,
+} from "@/lib/crops";
 
 import { CropFormDrawer } from "./crop-form-drawer";
 import { DeleteCropDialog } from "./delete-crop-dialog";
@@ -115,6 +120,28 @@ export function CropsPage() {
           <span className="text-muted-foreground">{info.getValue()}</span>
         ),
       }),
+      columnHelper.accessor((crop) => crop.harvestType ?? "", {
+        id: "harvestType",
+        header: "Colheita",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">
+            {row.original.harvestType
+              ? HARVEST_TYPE_LABELS[row.original.harvestType]
+              : "—"}
+          </span>
+        ),
+      }),
+      columnHelper.accessor((crop) => crop.unit ?? "", {
+        id: "unit",
+        header: "Unidade",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">
+            {row.original.unit ? UNIT_NAMES[row.original.unit] : "—"}
+          </span>
+        ),
+      }),
       columnHelper.accessor("isPriority", {
         header: "Prioritária",
         enableSorting: false,
@@ -195,6 +222,10 @@ export function CropsPage() {
           <div className="min-w-0 flex-1">
             <p className="font-medium text-foreground">
               {crop.name} — {crop.variety}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {crop.harvestType ? HARVEST_TYPE_LABELS[crop.harvestType] : "—"} ·{" "}
+              {crop.unit ? UNIT_NAMES[crop.unit] : "—"}
             </p>
             <div className="mt-2">
               <PriorityBadge isPriority={crop.isPriority} />

@@ -127,7 +127,7 @@ export function ReportsPage() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Relatórios</h2>
         <p className="text-sm text-muted-foreground">
-          Comparativo de previsto vs realizado por plano de produção.
+          Comparativo de previsto vs realizado (em kg) por plano de produção. Somente apontamentos validados contam no realizado.
         </p>
       </div>
 
@@ -215,7 +215,7 @@ export function ReportsPage() {
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                           {formatNumber(comparison.totalActualYield)} /{" "}
-                          {formatNumber(comparison.expectedYield)} t
+                          {formatNumber(comparison.expectedYield)} kg
                         </span>
                       </div>
                       <div className="relative h-7 w-full overflow-hidden rounded-md bg-muted">
@@ -283,13 +283,13 @@ export function ReportsPage() {
                           <span>
                             Realizado{" "}
                             <span className="font-medium text-foreground tabular-nums">
-                              {formatNumber(comparison.totalActualYield)} t
+                              {formatNumber(comparison.totalActualYield)} kg
                             </span>
                           </span>
                           <span>
                             Previsto{" "}
                             <span className="font-medium text-foreground tabular-nums">
-                              {formatNumber(comparison.expectedYield)} t
+                              {formatNumber(comparison.expectedYield)} kg
                             </span>
                           </span>
                         </div>
