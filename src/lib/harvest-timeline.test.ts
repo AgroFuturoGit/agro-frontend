@@ -217,4 +217,30 @@ describe("buildHarvestTimeline", () => {
     expect(t.points).toEqual([]);
     expect(t.unit).toBe("kg");
   });
+
+  it("CR-002: apontamento com ano absurdo não explode o eixo (fora de 5 anos da janela)", () => {
+    const plan = makePlan({
+      expectedHarvestStart: "2026-05-01",
+      expectedHarvestEnd: "2026-06-30",
+      expectedYield: 600,
+    });
+    const t = buildHarvestTimeline(
+      plan,
+      [exec("2026-05-10", 50), exec("2206-05-05", 999), exec("0001-01-01", 999)],
+      "WEEK",
+    );
+    expect(t.points.length).toBeLessThanOrEqual(10);
+    expect(sum(t.points.map((p) => p.actualValue))).toBe(50);
+    expect(sum(t.points.map((p) => p.expectedValue))).toBe(600);
+  });
+
+  it("CR-002: sem janela, a referência é a mediana das datas", () => {
+    const t = buildHarvestTimeline(
+      makePlan(),
+      [exec("2026-05-04", 10), exec("2026-05-20", 20), exec("2026-06-01", 30), exec("2206-05-05", 999)],
+      "MONTH",
+    );
+    expect(t.points.map((p) => p.date)).toEqual(["2026-05-01", "2026-06-01"]);
+    expect(sum(t.points.map((p) => p.actualValue))).toBe(60);
+  });
 });

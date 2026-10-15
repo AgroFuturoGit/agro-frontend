@@ -23,6 +23,16 @@ export type HarvestTimeline = {
 
 /** Máximo de semanas para a granularidade automática ficar em WEEK (BR-004). */
 export const AUTO_WEEK_LIMIT = 16;
+/** Margem, em dias (~5 anos), além da qual uma data é tratada como erro de digitação. */
+export const OUTLIER_MARGIN_DAYS = 1826;
+
+/** Sem janela, a referência para descartar datas absurdas é a mediana das datas. */
+function withinMarginOfMedian(days: number[]): (day: number) => boolean {
+  if (days.length === 0) return () => true;
+  const sorted = [...days].sort((a, b) => a - b);
+  const median = sorted[Math.floor((sorted.length - 1) / 2)];
+  return (day) => Math.abs(day - median) <= OUTLIER_MARGIN_DAYS;
+}
 
 const DAY_MS = 86_400_000;
 const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})/;
@@ -93,15 +103,21 @@ export function buildHarvestTimeline(
 
   const winStart = parseDay(plan.expectedHarvestStart);
   const winEnd = parseDay(plan.expectedHarvestEnd);
-  const hasExpectedWindow =
-    winStart !== null &&
-    winEnd !== null &&
-    winEnd >= winStart &&
-    plan.expectedYield > 0;
+  const validWindow = winStart !== null && winEnd !== null && winEnd >= winStart;
+  const hasExpectedWindow = validWindow && plan.expectedYield > 0;
+
+  // Data com ano digitado errado (ex.: 2206) geraria milhares de períodos:
+  // fica de fora do gráfico (continua na tabela) o que estiver a mais de
+  // OUTLIER_MARGIN_DAYS da janela ou, sem janela, da mediana das datas.
+  const inRange = validWindow
+    ? (day: number) =>
+        day >= winStart - OUTLIER_MARGIN_DAYS && day <= winEnd + OUTLIER_MARGIN_DAYS
+    : withinMarginOfMedian(counted.map((c) => c.day));
+  const plotted = counted.filter((c) => inRange(c.day));
 
   // BR-003: intervalo do eixo.
-  const days = counted.map((c) => c.day);
-  if (winStart !== null && winEnd !== null && winEnd >= winStart) {
+  const days = plotted.map((c) => c.day);
+  if (validWindow) {
     days.push(winStart, winEnd);
   }
 
@@ -143,7 +159,7 @@ export function buildHarvestTimeline(
   // Cada apontamento conta uma única vez, no período do seu harvestedAt.
   const indexOf = (day: number) =>
     starts.findIndex((s) => day >= s && day < periodEnd(s, resolved));
-  for (const c of counted) {
+  for (const c of plotted) {
     const point = points[indexOf(c.day)];
     if (c.status === "VALIDATED") point.actualValue += c.kg;
     else point.pendingValue += c.kg;
@@ -154,7 +170,7 @@ export function buildHarvestTimeline(
   }
 
   // BR-006: previsto proporcional aos dias da janela em cada período.
-  if (hasExpectedWindow && winStart !== null && winEnd !== null) {
+  if (hasExpectedWindow) {
     const totalDays = winEnd - winStart + 1;
     let lastInWindow = -1;
     let allocated = 0;
