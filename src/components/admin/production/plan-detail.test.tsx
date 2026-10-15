@@ -28,6 +28,11 @@ import {
 // `producer-plans-page.test.tsx`). O resto do módulo é preservado via
 // `importActual` porque a tela e os diálogos usam outros exports
 // (`formatNumber`, `formatPlanDate`, escrita de apontamento, tipos).
+// O jsdom não tem canvas: o ECharts é mockado (a option é testada à parte).
+vi.mock("echarts/core", () => ({
+  use: vi.fn(),
+  init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+}));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: vi.fn(() => false) }));
 
 vi.mock("@/lib/production", async () => {
@@ -521,5 +526,49 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
     expect(screen.getByText("18.000 kg")).toBeTruthy();
     expect(screen.getByText("-22.000 kg")).toBeTruthy();
     expect(screen.queryByText(/\d t$/)).toBeNull();
+  });
+});
+
+describe("PlanDetail — gráfico previsto × realizado (UNIT-013)", () => {
+  beforeEach(() => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it("renderiza o gráfico entre o resumo e a tabela, com os dados da tela e sem nova chamada", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockResolvedValue({
+      ...PLAN,
+      crop: { ...PLAN.crop!, harvestType: "CONTINUOUS" },
+    });
+
+    renderPlanDetail();
+
+    const chart = await screen.findByRole("img", { name: /^Previsto 40\.000 kg/ });
+    expect(chart.getAttribute("data-mode")).toBe("composite");
+    expect(chart.getAttribute("aria-label")).toContain(
+      "0 kg validados e 240 kg pendentes",
+    );
+
+    const gauge = screen.getByRole("img", { name: /da meta alcançada/ });
+    const table = screen.getByRole("heading", {
+      name: "Apontamentos de colheita",
+    });
+    expect(
+      gauge.compareDocumentPosition(chart) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      chart.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    expect(getProductionPlan).toHaveBeenCalledTimes(1);
+    expect(getProductionComparison).toHaveBeenCalledTimes(1);
+    expect(listProductionExecutions).toHaveBeenCalledTimes(1);
+  });
+
+  it("cultura de colheita única usa barras simples", async () => {
+    loginAs("ADMIN");
+    renderPlanDetail();
+    const chart = await screen.findByRole("img", { name: /^Previsto 40\.000 kg/ });
+    expect(chart.getAttribute("data-mode")).toBe("simple");
   });
 });

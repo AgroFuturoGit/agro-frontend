@@ -43,6 +43,7 @@ import { ComparisonSummary } from "./comparison-summary";
 import { DeleteExecutionDialog } from "./delete-execution-dialog";
 import { ExecutionFormDrawer } from "./execution-form-drawer";
 import { ExecutionStatusBadge } from "./execution-status-badge";
+import { ContinuousHarvestChart } from "./harvest-timeline-chart";
 
 type Props = {
   orgId: string;
@@ -460,6 +461,13 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         <Skeleton className="h-40 w-full rounded-xl" />
       ) : (
         comparison && <ComparisonSummary comparison={comparison} />
+      )}
+
+      {/* Mesmos dados já carregados pela tela — sem chamada extra (AC-015). */}
+      {loading ? (
+        <Skeleton className="h-80 w-full rounded-xl" />
+      ) : (
+        plan && <ContinuousHarvestChart plan={plan} executions={executions} />
       )}
 
       <div className="flex flex-col gap-4">
