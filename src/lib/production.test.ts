@@ -3,8 +3,11 @@ import { apiRequest } from "@/lib/api";
 import {
   createProductionExecution,
   createProductionPlan,
+  getProductionDashboard,
   getProductionPlan,
   listProductionExecutions,
+  rejectProductionExecution,
+  validateProductionExecution,
   updateProductionExecution,
   updateProductionPlan,
 } from "@/lib/production";
@@ -124,7 +127,11 @@ describe("mapExecution (UNIT-005)", () => {
         "productionPlanId",
         "quantity",
         "quantityKg",
+        "rejectionReason",
         "status",
+        "updatedAt",
+        "validatedAt",
+        "validatedBy",
       ].sort(),
     );
   });
@@ -206,5 +213,111 @@ describe("payloads (UNIT-006)", () => {
       },
     ]);
     expect(apiRequestMock.mock.calls[1][0]).toBe("/production-executions/e-1");
+  });
+});
+
+const RAW_EXECUTION = {
+  id: "exec-1",
+  productionPlanId: "plan-1",
+  quantity: "12",
+  quantityKg: "240.00",
+  harvestedAt: "2026-05-10",
+  status: "REJECTED",
+  notes: null,
+  rejectionReason: "Quantidade acima do esperado",
+  validatedBy: "user-9",
+  validatedAt: "2026-05-11T09:30:00",
+  createdAt: "2026-05-10T08:00:00",
+  updatedAt: "2026-05-11T09:30:00",
+};
+
+describe("mapExecution — decisão (UNIT-001)", () => {
+  it("lê rejectionReason, validatedBy, validatedAt e updatedAt", async () => {
+    apiRequestMock.mockResolvedValue([RAW_EXECUTION]);
+    const [execution] = await listProductionExecutions("plan-1");
+    expect(execution).toMatchObject({
+      status: "REJECTED",
+      quantityKg: 240,
+      rejectionReason: "Quantidade acima do esperado",
+      validatedBy: "user-9",
+      validatedAt: "2026-05-11T09:30:00",
+      updatedAt: "2026-05-11T09:30:00",
+    });
+  });
+
+  it("campos ausentes viram null", async () => {
+    apiRequestMock.mockResolvedValue([
+      { id: "e", productionPlanId: "p", quantity: 1, quantityKg: 1, harvestedAt: "2026-05-10" },
+    ]);
+    const [execution] = await listProductionExecutions("plan-1");
+    expect(execution.rejectionReason).toBeNull();
+    expect(execution.validatedBy).toBeNull();
+    expect(execution.validatedAt).toBeNull();
+    expect(execution.updatedAt).toBeNull();
+  });
+});
+
+describe("validar e rejeitar apontamento (UNIT-001)", () => {
+  it("validate faz POST sem corpo", async () => {
+    apiRequestMock.mockResolvedValue({ ...RAW_EXECUTION, status: "VALIDATED", rejectionReason: null });
+    const result = await validateProductionExecution("exec-1");
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/production-executions/exec-1/validate",
+      { method: "POST" },
+    );
+    expect(result.status).toBe("VALIDATED");
+  });
+
+  it("reject com motivo envia reason aparado", async () => {
+    apiRequestMock.mockResolvedValue(RAW_EXECUTION);
+    await rejectProductionExecution("exec-1", "  Data errada  ");
+    expect(apiRequestMock).toHaveBeenCalledWith(
+      "/production-executions/exec-1/reject",
+      { method: "POST", body: { reason: "Data errada" } },
+    );
+  });
+
+  it.each([undefined, null, "", "   "])("reject sem motivo (%j) não envia reason", async (reason) => {
+    apiRequestMock.mockResolvedValue(RAW_EXECUTION);
+    await rejectProductionExecution("exec-1", reason);
+    const [, options] = apiRequestMock.mock.calls[0];
+    expect((options as { body: object }).body).not.toHaveProperty("reason");
+  });
+});
+
+describe("getProductionDashboard (UNIT-001)", () => {
+  it("mapeia totais e comunidades, com 'Sem comunidade' e números em string", async () => {
+    apiRequestMock.mockResolvedValue({
+      farmerCount: 3,
+      planCount: 4,
+      expectedYield: "40000.00",
+      actualYield: "18000",
+      difference: "-22000",
+      percentageRealized: "45",
+      communities: [
+        { communityId: "c-1", communityName: "Alto da Serra", farmerCount: 2, planCount: 3, expectedYield: 30000, actualYield: 18000, difference: -12000, percentageRealized: 60 },
+        { communityId: null, communityName: null, farmerCount: 1, planCount: 1, expectedYield: 10000, actualYield: 0, difference: -10000, percentageRealized: 0 },
+      ],
+    });
+    const dashboard = await getProductionDashboard();
+    expect(apiRequestMock).toHaveBeenCalledWith("/production/dashboard", { method: "GET" });
+    expect(dashboard).toMatchObject({
+      farmerCount: 3,
+      planCount: 4,
+      expectedYield: 40000,
+      actualYield: 18000,
+      difference: -22000,
+      percentageRealized: 45,
+    });
+    expect(dashboard.communities).toHaveLength(2);
+    expect(dashboard.communities[0].communityName).toBe("Alto da Serra");
+    expect(dashboard.communities[1]).toMatchObject({ communityId: null, communityName: "Sem comunidade" });
+  });
+
+  it("sem communities devolve lista vazia", async () => {
+    apiRequestMock.mockResolvedValue({ farmerCount: 0, planCount: 0 });
+    const dashboard = await getProductionDashboard();
+    expect(dashboard.communities).toEqual([]);
+    expect(dashboard.expectedYield).toBe(0);
   });
 });

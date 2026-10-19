@@ -18,6 +18,8 @@ import {
   getProductionComparison,
   getProductionPlan,
   listProductionExecutions,
+  rejectProductionExecution,
+  validateProductionExecution,
   type ProductionComparison,
   type ProductionExecution,
   type ProductionPlan,
@@ -46,6 +48,8 @@ vi.mock("@/lib/production", async () => {
     getProductionComparison: vi.fn(),
     listProductionExecutions: vi.fn(),
     deleteProductionExecution: vi.fn(),
+    validateProductionExecution: vi.fn(),
+    rejectProductionExecution: vi.fn(),
   };
 });
 
@@ -120,7 +124,31 @@ const EXECUTIONS: ProductionExecution[] = [
     harvestedAt: "2026-05-10",
     status: "PENDING",
     notes: null,
+    rejectionReason: null,
+    validatedBy: null,
+    validatedAt: null,
     createdAt: null,
+    updatedAt: null,
+  },
+];
+
+/** Uma linha em cada status — a ação de linha só renderiza se houver linha. */
+const ALL_STATUSES: ProductionExecution[] = [
+  { ...EXECUTIONS[0], id: "ex-pending", harvestedAt: "2026-05-10", status: "PENDING" },
+  {
+    ...EXECUTIONS[0],
+    id: "ex-validated",
+    harvestedAt: "2026-05-11",
+    status: "VALIDATED",
+    validatedAt: "2026-05-12T10:00:00",
+  },
+  {
+    ...EXECUTIONS[0],
+    id: "ex-rejected",
+    harvestedAt: "2026-05-13",
+    status: "REJECTED",
+    rejectionReason: "Quantidade acima do esperado",
+    validatedAt: "2026-05-14T10:00:00",
   },
 ];
 
@@ -175,7 +203,7 @@ function queryWriteAffordances() {
     primeiraColheita: screen.queryByRole("button", {
       name: /Registrar primeira colheita/i,
     }),
-    editar: screen.queryByRole("button", { name: "Editar apontamento" }),
+    editar: screen.queryByRole("button", { name: /^Editar( apontamento)?$/ }),
     excluir: screen.queryByRole("button", { name: "Excluir apontamento" }),
     colunaAcoes: screen.queryByRole("columnheader", { name: "Ações" }),
   };
@@ -187,6 +215,8 @@ beforeEach(() => {
   vi.mocked(getProductionComparison).mockResolvedValue(COMPARISON);
   vi.mocked(listProductionExecutions).mockResolvedValue(EXECUTIONS);
   vi.mocked(deleteProductionExecution).mockResolvedValue(undefined);
+  vi.mocked(validateProductionExecution).mockResolvedValue(EXECUTIONS[0]);
+  vi.mocked(rejectProductionExecution).mockResolvedValue(EXECUTIONS[0]);
   // Resolução do breadcrumb: best-effort, não faz parte das asserções deste
   // arquivo — qualquer resultado plausível serve.
   vi.mocked(getCommunity).mockRejectedValue(new Error("not relevant here"));
@@ -219,7 +249,8 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     expect(affordances.primeiraColheita).toBeNull();
     expect(affordances.editar).toBeNull();
     expect(affordances.excluir).toBeNull();
-    expect(affordances.colunaAcoes).toBeNull();
+    // A coluna existe só para hospedar Validar/Rejeitar (BR-006).
+    expect(affordances.colunaAcoes).toBeTruthy();
   });
 
   it("MANAGER: sem apontamentos, vê o estado vazio SEM o atalho de criação", async () => {
@@ -488,20 +519,46 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
     ).toBeTruthy();
   });
 
-  it("apontamento validado ou rejeitado não oferece Editar/Excluir; o pendente oferece", async () => {
+  it("FARMER: edita pendente e rejeitado, exclui só o pendente, validado travado (UNIT-005)", async () => {
     loginAs("FARMER");
-    vi.mocked(listProductionExecutions).mockResolvedValue([
-      EXECUTIONS[0],
-      { ...EXECUTIONS[0], id: "execution-2", harvestedAt: "2026-05-11", status: "VALIDATED" },
-      { ...EXECUTIONS[0], id: "execution-3", harvestedAt: "2026-05-12", status: "REJECTED" },
-    ]);
+    vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
 
     renderPlanDetail();
 
     await screen.findByText("Validado");
-    expect(screen.getAllByRole("button", { name: "Editar apontamento" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Editar apontamento" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Excluir apontamento" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Validar apontamento" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Rejeitar apontamento" })).toBeNull();
   });
+
+  it("FARMER: editar o rejeitado mostra o aviso de reenvio para validação", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue([ALL_STATUSES[2]]);
+
+    renderPlanDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Editar apontamento" }));
+    expect(
+      await screen.findByText(
+        "Alterar quantidade ou data reenvia o apontamento para validação.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it.each(["ADMIN", "TECHNICIAN"] as const)(
+    "%s: rejeitado e validado travados; só o pendente tem Editar/Excluir (UNIT-005)",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+      renderPlanDetail();
+
+      await screen.findByText("Validado");
+      expect(screen.getAllByRole("button", { name: "Editar apontamento" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: "Excluir apontamento" })).toHaveLength(1);
+    },
+  );
 
   it("no mobile, o card de apontamento validado também não oferece Editar/Excluir", async () => {
     loginAs("FARMER");
@@ -570,5 +627,157 @@ describe("PlanDetail — gráfico previsto × realizado (UNIT-013)", () => {
     renderPlanDetail();
     const chart = await screen.findByRole("img", { name: /^Previsto 40\.000 kg/ });
     expect(chart.getAttribute("data-mode")).toBe("simple");
+  });
+});
+
+describe("PlanDetail — decisão sobre apontamentos (UNIT-002 / UNIT-003 / UNIT-006)", () => {
+  afterEach(() => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it.each(["ADMIN", "TECHNICIAN", "MANAGER"] as const)(
+    "%s: Validar/Rejeitar só na linha pendente (tabela)",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+      renderPlanDetail();
+
+      await screen.findByText("Validado");
+      expect(screen.getAllByRole("button", { name: "Validar apontamento" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: "Rejeitar apontamento" })).toHaveLength(1);
+    },
+  );
+
+  it.each(["ADMIN", "TECHNICIAN", "MANAGER"] as const)(
+    "%s: Validar/Rejeitar só no card pendente (mobile)",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(useIsMobile).mockReturnValue(true);
+      vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+      renderPlanDetail();
+
+      await screen.findByText("Validado");
+      expect(screen.queryByRole("table")).toBeNull();
+      expect(screen.getAllByRole("button", { name: "Validar" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: "Rejeitar" })).toHaveLength(1);
+    },
+  );
+
+  it.each([false, true])(
+    "FARMER e role desconhecida nunca veem Validar/Rejeitar (mobile=%s)",
+    async (mobile) => {
+      vi.mocked(useIsMobile).mockReturnValue(mobile);
+      vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+      for (const role of ["FARMER", null] as const) {
+        if (role) loginAs(role);
+        else vi.mocked(readUserFromStorage).mockReturnValue(null);
+        const { unmount } = renderPlanDetail();
+        await screen.findByText("Validado");
+        expect(screen.queryByRole("button", { name: /^Validar/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: /^Rejeitar/ })).toBeNull();
+        unmount();
+      }
+    },
+  );
+
+  it("MANAGER com uma linha em cada status: nenhuma afordância de escrita (UNIT-006)", async () => {
+    loginAs("MANAGER");
+    vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+    renderPlanDetail();
+
+    await screen.findByText("Validado");
+    const affordances = queryWriteAffordances();
+    expect(affordances.novoApontamento).toBeNull();
+    expect(affordances.primeiraColheita).toBeNull();
+    expect(affordances.editar).toBeNull();
+    expect(affordances.excluir).toBeNull();
+  });
+
+  it("MANAGER mobile com uma linha em cada status: sem Editar/Excluir/Novo", async () => {
+    loginAs("MANAGER");
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+    renderPlanDetail();
+
+    await screen.findByText("Validado");
+    const affordances = queryWriteAffordances();
+    expect(affordances.novoApontamento).toBeNull();
+    expect(affordances.editar).toBeNull();
+    expect(affordances.excluir).toBeNull();
+  });
+
+  it("validar: confirma no dialog, chama a API e recarrega os 3 GET", async () => {
+    loginAs("TECHNICIAN");
+
+    renderPlanDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Validar apontamento" }));
+    expect(
+      await screen.findByRole("alertdialog", { name: "Validar apontamento" }),
+    ).toBeTruthy();
+    expect(validateProductionExecution).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Validar" }));
+
+    await waitFor(() =>
+      expect(validateProductionExecution).toHaveBeenCalledWith("execution-1"),
+    );
+    await waitFor(() => expect(listProductionExecutions).toHaveBeenCalledTimes(2));
+    expect(getProductionPlan).toHaveBeenCalledTimes(2);
+    expect(getProductionComparison).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejeitar sem motivo: chama a API e recarrega", async () => {
+    loginAs("MANAGER");
+
+    renderPlanDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Rejeitar apontamento" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Rejeitar" }));
+
+    await waitFor(() => expect(rejectProductionExecution).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(rejectProductionExecution).mock.calls[0][0]).toBe("execution-1");
+    await waitFor(() => expect(listProductionExecutions).toHaveBeenCalledTimes(2));
+  });
+
+  it("erro da API no dialog: mensagem do back, dialog aberto, sem recarregar", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(validateProductionExecution).mockRejectedValue(
+      new ApiError(403, "Técnico sem acesso a esta comunidade.", null),
+    );
+
+    renderPlanDetail();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Validar apontamento" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Validar" }));
+
+    expect(await screen.findByText("Técnico sem acesso a esta comunidade.")).toBeTruthy();
+    expect(screen.getByRole("alertdialog", { name: "Validar apontamento" })).toBeTruthy();
+    expect(listProductionExecutions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PlanDetail — status com motivo e data da decisão (UNIT-004)", () => {
+  afterEach(() => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it.each([false, true])("mostra motivo e data da decisão (mobile=%s)", async (mobile) => {
+    loginAs("MANAGER");
+    vi.mocked(useIsMobile).mockReturnValue(mobile);
+    vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+    renderPlanDetail();
+
+    expect(
+      await screen.findByText("Motivo: Quantidade acima do esperado"),
+    ).toBeTruthy();
+    expect(screen.getByText("Decidido em 12/05/2026")).toBeTruthy();
+    expect(screen.getByText("Decidido em 14/05/2026")).toBeTruthy();
   });
 });

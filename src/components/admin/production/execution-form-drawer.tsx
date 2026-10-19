@@ -26,6 +26,9 @@ import {
 export const MISSING_UNIT_WEIGHT_MESSAGE =
   "Cadastre o peso da unidade na cultura antes de registrar apontamentos";
 
+export const RESUBMIT_WARNING =
+  "Alterar quantidade ou data reenvia o apontamento para validação.";
+
 type Mode = "create" | "edit";
 
 type Props = {
@@ -204,6 +207,22 @@ export function ExecutionFormDrawer({
                 </div>
               )}
             </div>
+
+            {!isCreate && execution?.status === "REJECTED" && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{RESUBMIT_WARNING}</span>
+              </div>
+            )}
+
+            {!isCreate && execution?.status === "REJECTED" && execution.rejectionReason && (
+              <p className="text-sm text-muted-foreground">
+                Motivo da rejeição: {execution.rejectionReason}
+              </p>
+            )}
 
             {blocked && (
               <div

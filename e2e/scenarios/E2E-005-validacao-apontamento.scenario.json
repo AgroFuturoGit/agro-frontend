@@ -1,0 +1,336 @@
+{
+  "schema_version": 1,
+  "id": "E2E-005",
+  "title": "Validação de apontamentos de colheita e correção pelo agricultor",
+  "description": "O técnico valida um apontamento pendente (o realizado do plano sobe) e rejeita outro com motivo; o agricultor vê o motivo, corrige a quantidade do rejeitado e ele volta a Pendente.",
+  "feature_slug": "epic5-validacao-e-painel",
+  "ac_refs": [
+    "AC-009"
+  ],
+  "priority": "P0",
+  "tags": [
+    "producao",
+    "validacao",
+    "apontamento"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "TECHNICIAN",
+        "credentials_env": {
+          "email": "E2E_TECH_EMAIL",
+          "password": "E2E_TECH_PASSWORD"
+        }
+      },
+      {
+        "role": "FARMER",
+        "credentials_env": {
+          "email": "E2E_FARMER_EMAIL",
+          "password": "E2E_FARMER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Técnico com assistência ativa à comunidade do agricultor; nome em E2E_TECH_NAME",
+      "Plano de produção do agricultor em E2E_PLAN_PATH com dois apontamentos PENDENTES, de datas dd/mm/aaaa em E2E_EXEC_VALIDATE_DATE e E2E_EXEC_REJECT_DATE; nome do agricultor em E2E_FARMER_NAME",
+      "Motivo da rejeição em E2E_REJECT_REASON"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_TECH_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "css",
+        "value": "#password"
+      },
+      "value": "${env:E2E_TECH_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Técnico valida um apontamento pendente e ele passa a Validado",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "${env:E2E_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "css",
+            "value": "tr:has-text('${env:E2E_EXEC_VALIDATE_DATE}') button[aria-label='Validar apontamento']"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Validar"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "css",
+            "value": "tr:has-text('${env:E2E_EXEC_VALIDATE_DATE}') [data-status='VALIDATED']"
+          }
+        }
+      ]
+    },
+    {
+      "name": "rejeitar_com_motivo",
+      "title": "Técnico rejeita outro apontamento informando o motivo, que aparece junto do status",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "${env:E2E_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "css",
+            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') button[aria-label='Rejeitar apontamento']"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Motivo (opcional)"
+          },
+          "value": "${env:E2E_REJECT_REASON}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Rejeitar"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "css",
+            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') [data-status='REJECTED']"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "${env:E2E_REJECT_REASON}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agricultor_corrige_rejeitado",
+      "title": "Agricultor corrige a quantidade do apontamento rejeitado e ele volta a Pendente",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "${env:E2E_TECH_NAME}"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "menuitem",
+            "name": "Sair"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/login",
+          "note": "logout"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_FARMER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_FARMER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "css",
+            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') button[aria-label='Editar apontamento']"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Quantidade colhida"
+          },
+          "value": "7"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar alterações"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "css",
+            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') [data-status='PENDING']"
+          }
+        }
+      ]
+    },
+    {
+      "name": "forbidden_agricultor_sem_decisao",
+      "title": "Agricultor não vê Validar nem Rejeitar em nenhuma linha",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "${env:E2E_TECH_NAME}"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "menuitem",
+            "name": "Sair"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/login",
+          "note": "logout"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_FARMER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_FARMER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PLAN_PATH}"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "count",
+          "target": {
+            "by": "css",
+            "value": "button[aria-label='Validar apontamento']"
+          },
+          "value": 0
+        },
+        {
+          "expect": "count",
+          "target": {
+            "by": "css",
+            "value": "button[aria-label='Rejeitar apontamento']"
+          },
+          "value": 0
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "O motivo é opcional no back; erro de API no dialog é coberto por execution-decision-dialog.test.tsx e planos-producao.spec.ts.",
+    "empty_state": "A feature não altera o estado vazio da tela do plano."
+  }
+}

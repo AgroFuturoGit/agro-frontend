@@ -178,3 +178,25 @@ describe("ExecutionFormDrawer — payload sem status (UNIT-013 / AC-014)", () =>
     ]);
   });
 });
+
+describe("ExecutionFormDrawer — aviso de reenvio (UNIT-005)", () => {
+  const WARNING = "Alterar quantidade ou data reenvia o apontamento para validação.";
+
+  it("editar rejeitado mostra o aviso e o motivo", () => {
+    renderForm("edit", BOX, {
+      ...EXECUTION,
+      status: "REJECTED",
+      rejectionReason: "Data errada",
+    });
+    expect(screen.getByText(WARNING)).toBeTruthy();
+    expect(screen.getByText("Motivo da rejeição: Data errada")).toBeTruthy();
+  });
+
+  it("pendente e criação não mostram o aviso", () => {
+    renderForm("edit", BOX, { ...EXECUTION, status: "PENDING" });
+    expect(screen.queryByText(WARNING)).toBeNull();
+    cleanup();
+    renderForm("create", BOX);
+    expect(screen.queryByText(WARNING)).toBeNull();
+  });
+});

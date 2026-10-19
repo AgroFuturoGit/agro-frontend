@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "id": "E2E-006",
+  "title": "Painel de produção na Visão geral por perfil",
+  "description": "Cada perfil abre a Visão geral e vê meta, realizado e percentual do seu recorte (GET /production/dashboard); apenas quem não é agricultor vê a tabela por comunidade.",
+  "feature_slug": "epic5-validacao-e-painel",
+  "ac_refs": [
+    "AC-010"
+  ],
+  "priority": "P0",
+  "tags": [
+    "painel",
+    "visao-geral",
+    "perfis"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      },
+      {
+        "role": "MANAGER",
+        "credentials_env": {
+          "email": "E2E_MANAGER_EMAIL",
+          "password": "E2E_MANAGER_PASSWORD"
+        }
+      },
+      {
+        "role": "TECHNICIAN",
+        "credentials_env": {
+          "email": "E2E_TECH_EMAIL",
+          "password": "E2E_TECH_PASSWORD"
+        }
+      },
+      {
+        "role": "FARMER",
+        "credentials_env": {
+          "email": "E2E_FARMER_EMAIL",
+          "password": "E2E_FARMER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Nomes de exibição dos usuários em E2E_ADMIN_NAME, E2E_MANAGER_NAME, E2E_TECH_NAME e E2E_FARMER_NAME (botão do menu do usuário)",
+      "Planos com apontamentos validados no recorte de cada perfil; textos esperados da meta em kg (ex.: 40.000 kg) em E2E_ADMIN_EXPECTED_META, E2E_MANAGER_EXPECTED_META, E2E_TECH_EXPECTED_META e E2E_FARMER_EXPECTED_META, e do gauge (ex.: 45% da meta alcançada) em E2E_<PERFIL>_EXPECTED_GAUGE"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_ADMIN_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "css",
+        "value": "#password"
+      },
+      "value": "${env:E2E_ADMIN_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Administrador vê o painel com todas as comunidades",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "${env:E2E_ADMIN_EXPECTED_META}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "img",
+            "name": "${env:E2E_ADMIN_EXPECTED_GAUGE}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "columnheader",
+            "name": "Comunidade"
+          }
+        }
+      ]
+    },
+    {
+      "name": "gestor",
+      "title": "Gestor vê o painel recortado pela sua organização, com a tabela por comunidade",
+      "as_user": "MANAGER",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "${env:E2E_ADMIN_NAME}"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "menuitem",
+            "name": "Sair"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/login",
+          "note": "logout"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_MANAGER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_MANAGER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "${env:E2E_MANAGER_EXPECTED_META}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "img",
+            "name": "${env:E2E_MANAGER_EXPECTED_GAUGE}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "columnheader",
+            "name": "Comunidade"
+          }
+        }
+      ]
+    },
+    {
+      "name": "tecnico",
+      "title": "Técnico vê o painel recortado pelas comunidades com assistência ativa",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "${env:E2E_ADMIN_NAME}"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "menuitem",
+            "name": "Sair"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/login",
+          "note": "logout"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_TECH_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_TECH_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "${env:E2E_TECH_EXPECTED_META}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "img",
+            "name": "${env:E2E_TECH_EXPECTED_GAUGE}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "columnheader",
+            "name": "Comunidade"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agricultor",
+      "title": "Agricultor vê só os próprios totais, sem tabela por comunidade",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "${env:E2E_ADMIN_NAME}"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "menuitem",
+            "name": "Sair"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/login",
+          "note": "logout"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_FARMER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_FARMER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "${env:E2E_FARMER_EXPECTED_META}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "img",
+            "name": "${env:E2E_FARMER_EXPECTED_GAUGE}"
+          }
+        },
+        {
+          "expect": "count",
+          "target": {
+            "by": "role",
+            "value": "table"
+          },
+          "value": 0
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "A tela do painel não tem formulário.",
+    "forbidden": "Cobertura de 403 do painel (técnico sem perfil, gestor sem organização) está em production-dashboard.test.tsx e rbac.spec.ts.",
+    "empty_state": "Estado vazio (planCount = 0) é coberto por production-dashboard.test.tsx."
+  }
+}

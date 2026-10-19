@@ -435,7 +435,11 @@ test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", (
       harvestedAt,
       status,
       notes: null,
+      rejectionReason: null,
+      validatedBy: null,
+      validatedAt: null,
       createdAt: "2026-05-06T10:00:00Z",
+      updatedAt: "2026-05-06T10:00:00Z",
     });
 
     await page.route(`**/communities/${COMMUNITY_A.id}`, (route) =>
@@ -495,5 +499,220 @@ test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", (
       "MONTH",
     );
     await expect(page.getByRole("button", { name: "Mês" })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+test.describe("Detalhe do plano — validação de apontamentos (mockado)", () => {
+  const PLAN_ID = "plan-validacao-1";
+  const PLAN_URL = `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}/planos/${PLAN_ID}`;
+
+  type Exec = {
+    id: string;
+    productionPlanId: string;
+    quantity: number;
+    quantityKg: number;
+    harvestedAt: string;
+    status: string;
+    notes: string | null;
+    rejectionReason: string | null;
+    validatedBy: string | null;
+    validatedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+  };
+
+  function makeExecution(id: string, harvestedAt: string, status = "PENDING"): Exec {
+    return {
+      id,
+      productionPlanId: PLAN_ID,
+      quantity: 10,
+      quantityKg: 600,
+      harvestedAt,
+      status,
+      notes: null,
+      rejectionReason: null,
+      validatedBy: null,
+      validatedAt: null,
+      createdAt: "2026-05-06T10:00:00Z",
+      updatedAt: "2026-05-06T10:00:00Z",
+    };
+  }
+
+  /** Mocks do plano; o estado das execuções vive no teste e é devolvido a cada GET. */
+  async function mockPlan(page: Page, executions: Exec[]) {
+    const plan = { ...planFor(PRODUCER_ANA.id, "Café"), id: PLAN_ID };
+    await page.route(`**/communities/${COMMUNITY_A.id}`, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(COMMUNITY_A) }),
+    );
+    await page.route("**/farmers/me", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(PRODUCER_ANA) }),
+    );
+    await page.route("**/farmers?*", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCER_ANA]) }),
+    );
+    await page.route(`**/production-plans/${PLAN_ID}`, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(plan) }),
+    );
+    await page.route(`**/production-plans/${PLAN_ID}/comparison`, (route) => {
+      const validatedKg = executions
+        .filter((item) => item.status === "VALIDATED")
+        .reduce((sum, item) => sum + item.quantityKg, 0);
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          productionPlanId: PLAN_ID,
+          expectedYield: 15000,
+          totalActualYield: validatedKg,
+          difference: validatedKg - 15000,
+          percentageRealized: (validatedKg / 15000) * 100,
+        }),
+      });
+    });
+    await page.route(`**/production-plans/${PLAN_ID}/executions`, (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(executions) }),
+    );
+  }
+
+  test("TECHNICIAN valida um apontamento e rejeita outro sem motivo; o status muda na tela", async ({
+    page,
+  }) => {
+    await loginAs(page, "TECHNICIAN", {
+      id: "cccccccc-1111-0000-0000-000000000001",
+      fullName: "Tereza Técnica",
+      email: "tereza.tech@example.com",
+      cpf: "55566677788",
+      role: "TECHNICIAN",
+      dateOfBirth: null,
+    });
+
+    const executions = [makeExecution("ex-a", "2026-05-10"), makeExecution("ex-b", "2026-05-11")];
+    await mockPlan(page, executions);
+
+    const bodies: Record<string, string | null> = {};
+    for (const action of ["validate", "reject"] as const) {
+      await page.route(`**/production-executions/*/${action}`, async (route) => {
+        const id = route.request().url().split("/production-executions/")[1].split("/")[0];
+        bodies[`${action}:${id}`] = route.request().postData();
+        const target = executions.find((item) => item.id === id)!;
+        target.status = action === "validate" ? "VALIDATED" : "REJECTED";
+        target.validatedAt = "2026-05-12T09:00:00";
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(target) });
+      });
+    }
+
+    await page.goto(PLAN_URL);
+
+    // Linha de 10/05 (ex-a): validar com confirmação.
+    await expect(page.getByRole("button", { name: "Validar apontamento" })).toHaveCount(2);
+    await page.getByRole("button", { name: "Validar apontamento" }).first().click();
+    const validateDialog = page.getByRole("alertdialog", { name: "Validar apontamento" });
+    await expect(validateDialog).toBeVisible();
+    expect(Object.keys(bodies)).toHaveLength(0);
+    await validateDialog.getByRole("button", { name: "Validar", exact: true }).click();
+    await expect(validateDialog).toBeHidden();
+    expect(bodies["validate:ex-a"] ?? null).toBeNull();
+    await expect(page.getByText("Validado", { exact: true })).toBeVisible();
+    await expect(page.getByText("Decidido em 12/05/2026")).toBeVisible();
+
+    // Restou só uma linha pendente: rejeitar com motivo vazio.
+    await expect(page.getByRole("button", { name: "Rejeitar apontamento" })).toHaveCount(1);
+    await page.getByRole("button", { name: "Rejeitar apontamento" }).click();
+    const rejectDialog = page.getByRole("alertdialog", { name: "Rejeitar apontamento" });
+    await rejectDialog.getByRole("button", { name: "Rejeitar", exact: true }).click();
+    await expect(rejectDialog).toBeHidden();
+    expect(JSON.parse(bodies["reject:ex-b"] ?? "{}")).not.toHaveProperty("reason");
+    await expect(page.getByText("Rejeitado", { exact: true })).toBeVisible();
+    // Sem pendentes: nenhuma ação de decisão sobra.
+    await expect(page.getByRole("button", { name: "Validar apontamento" })).toHaveCount(0);
+  });
+
+  test("TECHNICIAN vê o erro do back no dialog de rejeição e ele continua aberto", async ({ page }) => {
+    await loginAs(page, "TECHNICIAN", {
+      id: "cccccccc-1111-0000-0000-000000000001",
+      fullName: "Tereza Técnica",
+      email: "tereza.tech@example.com",
+      cpf: "55566677788",
+      role: "TECHNICIAN",
+      dateOfBirth: null,
+    });
+    await mockPlan(page, [makeExecution("ex-a", "2026-05-10")]);
+    await page.route("**/production-executions/*/reject", (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Técnico sem acesso a esta comunidade." }),
+      }),
+    );
+
+    await page.goto(PLAN_URL);
+    await page.getByRole("button", { name: "Rejeitar apontamento" }).click();
+    const dialog = page.getByRole("alertdialog", { name: "Rejeitar apontamento" });
+    await dialog.getByLabel("Motivo (opcional)").fill("Quantidade inconsistente");
+    await dialog.getByRole("button", { name: "Rejeitar", exact: true }).click();
+
+    await expect(dialog.getByRole("alert")).toContainText("Técnico sem acesso a esta comunidade.");
+    await expect(dialog).toBeVisible();
+  });
+
+  test("FARMER nunca vê Validar/Rejeitar e corrige o apontamento rejeitado, que volta a Pendente", async ({
+    page,
+  }) => {
+    await loginAs(page, "FARMER", {
+      id: PRODUCER_ANA.user.id,
+      fullName: PRODUCER_ANA.user.fullName,
+      email: PRODUCER_ANA.user.email,
+      cpf: PRODUCER_ANA.user.cpf,
+      role: "FARMER",
+      dateOfBirth: null,
+    });
+
+    const rejected = {
+      ...makeExecution("ex-r", "2026-05-10", "REJECTED"),
+      rejectionReason: "Quantidade acima do esperado",
+      validatedAt: "2026-05-11T09:00:00",
+    };
+    const executions = [rejected];
+    await mockPlan(page, executions);
+
+    let putBody: Record<string, unknown> | null = null;
+    await page.route("**/production-executions/ex-r", async (route) => {
+      if (route.request().method() !== "PUT") {
+        await route.fallback();
+        return;
+      }
+      putBody = route.request().postDataJSON();
+      Object.assign(executions[0], {
+        quantity: 8,
+        quantityKg: 480,
+        status: "PENDING",
+        rejectionReason: null,
+        validatedAt: null,
+      });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(executions[0]) });
+    });
+
+    await page.goto(PLAN_URL);
+
+    await expect(page.getByText("Rejeitado", { exact: true })).toBeVisible();
+    await expect(page.getByText("Motivo: Quantidade acima do esperado")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Validar apontamento" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Rejeitar apontamento" })).toHaveCount(0);
+    // Rejeitado não se exclui.
+    await expect(page.getByRole("button", { name: "Excluir apontamento" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Editar apontamento" }).click();
+    await expect(
+      page.getByText("Alterar quantidade ou data reenvia o apontamento para validação."),
+    ).toBeVisible();
+    await page.getByLabel(/Quantidade colhida/).fill("8");
+    await page.getByRole("button", { name: "Salvar alterações" }).click();
+
+    await expect(page.getByText("Pendente", { exact: true })).toBeVisible();
+    await expect(page.getByText("Rejeitado", { exact: true })).toHaveCount(0);
+    expect(putBody).not.toBeNull();
+    expect(putBody).not.toHaveProperty("status");
+    expect(putBody).not.toHaveProperty("validatedBy");
+    expect(putBody).not.toHaveProperty("validatedAt");
   });
 });
