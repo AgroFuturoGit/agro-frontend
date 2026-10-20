@@ -17,6 +17,10 @@ vi.mock("@/lib/auth", async () => {
   return { ...actual, readUserFromStorage: vi.fn() };
 });
 
+vi.mock("@/components/admin/dashboard/farmer-dashboard", () => ({
+  FarmerDashboard: () => <div data-testid="farmer-dashboard" />,
+}));
+
 const DASHBOARD: Dashboard = {
   farmerCount: 3,
   planCount: 4,
@@ -85,21 +89,31 @@ describe("ProductionDashboard — números e recorte por perfil (UNIT-007)", () 
     },
   );
 
-  it("FARMER: só os totais, sem tabela por comunidade", async () => {
+  it("FARMER: vê o dashboard da 6.1 e não chama o painel de produção", async () => {
     loginAs("FARMER");
     render(<ProductionDashboard />);
 
-    expect(await screen.findByText("40.000 kg")).toBeTruthy();
+    expect(await screen.findByTestId("farmer-dashboard")).toBeTruthy();
+    expect(getProductionDashboard).not.toHaveBeenCalled();
     expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.queryByText("Alto da Serra")).toBeNull();
   });
 
-  it("role desconhecida: sem tabela (falha fechado)", async () => {
-    loginAs(null);
-    render(<ProductionDashboard />);
+  it.each(["ADMIN", "MANAGER", "TECHNICIAN"] as const)(
+    "%s: não vê o dashboard do agricultor",
+    async (role) => {
+      loginAs(role);
+      render(<ProductionDashboard />);
+      expect(await screen.findByText("40.000 kg")).toBeTruthy();
+      expect(screen.queryByTestId("farmer-dashboard")).toBeNull();
+    },
+  );
 
-    expect(await screen.findByText("40.000 kg")).toBeTruthy();
-    expect(screen.queryByRole("table")).toBeNull();
+  it("role desconhecida: nada renderiza (falha fechado)", async () => {
+    loginAs(null);
+    const { container } = render(<ProductionDashboard />);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(container.innerHTML).toBe("");
+    expect(getProductionDashboard).not.toHaveBeenCalled();
   });
 
   it("deixa claro que o realizado considera só apontamentos validados", async () => {

@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { ContinuousHarvestChart } from "@/components/admin/production/harvest-timeline-chart";
+import { getHarvestTimeline, type HarvestTimelineResponse } from "@/lib/analytics";
+import { ApiError } from "@/lib/api";
 import type { Crop } from "@/lib/crops";
 import type { ProductionExecution, ProductionPlan } from "@/lib/production";
+
+vi.mock("@/lib/analytics", () => ({ getHarvestTimeline: vi.fn() }));
 
 const chart = vi.hoisted(() => ({
   setOption: vi.fn(),
@@ -91,108 +95,159 @@ const EXECS = [
   exec("c", "2026-06-02", 30, "PENDING"),
 ];
 
+function weeks(n: number): HarvestTimelineResponse["points"] {
+  return Array.from({ length: n }, (_, i) => ({
+    date: `2026-05-${String(4 + i * 7).padStart(2, "0")}`,
+    expectedValue: 200,
+    actualValue: i === 0 ? 105 : 0,
+    pendingValue: i === 4 ? 30 : 0,
+  }));
+}
+
+function timeline(
+  overrides: Partial<HarvestTimelineResponse> = {},
+): HarvestTimelineResponse {
+  return {
+    planId: "plan-1",
+    harvestType: "CONTINUOUS",
+    granularity: "WEEK",
+    unit: "kg",
+    points: weeks(9),
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.mocked(getHarvestTimeline).mockReset().mockResolvedValue(timeline());
+});
+
+async function renderChart(
+  plan = makePlan(),
+  executions: ProductionExecution[] = EXECS,
+) {
+  const utils = render(<ContinuousHarvestChart plan={plan} executions={executions} />);
+  await waitFor(() => expect(screen.queryByLabelText("Carregando gráfico")).toBeNull());
+  return utils;
+}
+
 describe("ContinuousHarvestChart", () => {
-  it("UNIT-009: plano CONTINUOUS renderiza o gráfico composto e o alternador troca os períodos", () => {
-    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+  it("UNIT-007: abre em WEEK chamando o endpoint e o alternador refaz a chamada com MONTH", async () => {
+    await renderChart();
+    expect(getHarvestTimeline).toHaveBeenCalledWith("plan-1", "WEEK");
 
-    const chart = screen.getByRole("img");
-    expect(chart).toHaveAttribute("data-mode", "composite");
-    // 04/05 a 29/06 = 9 semanas → padrão automático Semana.
-    expect(chart).toHaveAttribute("data-granularity", "WEEK");
-    expect(chart).toHaveAttribute("data-points", "9");
+    const chartEl = screen.getByRole("img");
+    expect(chartEl).toHaveAttribute("data-mode", "composite");
+    expect(chartEl).toHaveAttribute("data-granularity", "WEEK");
+    expect(chartEl).toHaveAttribute("data-points", "9");
+    expect(screen.getByRole("button", { name: "Semana" })).toHaveAttribute("aria-pressed", "true");
 
-    const week = screen.getByRole("button", { name: "Semana" });
-    const month = screen.getByRole("button", { name: "Mês" });
-    expect(week).toHaveAttribute("aria-pressed", "true");
-    expect(month).toHaveAttribute("aria-pressed", "false");
-
-    fireEvent.click(month);
-    expect(screen.getByRole("img")).toHaveAttribute("data-granularity", "MONTH");
+    vi.mocked(getHarvestTimeline).mockResolvedValue(
+      timeline({ granularity: "MONTH", points: weeks(2) }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Mês" }));
+    await waitFor(() =>
+      expect(screen.getByRole("img")).toHaveAttribute("data-granularity", "MONTH"),
+    );
+    expect(getHarvestTimeline).toHaveBeenLastCalledWith("plan-1", "MONTH");
     expect(screen.getByRole("img")).toHaveAttribute("data-points", "2");
-    expect(screen.getByRole("button", { name: "Mês" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: "Semana" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
+    expect(screen.getByRole("button", { name: "Mês" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("UNIT-010: SINGLE e harvestType nulo renderizam barras simples, sem alternador", () => {
+  it("UNIT-007: SINGLE e harvestType nulo renderizam barras simples, sem alternador", async () => {
     for (const harvestType of ["SINGLE", null] as const) {
-      const { unmount } = render(
-        <ContinuousHarvestChart
-          plan={makePlan({ crop: { harvestType, unit: "KG" } as Crop })}
-          executions={EXECS}
-        />,
+      vi.mocked(getHarvestTimeline).mockResolvedValue(
+        timeline({ harvestType: "SINGLE", points: weeks(1) }),
+      );
+      const { unmount } = await renderChart(
+        makePlan({ crop: { harvestType, unit: "KG" } as Crop }),
       );
       expect(screen.getByRole("img")).toHaveAttribute("data-mode", "simple");
       expect(screen.queryByRole("button", { name: "Semana" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "Mês" })).toBeNull();
       unmount();
     }
   });
 
-  it("UNIT-011: sem janela mostra só o realizado e o aviso; sem dados mostra o estado vazio", () => {
-    const { unmount } = render(
-      <ContinuousHarvestChart
-        plan={makePlan({ expectedHarvestStart: null, expectedHarvestEnd: null })}
-        executions={EXECS}
-      />,
-    );
+  it("UNIT-007: sem janela mostra o aviso e sem curva prevista; sem pontos mostra o estado vazio", async () => {
+    const noWindow = makePlan({ expectedHarvestStart: null, expectedHarvestEnd: null });
+    const { unmount } = await renderChart(noWindow);
     expect(
-      screen.getByText(
-        "Defina o início e o fim previstos da colheita para ver a curva prevista.",
-      ),
+      screen.getByText("Defina o início e o fim previstos da colheita para ver a curva prevista."),
     ).toBeInTheDocument();
     expect(screen.getByRole("img")).toHaveAttribute("data-has-window", "false");
+    expect(chart.setOption.mock.calls[0][0].series.map((s: { name: string }) => s.name)).not.toContain("Previsto");
     unmount();
 
-    render(
-      <ContinuousHarvestChart
-        plan={makePlan({ expectedHarvestStart: null, expectedHarvestEnd: null })}
-        executions={[]}
-      />,
-    );
+    vi.mocked(getHarvestTimeline).mockResolvedValue(timeline({ points: [] }));
+    await renderChart(noWindow, []);
     expect(
-      screen.getByText(
-        "Ainda não há dados para o gráfico. Registre um apontamento ou defina a janela de colheita.",
-      ),
+      screen.getByText("Ainda não há dados para o gráfico. Registre um apontamento ou defina a janela de colheita."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("img")).toBeNull();
   });
 
-  it("UNIT-012: aria-label resume os valores, legenda e nota aparecem", () => {
-    render(
-      <ContinuousHarvestChart
-        plan={makePlan()}
-        executions={[exec("a", "2026-05-05", 105)]}
-      />,
+  it("UNIT-007: com janela válida e meta > 0 a curva prevista aparece", async () => {
+    await renderChart();
+    expect(chart.setOption.mock.calls[0][0].series.map((s: { name: string }) => s.name)).toContain("Previsto");
+    expect(screen.getByRole("img")).toHaveAttribute("data-has-window", "true");
+  });
+
+  it("UNIT-008: carregando mostra skeleton; erro mostra a mensagem do back e 'Tentar novamente' recupera", async () => {
+    vi.mocked(getHarvestTimeline)
+      .mockRejectedValueOnce(new ApiError(500, "Falha na timeline.", null))
+      .mockResolvedValue(timeline());
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    expect(screen.getByLabelText("Carregando gráfico")).toBeInTheDocument();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Falha na timeline.");
+    expect(echarts.init).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByRole("img")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("UNIT-008: erro que não é ApiError usa a mensagem genérica", async () => {
+    vi.mocked(getHarvestTimeline).mockRejectedValue(new Error("boom"));
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "Não foi possível carregar o gráfico de colheita.",
     );
+  });
+
+  it("UNIT-008: recarrega quando a lista de apontamentos muda", async () => {
+    const { rerender } = await renderChart();
+    expect(getHarvestTimeline).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <ContinuousHarvestChart plan={makePlan()} executions={[...EXECS, exec("d", "2026-06-10", 8)]} />,
+    );
+    await waitFor(() => expect(getHarvestTimeline).toHaveBeenCalledTimes(2));
+  });
+
+  it("UNIT-012: aria-label resume os valores a partir dos pontos da API, legenda e nota aparecem", async () => {
+    vi.mocked(getHarvestTimeline).mockResolvedValue(
+      timeline({ points: [{ date: "2026-05-04", expectedValue: 1800, actualValue: 105, pendingValue: 0 }] }),
+    );
+    await renderChart();
     expect(screen.getByRole("img")).toHaveAttribute(
       "aria-label",
       "Previsto 1.800 kg, realizado 105 kg validados e 0 kg pendentes, de 04/05/2026 a 29/06/2026",
     );
-    expect(
-      screen.getByText("Somente validados contam no realizado oficial."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Somente validados contam no realizado oficial.")).toBeInTheDocument();
   });
 
-  it("BR-015: init no mount, setOption por dados/granularidade, resize e dispose no unmount", () => {
-    const { unmount } = render(
-      <ContinuousHarvestChart plan={makePlan()} executions={EXECS} />,
-    );
+  it("BR-015: init no mount, setOption por dados/granularidade, resize e dispose no unmount", async () => {
+    const { unmount } = await renderChart();
     expect(echarts.init).toHaveBeenCalledTimes(1);
     expect(echarts.init.mock.calls[0][2]).toEqual({ renderer: "canvas" });
     expect(chart.setOption).toHaveBeenCalledTimes(1);
-    const first = chart.setOption.mock.calls[0][0];
-    expect(first.xAxis.data).toHaveLength(9);
+    expect(chart.setOption.mock.calls[0][0].xAxis.data).toHaveLength(9);
 
+    vi.mocked(getHarvestTimeline).mockResolvedValue(timeline({ granularity: "MONTH", points: weeks(2) }));
     fireEvent.click(screen.getByRole("button", { name: "Mês" }));
+    await waitFor(() => expect(chart.setOption.mock.calls.at(-1)?.[0].xAxis.data).toHaveLength(2));
     expect(echarts.init).toHaveBeenCalledTimes(1);
-    expect(chart.setOption).toHaveBeenCalledTimes(2);
-    expect(chart.setOption.mock.calls[1][0].xAxis.data).toHaveLength(2);
 
     resizeCallback?.();
     expect(chart.resize).toHaveBeenCalled();
@@ -201,43 +256,37 @@ describe("ContinuousHarvestChart", () => {
     expect(chart.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it("CR-001: ao estreitar o contêiner, recalcula a option e liga o dataZoom; resize sem mudar a capacidade não refaz a option", () => {
+  it("CR-001: ao estreitar o contêiner, recalcula a option e liga o dataZoom", async () => {
     let width = 800;
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(() => width);
-    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
-    expect(chart.setOption).toHaveBeenCalledTimes(1);
-    expect(chart.setOption.mock.calls[0][0].dataZoom).toBeUndefined();
+    await renderChart();
+    const base = chart.setOption.mock.calls.length;
+    expect(chart.setOption.mock.calls[base - 1][0].dataZoom).toBeUndefined();
 
-    width = 790; // mesma capacidade (16 pontos de 48 px): só redimensiona
+    width = 790;
     act(() => resizeCallback?.());
-    expect(chart.resize).toHaveBeenCalledTimes(1);
-    expect(chart.setOption).toHaveBeenCalledTimes(1);
+    expect(chart.setOption).toHaveBeenCalledTimes(base);
 
-    width = 200; // cabem 4 dos 9 pontos
+    width = 200;
     act(() => resizeCallback?.());
-    expect(chart.setOption).toHaveBeenCalledTimes(2);
-    const zoom = chart.setOption.mock.calls[1][0].dataZoom;
+    expect(chart.setOption).toHaveBeenCalledTimes(base + 1);
+    const zoom = chart.setOption.mock.calls[base][0].dataZoom;
     expect(zoom.map((d: { type: string }) => d.type)).toEqual(["inside", "slider"]);
   });
 
-  it("estado vazio não inicializa o ECharts", () => {
-    render(
-      <ContinuousHarvestChart
-        plan={makePlan({ expectedHarvestStart: null, expectedHarvestEnd: null })}
-        executions={[]}
-      />,
-    );
+  it("estado vazio não inicializa o ECharts", async () => {
+    vi.mocked(getHarvestTimeline).mockResolvedValue(timeline({ points: [] }));
+    await renderChart(makePlan({ expectedHarvestStart: null, expectedHarvestEnd: null }), []);
     expect(echarts.init).not.toHaveBeenCalled();
   });
 
   it("BR-012: reaplica a option quando o tema do <html> muda", async () => {
-    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
-    expect(chart.setOption).toHaveBeenCalledTimes(1);
-    // Troca de tema no <html> ou em qualquer ancestral do gráfico.
+    await renderChart();
+    const base = chart.setOption.mock.calls.length;
     document.documentElement.classList.add("dark");
-    await vi.waitFor(() => expect(chart.setOption).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(chart.setOption).toHaveBeenCalledTimes(base + 1));
     screen.getByRole("img").parentElement!.classList.add("light");
-    await vi.waitFor(() => expect(chart.setOption).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(chart.setOption).toHaveBeenCalledTimes(base + 2));
     document.documentElement.classList.remove("dark");
   });
 });

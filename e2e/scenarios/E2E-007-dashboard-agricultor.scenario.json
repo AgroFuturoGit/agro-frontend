@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "id": "E2E-007",
+  "title": "Dashboard do agricultor na Visão geral",
+  "description": "O agricultor abre a Visão geral e vê os totais e um cartão por plano vindos de GET /analytics/farmers/me/summary, troca de safra e abre um plano pelo cartão.",
+  "feature_slug": "epic6-painel-agricultor-e-timeline",
+  "ac_refs": [
+    "AC-010"
+  ],
+  "priority": "P0",
+  "tags": [
+    "painel",
+    "agricultor",
+    "analytics"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "FARMER",
+        "credentials_env": {
+          "email": "E2E_FARMER_EMAIL",
+          "password": "E2E_FARMER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Agricultor com ao menos um plano e um apontamento validado na safra vigente; segunda safra listada em GET /harvests",
+      "Nome da safra alternativa (com planos do agricultor) em E2E_FARMER_OTHER_HARVEST"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_FARMER_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "css",
+        "value": "#password"
+      },
+      "value": "${env:E2E_FARMER_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Agricultor vê totais e cartões, troca de safra e abre um plano",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Pendente de validação"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Realizado (validado)"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "farmer-plan-card"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "columnheader",
+            "name": "Comunidade"
+          }
+        }
+      ]
+    },
+    {
+      "name": "troca_safra",
+      "title": "Trocar a safra refaz o resumo",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin"
+        },
+        {
+          "action": "select",
+          "target": {
+            "by": "label",
+            "value": "Safra"
+          },
+          "value": "${env:E2E_FARMER_OTHER_HARVEST}"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Safra: ${env:E2E_FARMER_OTHER_HARVEST}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "abre_plano",
+      "title": "O cartão leva ao detalhe do plano",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "link",
+            "name": "Ver plano"
+          },
+          "note": "primeiro cartão"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "url",
+          "value": "/planos/"
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Apontamentos de colheita"
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "A tela do painel não tem formulário.",
+    "forbidden": "Outros perfis não chamam o resumo; coberto em production-dashboard.test.tsx.",
+    "empty_state": "Estado vazio coberto em farmer-dashboard.test.tsx."
+  }
+}

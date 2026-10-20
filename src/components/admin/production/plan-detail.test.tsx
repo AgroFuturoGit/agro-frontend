@@ -12,6 +12,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
+import { getHarvestTimeline } from "@/lib/analytics";
 import { getMyProducer, listProducers } from "@/lib/producers";
 import {
   deleteProductionExecution,
@@ -34,6 +35,17 @@ import {
 vi.mock("echarts/core", () => ({
   use: vi.fn(),
   init: vi.fn(() => ({ setOption: vi.fn(), resize: vi.fn(), dispose: vi.fn() })),
+}));
+vi.mock("@/lib/analytics", () => ({
+  getHarvestTimeline: vi.fn(() =>
+    Promise.resolve({
+      planId: "plan-1",
+      harvestType: "SINGLE",
+      granularity: "WEEK",
+      unit: "kg",
+      points: [{ date: "2026-06-30", expectedValue: 40000, actualValue: 0, pendingValue: 0 }],
+    }),
+  ),
 }));
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: vi.fn(() => false) }));
 
@@ -589,6 +601,13 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
 describe("PlanDetail — gráfico previsto × realizado (UNIT-013)", () => {
   beforeEach(() => {
     vi.mocked(useIsMobile).mockReturnValue(false);
+    vi.mocked(getHarvestTimeline).mockResolvedValue({
+      planId: "plan-1",
+      harvestType: "SINGLE",
+      granularity: "WEEK",
+      unit: "kg",
+      points: [{ date: "2026-06-30", expectedValue: 40000, actualValue: 0, pendingValue: 0 }],
+    });
   });
 
   it("renderiza o gráfico entre o resumo e a tabela, com os dados da tela e sem nova chamada", async () => {
@@ -596,6 +615,16 @@ describe("PlanDetail — gráfico previsto × realizado (UNIT-013)", () => {
     vi.mocked(getProductionPlan).mockResolvedValue({
       ...PLAN,
       crop: { ...PLAN.crop!, harvestType: "CONTINUOUS" },
+    });
+    vi.mocked(getHarvestTimeline).mockResolvedValue({
+      planId: "plan-1",
+      harvestType: "CONTINUOUS",
+      granularity: "WEEK",
+      unit: "kg",
+      points: [
+        { date: "2026-05-04", expectedValue: 20000, actualValue: 0, pendingValue: 240 },
+        { date: "2026-05-11", expectedValue: 20000, actualValue: 0, pendingValue: 0 },
+      ],
     });
 
     renderPlanDetail();

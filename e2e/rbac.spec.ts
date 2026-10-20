@@ -94,19 +94,63 @@ for (const role of ["ADMIN", "MANAGER", "TECHNICIAN"]) {
   });
 }
 
-test("FARMER vê o painel da Visão geral sem a tabela por comunidade", async ({
+const FARMER_SUMMARY = {
+  farmerId: "00000000-0000-0000-0000-000000000001",
+  farmerName: "Zé",
+  communityName: "Alto da Serra",
+  currentHarvest: { id: "h-1", label: "Safra 2026", startDate: "2026-01-01", endDate: "2026-12-31" },
+  isEmpty: false,
+  totalPlansCount: 2,
+  activePlotsCount: 2,
+  totalPlantedAreaHa: 3.5,
+  totalTargetKg: 5000,
+  totalRealizedKg: 1200,
+  totalPendingKg: 300,
+  overallCompletionPct: 24,
+  plans: [
+    {
+      planId: "p-1", cropId: "c-1", cropName: "Milho", cropVariety: "BRS", harvestType: "SINGLE", unit: "KG",
+      status: "ACTIVE", locationDescription: "Talhão 1", plantedAreaHa: 2, targetKg: 3000, realizedKg: 1200,
+      pendingKg: 300, completionPct: 40, progressStatus: "BELOW_EXPECTED", plantingDate: null,
+      expectedHarvestStart: null, expectedHarvestEnd: null, lastExecutionDate: "2026-05-20",
+    },
+    {
+      planId: "p-2", cropId: "c-2", cropName: "Feijão", cropVariety: null, harvestType: "SINGLE", unit: "KG",
+      status: "PLANNED", locationDescription: null, plantedAreaHa: 1.5, targetKg: 2000, realizedKg: 0,
+      pendingKg: 0, completionPct: 0, progressStatus: "NOT_STARTED", plantingDate: null,
+      expectedHarvestStart: null, expectedHarvestEnd: null, lastExecutionDate: null,
+    },
+  ],
+};
+
+test("FARMER vê o dashboard do agricultor na Visão geral, sem o painel de produção", async ({
   page,
 }) => {
   await loginAs(page, "FARMER");
   await seedUser(page, "FARMER");
-  await page.route("**/production/dashboard", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...DASHBOARD, communities: [DASHBOARD.communities[0]] }) }),
+  let productionDashboardCalls = 0;
+  await page.route("**/production/dashboard", (route) => {
+    productionDashboardCalls += 1;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(DASHBOARD) });
+  });
+  await page.route("**/analytics/farmers/me/summary*", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(FARMER_SUMMARY) }),
+  );
+  await page.route("**/harvests", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) }),
+  );
+  await page.route("**/farmers/me", (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ message: "x" }) }),
   );
 
   await page.goto("/admin");
 
-  await expect(page.getByText("40.000 kg")).toBeVisible();
+  await expect(page.getByText("Safra: Safra 2026")).toBeVisible();
+  await expect(page.getByText("Pendente de validação")).toBeVisible();
+  await expect(page.getByTestId("farmer-plan-card")).toHaveCount(2);
+  await expect(page.getByText("Abaixo do esperado")).toBeVisible();
   await expect(page.getByRole("table")).toHaveCount(0);
+  expect(productionDashboardCalls).toBe(0);
 });
 
 test("erro do painel mostra a mensagem do back e 'Tentar novamente' recupera", async ({

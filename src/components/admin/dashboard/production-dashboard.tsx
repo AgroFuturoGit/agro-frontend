@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Sprout, Users } from "lucide-react";
 
+import { FarmerDashboard } from "@/components/admin/dashboard/farmer-dashboard";
 import { ComparisonSummary } from "@/components/admin/production/comparison-summary";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,20 +30,31 @@ import {
 } from "@/lib/production";
 
 /**
- * Painel da Visão geral: números de `GET /production/dashboard`. O recorte
- * (agricultor, técnico, gestor, admin) é aplicado pelo back; o front só decide
- * se mostra a quebra por comunidade (todos menos FARMER).
+ * Visão geral: o agricultor vê o dashboard da Feature 6.1; os demais perfis,
+ * o painel de produção abaixo. Sem role conhecida nada renderiza (falha fechado).
  */
 export function ProductionDashboard() {
-  const [role, setRole] = useState<Role | null>(null);
-  const [data, setData] = useState<Dashboard | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState<Role | null | undefined>(undefined);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setRole(readUserFromStorage()?.role ?? null);
   }, []);
+
+  if (!role) return null;
+  if (role === "FARMER") return <FarmerDashboard />;
+  return <StaffDashboard />;
+}
+
+/**
+ * Painel de ADMIN, MANAGER e TECHNICIAN: números de `GET /production/dashboard`. O recorte
+ * (agricultor, técnico, gestor, admin) é aplicado pelo back; o front só decide
+ * se mostra a quebra por comunidade (todos menos FARMER).
+ */
+function StaffDashboard() {
+  const [data, setData] = useState<Dashboard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -117,9 +129,6 @@ export function ProductionDashboard() {
     );
   }
 
-  // Falha fechado: sem role conhecida não mostra a quebra por comunidade.
-  const showCommunities = role !== null && role !== "FARMER";
-
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -161,7 +170,6 @@ export function ProductionDashboard() {
         apontamentos validados.
       </p>
 
-      {showCommunities && (
         <div className="flex flex-col gap-3">
           <h3 className="text-lg font-semibold tracking-tight">
             Por comunidade
@@ -205,7 +213,6 @@ export function ProductionDashboard() {
             </Table>
           </Card>
         </div>
-      )}
     </div>
   );
 }
