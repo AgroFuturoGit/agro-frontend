@@ -291,6 +291,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   }
 
   const active = choice;
+  const refreshing = loading && data !== null;
 
   return (
     <Card>
@@ -343,17 +344,35 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
           </p>
         )}
 
-        <div
-          ref={containerRef}
-          role="img"
-          aria-label={ariaLabel}
-          data-mode={isContinuous ? "composite" : "simple"}
-          data-granularity={isContinuous ? active : undefined}
-          data-points={isContinuous ? points.length : 2}
-          data-has-window={String(hasExpected)}
-          style={{ height: CHART_HEIGHT }}
-          className="w-full max-w-full"
-        />
+        {/*
+          Recarga com dados já na tela (troca Semana/Mês ou novo apontamento):
+          o gráfico anterior fica esmaecido e marcado como ocupado até a
+          resposta chegar, em vez de parecer já atualizado.
+        */}
+        <div className="relative" aria-busy={refreshing}>
+          <div
+            ref={containerRef}
+            role="img"
+            aria-label={ariaLabel}
+            data-mode={isContinuous ? "composite" : "simple"}
+            data-granularity={isContinuous ? active : undefined}
+            data-points={isContinuous ? points.length : 2}
+            data-has-window={String(hasExpected)}
+            style={{ height: CHART_HEIGHT }}
+            className={cn(
+              "w-full max-w-full transition-opacity",
+              refreshing && "opacity-40",
+            )}
+          />
+          {refreshing && (
+            <p
+              role="status"
+              className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground"
+            >
+              Atualizando gráfico…
+            </p>
+          )}
+        </div>
 
         <p className="text-xs text-muted-foreground">
           Somente validados contam no realizado oficial.

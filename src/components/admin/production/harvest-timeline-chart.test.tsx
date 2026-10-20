@@ -153,6 +153,27 @@ describe("ContinuousHarvestChart", () => {
     expect(screen.getByRole("button", { name: "Mês" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("CR-004: na troca Semana/Mês o gráfico anterior fica marcado como atualizando até a resposta", async () => {
+    await renderChart();
+    expect(screen.queryByRole("status")).toBeNull();
+
+    let resolveMonth: (value: HarvestTimelineResponse) => void = () => {};
+    vi.mocked(getHarvestTimeline).mockReturnValue(
+      new Promise((resolve) => {
+        resolveMonth = resolve;
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Mês" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("Atualizando gráfico…");
+    expect(screen.getByRole("img").parentElement).toHaveAttribute("aria-busy", "true");
+
+    resolveMonth(timeline({ granularity: "MONTH", points: weeks(2) }));
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(screen.getByRole("img").parentElement).toHaveAttribute("aria-busy", "false");
+    expect(screen.getByRole("img")).toHaveAttribute("data-points", "2");
+  });
+
   it("UNIT-007: SINGLE e harvestType nulo renderizam barras simples, sem alternador", async () => {
     for (const harvestType of ["SINGLE", null] as const) {
       vi.mocked(getHarvestTimeline).mockResolvedValue(
