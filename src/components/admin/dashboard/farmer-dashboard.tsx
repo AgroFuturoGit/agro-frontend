@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, Sprout } from "lucide-react";
 
@@ -12,6 +12,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   getFarmerSummary,
@@ -168,12 +176,22 @@ export function FarmerDashboard() {
     };
   }, []);
 
+  // Só a resposta da consulta mais recente vale: ao trocar de safra rápido,
+  // uma resposta atrasada da safra anterior não pode sobrescrever a nova.
+  const requestSeq = useRef(0);
+
   const load = useCallback(async (selected: string) => {
+    const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     try {
-      setSummary(await getFarmerSummary(selected === CURRENT ? undefined : selected));
+      const data = await getFarmerSummary(
+        selected === CURRENT ? undefined : selected,
+      );
+      if (seq !== requestSeq.current) return;
+      setSummary(data);
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setSummary(null);
       setError(
         err instanceof ApiError
@@ -181,7 +199,7 @@ export function FarmerDashboard() {
           : "Não foi possível carregar o resumo da sua safra.",
       );
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   }, []);
 
@@ -192,22 +210,31 @@ export function FarmerDashboard() {
 
   const selector = (
     <div className="flex items-center gap-2">
-      <label htmlFor="farmer-harvest" className="text-sm text-muted-foreground">
+      <Label htmlFor="farmer-harvest" className="font-normal text-muted-foreground">
         Safra
-      </label>
-      <select
-        id="farmer-harvest"
+      </Label>
+      <Select
         value={harvestId}
-        onChange={(e) => setHarvestId(e.target.value)}
-        className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+        onValueChange={(v) => setHarvestId(v ?? CURRENT)}
       >
-        <option value={CURRENT}>Safra vigente</option>
-        {harvests.map((h) => (
-          <option key={h.id} value={h.id}>
-            {h.label}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger id="farmer-harvest" className="min-w-44">
+          <SelectValue>
+            {(v) =>
+              v === CURRENT || !v
+                ? "Safra vigente"
+                : (harvests.find((h) => h.id === v)?.label ?? "Safra vigente")
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={CURRENT}>Safra vigente</SelectItem>
+          {harvests.map((h) => (
+            <SelectItem key={h.id} value={h.id}>
+              {h.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 
@@ -250,7 +277,7 @@ export function FarmerDashboard() {
     );
   } else if (summary) {
     const plansHref = paths
-      ? `/admin/organizacoes/${paths.org}/comunidades/${paths.community}/produtores/${paths.farmerId}/planos`
+      ? `/admin/organizacoes/${paths.org}/comunidades/${paths.community}/produtores/${paths.farmerId}`
       : null;
     if (summary.isEmpty) {
       body = (

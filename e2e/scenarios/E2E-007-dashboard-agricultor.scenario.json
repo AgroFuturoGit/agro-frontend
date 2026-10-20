@@ -115,12 +115,20 @@
           "value": "/admin"
         },
         {
-          "action": "select",
+          "action": "click",
           "target": {
-            "by": "label",
-            "value": "Safra"
-          },
-          "value": "${env:E2E_FARMER_OTHER_HARVEST}"
+            "by": "role",
+            "value": "combobox",
+            "name": "Safra"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_FARMER_OTHER_HARVEST}"
+          }
         }
       ],
       "assertions": [

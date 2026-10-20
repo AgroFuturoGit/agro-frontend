@@ -22,6 +22,30 @@ vi.mock("@/lib/producers", async () => {
   return { ...actual, getMyProducer: vi.fn() };
 });
 
+// O `Select` do `@base-ui/react` só confirma o item DESTACADO no jsdom (clique
+// direto é ignorado): abre pelo teclado e caminha até o alvo, como em
+// `data-table-pagination.test.tsx`.
+async function chooseHarvest(label: string) {
+  const trigger = screen.getByRole("combobox", { name: "Safra" });
+  trigger.focus();
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  fireEvent.keyUp(trigger, { key: "ArrowDown" });
+  const target = await screen.findByRole("option", { name: label });
+  const options = screen.getAllByRole("option");
+  const highlighted = () =>
+    options.find((o) => o.getAttribute("data-highlighted") !== null) as HTMLElement;
+  const from = options.indexOf(highlighted());
+  const to = options.indexOf(target);
+  const key = to > from ? "ArrowDown" : "ArrowUp";
+  for (let step = 0; step < Math.abs(to - from); step += 1) {
+    const current = highlighted();
+    fireEvent.keyDown(current, { key });
+    fireEvent.keyUp(current, { key });
+  }
+  fireEvent.keyDown(target, { key: "Enter" });
+  fireEvent.keyUp(target, { key: "Enter" });
+}
+
 function card(planId: string, progressStatus: ProgressStatus, over: Partial<FarmerPlanCard> = {}): FarmerPlanCard {
   return {
     planId,
@@ -140,21 +164,42 @@ describe("FarmerDashboard (UNIT-003..006)", () => {
     await screen.findAllByTestId("farmer-plan-card");
     expect(getFarmerSummary).toHaveBeenLastCalledWith(undefined);
 
+    await waitFor(() => expect(listHarvests).toHaveBeenCalled());
+    fireEvent.click(screen.getByRole("combobox", { name: "Safra" }));
     await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(3));
     expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
       "Safra vigente",
       "Safra 2026",
       "Safra 2025",
     ]);
-    fireEvent.change(screen.getByLabelText("Safra"), { target: { value: "h-0" } });
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    await chooseHarvest("Safra 2025");
     await waitFor(() => expect(getFarmerSummary).toHaveBeenLastCalledWith("h-0"));
+  });
+
+  it("CR-001: resposta atrasada da safra anterior não sobrescreve a da safra escolhida depois", async () => {
+    let resolveOld: (value: FarmerSummary) => void = () => {};
+    vi.mocked(getFarmerSummary)
+      .mockReturnValueOnce(new Promise((resolve) => { resolveOld = resolve; }))
+      .mockResolvedValueOnce({ ...SUMMARY, totalPlantedAreaHa: 99 });
+    render(<FarmerDashboard />);
+    await waitFor(() => expect(listHarvests).toHaveBeenCalled());
+
+    await chooseHarvest("Safra 2025");
+    expect(await screen.findByText("99 ha")).toBeTruthy();
+
+    resolveOld(SUMMARY);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.getByText("99 ha")).toBeTruthy();
+    expect(screen.queryByText("10,5 ha")).toBeNull();
   });
 
   it("UNIT-005: falha em /harvests não quebra o resumo", async () => {
     vi.mocked(listHarvests).mockRejectedValue(new Error("403"));
     render(<FarmerDashboard />);
     await screen.findAllByTestId("farmer-plan-card");
-    expect(screen.getAllByRole("option")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("combobox", { name: "Safra" }));
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(1));
   });
 
   it("UNIT-006: estado vazio orienta o próximo passo e linka para os planos", async () => {
@@ -165,7 +210,7 @@ describe("FarmerDashboard (UNIT-003..006)", () => {
     await waitFor(() =>
       expect(
         screen.getByRole("link", { name: "Ir para os meus planos" }).getAttribute("href"),
-      ).toBe("/admin/organizacoes/org-1/comunidades/com-1/produtores/f-1/planos"),
+      ).toBe("/admin/organizacoes/org-1/comunidades/com-1/produtores/f-1"),
     );
   });
 

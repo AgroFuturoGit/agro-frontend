@@ -51,7 +51,8 @@ test.describe('E2E-007 Dashboard do agricultor na Visão geral', () => {
     // aguarda o redirecionamento pós-login
     await page.waitForURL(new RegExp(escapeRegExp('/admin')));
     await page.goto('/admin');
-    await page.getByLabel('Safra').selectOption(env('E2E_FARMER_OTHER_HARVEST'));
+    await page.getByRole('combobox', { name: 'Safra' }).click();
+    await page.getByRole('option', { name: env('E2E_FARMER_OTHER_HARVEST') }).click();
     await expect(page.getByText(`Safra: ${env('E2E_FARMER_OTHER_HARVEST')}`)).toBeVisible();
   });
 
