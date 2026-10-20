@@ -57,16 +57,15 @@ export type ProductionExecution = {
   harvestedAt: string | null;
   status: ExecutionStatus | null;
   notes: string | null;
-  // Campos de decisão opcionais no tipo (o mapper sempre os preenche) para não
-  // quebrar fixtures de testes que não lidam com a decisão.
   /** Motivo informado ao rejeitar (opcional no back). */
-  rejectionReason?: string | null;
+  rejectionReason: string | null;
   /** UUID de quem decidiu — o back não devolve o nome. */
-  validatedBy?: string | null;
+  validatedBy: string | null;
   /** Momento da decisão (validação ou rejeição). */
-  validatedAt?: string | null;
+  validatedAt: string | null;
   createdAt: string | null;
-  updatedAt?: string | null;
+  /** Versão do apontamento; volta no PUT como `baseUpdatedAt`. */
+  updatedAt: string | null;
 };
 
 export type CommunityDashboardRow = {
@@ -127,6 +126,11 @@ export type ProductionExecutionWritePayload = {
   quantityKg: number;
   harvestedAt: string;
   notes?: string | null;
+  /**
+   * Versão que o usuário tinha na tela ao editar. O back recusa com 409 se o
+   * apontamento mudou depois disso (ex.: um técnico decidiu nesse meio-tempo).
+   */
+  baseUpdatedAt?: string | null;
 };
 
 // ----- Tipos de resposta da API -----

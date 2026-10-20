@@ -162,11 +162,25 @@ export function ExecutionFormDrawer({
       if (isCreate) {
         await createProductionExecution(planId, payload);
       } else if (execution) {
-        await updateProductionExecution(execution.id, payload);
+        // Com a versão que estava na tela, o back recusa (409) se alguém
+        // mudou o apontamento depois — em vez de sobrescrever em silêncio.
+        await updateProductionExecution(execution.id, {
+          ...payload,
+          baseUpdatedAt: execution.updatedAt,
+        });
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        // A lista por trás do drawer está desatualizada: recarrega para o
+        // usuário ver a versão atual antes de tentar de novo.
+        onSaved();
+        setFormError(
+          "Este apontamento foi alterado por outra pessoa enquanto você editava. Os dados foram atualizados; feche e abra a edição novamente para continuar.",
+        );
+        return;
+      }
       setFormError(
         err instanceof ApiError
           ? err.message
