@@ -115,4 +115,12 @@ describe("analytics — mappers (UNIT-001)", () => {
     expect(t.points[1].expectedValue).toBeNull();
     expect(t.points[1].actualValue).toBe(0);
   });
+
+  it("CR-005: cartão sem planId é descartado em vez de virar 'undefined'", () => {
+    const summary = mapFarmerSummary({
+      isEmpty: false,
+      plans: [{ cropName: "Sem id" }, { planId: "p-9", cropName: "Milho" }],
+    });
+    expect(summary.plans.map((p) => p.planId)).toEqual(["p-9"]);
+  });
 });

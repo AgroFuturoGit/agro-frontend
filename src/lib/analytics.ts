@@ -82,14 +82,18 @@ const PROGRESS: ProgressStatus[] = [
   "NOT_STARTED",
 ];
 
-function mapCard(raw: Raw): FarmerPlanCard {
+// Sem `planId` o cartão não tem chave nem link: é descartado em vez de virar
+// um plano "undefined".
+function mapCard(raw: Raw): FarmerPlanCard | null {
+  const planId = str(raw.planId);
+  if (!planId) return null;
   const progress = PROGRESS.find((p) => p === raw.progressStatus);
   const harvestType =
     raw.harvestType === "SINGLE" || raw.harvestType === "CONTINUOUS"
       ? raw.harvestType
       : null;
   return {
-    planId: String(raw.planId),
+    planId,
     cropId: str(raw.cropId),
     cropName: str(raw.cropName) ?? "Cultura",
     cropVariety: str(raw.cropVariety),
@@ -112,7 +116,11 @@ function mapCard(raw: Raw): FarmerPlanCard {
 
 export function mapFarmerSummary(raw: Raw): FarmerSummary {
   const harvest = raw.currentHarvest as Raw | null | undefined;
-  const plans = Array.isArray(raw.plans) ? (raw.plans as Raw[]).map(mapCard) : [];
+  const plans = Array.isArray(raw.plans)
+    ? (raw.plans as Raw[])
+        .map(mapCard)
+        .filter((card): card is FarmerPlanCard => card !== null)
+    : [];
   return {
     farmerId: str(raw.farmerId),
     farmerName: str(raw.farmerName),
