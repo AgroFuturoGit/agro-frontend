@@ -35,7 +35,7 @@ function TestSheet({
           <button type="button">Ação do filho</button>
         </div>
         <SheetFooter>
-          <SheetClose>Fechar</SheetClose>
+          <SheetClose>Dispensar</SheetClose>
         </SheetFooter>
       </SheetContent>
     </Sheet>
@@ -74,7 +74,7 @@ describe("Sheet — abertura e renderização dos filhos", () => {
     await user.click(screen.getByRole("button", { name: "Abrir painel" }));
     await screen.findByText("Conteúdo filho");
 
-    await user.click(screen.getByRole("button", { name: "Fechar" }));
+    await user.click(screen.getByRole("button", { name: "Dispensar" }));
 
     expect(screen.queryByText("Conteúdo filho")).not.toBeInTheDocument();
   });
@@ -84,13 +84,13 @@ describe("Sheet — abertura e renderização dos filhos", () => {
 
     const { unmount } = render(<TestSheet />);
     await user.click(screen.getByRole("button", { name: "Abrir painel" }));
-    expect(await screen.findByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Fechar" })).toBeInTheDocument();
     unmount();
 
     render(<TestSheet showCloseButton={false} />);
     await user.click(screen.getByRole("button", { name: "Abrir painel" }));
     await screen.findByText("Conteúdo filho");
-    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Fechar" })).not.toBeInTheDocument();
   });
 });
 
@@ -127,7 +127,7 @@ describe("Sheet — controle externo de abertura", () => {
     // Já nasce aberto: quem controla é o estado do pai, não um clique.
     expect(await screen.findByText("Filho controlado")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Close" }));
+    await user.click(screen.getByRole("button", { name: "Fechar" }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(screen.queryByText("Filho controlado")).not.toBeInTheDocument();
@@ -148,7 +148,7 @@ describe("Sheet — padding do cabeçalho e rodapé", () => {
     await user.click(screen.getByRole("button", { name: "Abrir painel" }));
 
     const header = (await screen.findByText("Título do painel")).parentElement;
-    const footer = screen.getByRole("button", { name: "Fechar" }).parentElement;
+    const footer = screen.getByRole("button", { name: "Dispensar" }).parentElement;
 
     expect(header?.className).toMatch(/\bp-4\b/);
     expect(footer?.className).toMatch(/\bp-4\b/);
