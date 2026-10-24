@@ -557,9 +557,9 @@ export function mapManagementSummary(raw: Raw): ManagementSummary {
     scope: raw.scope === "GLOBAL" ? "GLOBAL" : "ORGANIZATION",
     organizationId: str(raw.organizationId),
     organizationName: str(raw.organizationName),
-    currentHarvest: harvest
+    currentHarvest: harvest && str(harvest.id)
       ? {
-          id: String(harvest.id),
+          id: str(harvest.id) as string,
           label: str(harvest.label) ?? "",
           startDate: str(harvest.startDate),
           endDate: str(harvest.endDate),

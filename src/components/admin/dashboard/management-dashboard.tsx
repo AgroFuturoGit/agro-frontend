@@ -3,10 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertCircle, Sprout } from "lucide-react";
 
-import {
-  CommunityTargetChart,
-  CropShareChart,
-} from "@/components/admin/dashboard/crop-share-chart";
+import { CommunityTargetChart } from "@/components/admin/dashboard/community-target-chart";
+import { CropShareChart } from "@/components/admin/dashboard/crop-share-chart";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -271,7 +269,8 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
   }, [isAdmin]);
 
   // Comunidades: do admin, as da organização escolhida; do gestor, as da sua
-  // (id vem da primeira resposta do resumo).
+  // (id vem da primeira resposta de sucesso do resumo; até lá o seletor fica
+  // desabilitado em "Todas" e as opções carregam assim que a organização é conhecida).
   const communitiesOrgId = isAdmin
     ? organizationId === ALL
       ? null
@@ -375,7 +374,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
         label="Comunidade"
         value={communityId}
         onChange={setCommunityId}
-        disabled={isAdmin && organizationId === ALL}
+        disabled={!communitiesOrgId}
         options={[{ value: ALL, label: "Todas" }, ...communityOptions]}
       />
     </div>

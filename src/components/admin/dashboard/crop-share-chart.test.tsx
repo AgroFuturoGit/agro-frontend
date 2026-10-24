@@ -2,16 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import {
-  buildCommunityTargetOption,
   buildCropShareOption,
-  CommunityTargetChart,
   CropShareChart,
   type ShareChartColors,
 } from "@/components/admin/dashboard/crop-share-chart";
-import type {
-  ManagementCommunityPerformance,
-  ManagementCropRankingItem,
-} from "@/lib/analytics";
+import type { ManagementCropRankingItem } from "@/lib/analytics";
 
 const chart = vi.hoisted(() => ({
   setOption: vi.fn(),
@@ -69,24 +64,6 @@ function crop(name: string, share: number, over: Partial<ManagementCropRankingIt
   };
 }
 
-function community(id: string, name: string): ManagementCommunityPerformance {
-  return {
-    communityId: id,
-    communityName: name,
-    organizationId: "o",
-    organizationName: "Coop",
-    activeFarmersCount: 2,
-    compliantFarmersCount: 1,
-    complianceRatePct: 50,
-    plansCount: 2,
-    plantedAreaHa: 3,
-    targetKg: 1000,
-    realizedKg: 400,
-    conversionRatePct: 40,
-    lastExecutionDate: null,
-  };
-}
-
 describe("CropShareChart (UNIT-005)", () => {
   it("option: rosca com a participação de cada cultura, sem as de 0%", () => {
     const option = buildCropShareOption(
@@ -129,25 +106,5 @@ describe("CropShareChart (UNIT-005)", () => {
     const html = option.tooltip.formatter({ dataIndex: 0 });
     expect(html).toContain("&lt;b&gt;");
     expect(html).not.toContain("<b>x");
-  });
-});
-
-describe("CommunityTargetChart (UNIT-006)", () => {
-  it("option: barras de meta e colhido por comunidade", () => {
-    const option = buildCommunityTargetOption(
-      [community("c1", "Serra"), community("c2", "Vale")],
-      COLORS,
-    ) as {
-      xAxis: { data: string[] };
-      series: { name: string; data: number[] }[];
-    };
-    expect(option.xAxis.data).toEqual(["Serra", "Vale"]);
-    expect(option.series.map((s) => s.name)).toEqual(["Meta", "Colhido"]);
-    expect(option.series[1].data).toEqual([400, 400]);
-  });
-
-  it("não renderiza sem comunidades", () => {
-    render(<CommunityTargetChart communities={[]} />);
-    expect(screen.queryByTestId("management-community-chart")).toBeNull();
   });
 });

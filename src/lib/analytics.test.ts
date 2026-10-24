@@ -207,6 +207,11 @@ describe("analytics — resumo do técnico (UNIT-001)", () => {
     expect(s.totalWarningsCount).toBe(0);
     expect(s.isEmpty).toBe(false);
   });
+
+  it("mapManagementSummary descarta currentHarvest sem id", () => {
+    const s = mapManagementSummary({ currentHarvest: { label: "2026" } });
+    expect(s.currentHarvest).toBeNull();
+  });
 });
 
 describe("analytics — resumo da gestão (UNIT-001)", () => {
@@ -280,5 +285,10 @@ describe("analytics — resumo da gestão (UNIT-001)", () => {
     expect(s.organizations).toEqual([]);
     expect(s.currentHarvest).toBeNull();
     expect(s.isEmpty).toBe(false);
+  });
+
+  it("mapManagementSummary descarta currentHarvest sem id", () => {
+    const s = mapManagementSummary({ currentHarvest: { label: "2026" } });
+    expect(s.currentHarvest).toBeNull();
   });
 });

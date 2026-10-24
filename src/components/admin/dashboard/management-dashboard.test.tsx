@@ -39,6 +39,8 @@ vi.mock("@/components/admin/dashboard/crop-share-chart", () => ({
   CropShareChart: ({ ranking }: { ranking: { cropName: string }[] }) => (
     <div data-testid="crop-share-chart">{ranking.map((r) => r.cropName).join(",")}</div>
   ),
+}));
+vi.mock("@/components/admin/dashboard/community-target-chart", () => ({
   CommunityTargetChart: ({ communities }: { communities: { communityName: string }[] }) => (
     <div data-testid="management-community-chart">
       {communities.map((c) => c.communityName).join(",")}
@@ -358,6 +360,21 @@ describe("ManagementDashboard — estados (UNIT-008)", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("Falha no servidor");
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByTestId("crop-ranking")).toBeTruthy();
+  });
+
+  it("primeira consulta falha: comunidade desabilitada até o 'Tentar novamente' funcionar", async () => {
+    vi.mocked(getManagerSummary)
+      .mockRejectedValueOnce(new ApiError(500, "Falha no servidor", null))
+      .mockResolvedValueOnce(summary());
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByRole("alert");
+    expect(screen.getByRole("combobox", { name: "Comunidade" }).hasAttribute("disabled")).toBe(true);
+    expect(listCommunities).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await waitFor(() => expect(listCommunities).toHaveBeenCalledWith("o-1"));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Comunidade" }).hasAttribute("disabled")).toBe(false),
+    );
   });
 
   it("403 mostra a mensagem do back", async () => {
