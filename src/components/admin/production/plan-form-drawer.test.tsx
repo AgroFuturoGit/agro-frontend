@@ -108,7 +108,7 @@ describe("PlanFormDrawer — meta calculada (UNIT-008 / AC-009)", () => {
 
     await pick("Cultivo", "Tomate — Italiano");
     fireEvent.change(screen.getByLabelText("Área plantada (ha)"), {
-      target: { value: "2.5" },
+      target: { value: "2,5" },
     });
     expect(target.value).toBe("3.750 kg");
 
@@ -218,5 +218,119 @@ describe("PlanFormDrawer — janela e status (UNIT-010 / AC-011)", () => {
         plannedPlantingDate: "2026-02-01",
       }),
     );
+  });
+});
+
+describe("PlanFormDrawer — QA (UNIT-003 / UNIT-004)", () => {
+  it("recusa notação científica na área", async () => {
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: "1e3" } });
+    submit();
+    expect(await screen.findByText(/Informe uma área válida/)).toBeTruthy();
+    expect(createProductionPlan).not.toHaveBeenCalled();
+  });
+
+  it("recusa área abaixo de 0,01 e ponto decimal ambíguo", async () => {
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    for (const bad of ["0,001", "12.5"]) {
+      fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: bad } });
+      submit();
+      expect(await screen.findByText(/Informe uma área válida/)).toBeTruthy();
+    }
+    expect(createProductionPlan).not.toHaveBeenCalled();
+  });
+
+  it("'1.234' vale 1234 e '12,5' vale 12,5 no envio; edição mostra vírgula", async () => {
+    vi.mocked(createProductionPlan).mockResolvedValue(PLAN);
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: "1.234" } });
+    submit();
+    await waitFor(() => expect(createProductionPlan).toHaveBeenCalled());
+    expect(vi.mocked(createProductionPlan).mock.calls[0][1].plantedArea).toBe(1234);
+    cleanup();
+
+    renderForm("edit", { ...PLAN, plantedArea: 12.5 });
+    expect(
+      ((await screen.findByLabelText("Área plantada (ha)")) as HTMLInputElement).value,
+    ).toBe("12,5");
+  });
+
+  it("plano legado com plantio fora da safra salva outras mudanças; mudar a data fora é recusado", async () => {
+    vi.mocked(updateProductionPlan).mockResolvedValue(PLAN);
+    const legacy: ProductionPlan = {
+      ...PLAN,
+      harvest: { id: "h-1", label: "Safra 2026", startDate: "2026-03-01", endDate: "2026-12-31" },
+      plannedPlantingDate: "2026-02-01",
+    };
+    renderForm("edit", legacy);
+    await screen.findByLabelText("Status");
+    await pick("Status", "Ativo");
+    submit();
+    await waitFor(() => expect(updateProductionPlan).toHaveBeenCalled());
+    cleanup();
+
+    vi.mocked(updateProductionPlan).mockClear();
+    renderForm("edit", legacy);
+    fireEvent.change(await screen.findByLabelText("Data prevista de plantio"), {
+      target: { value: "2026-01-15" },
+    });
+    submit();
+    expect(await screen.findByText(/O plantio deve estar dentro da safra/)).toBeTruthy();
+    expect(updateProductionPlan).not.toHaveBeenCalled();
+  });
+
+  it("recusa plantio fora do intervalo da safra escolhida", async () => {
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Data prevista de plantio"), {
+      target: { value: "2025-12-31" },
+    });
+    submit();
+    expect(
+      await screen.findByText(/O plantio deve estar dentro da safra \(01\/01\/2026 a 31\/12\/2026\)/),
+    ).toBeTruthy();
+    expect(createProductionPlan).not.toHaveBeenCalled();
+  });
+
+  it("aceita plantio dentro da safra", async () => {
+    vi.mocked(createProductionPlan).mockResolvedValue(PLAN);
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Data prevista de plantio"), {
+      target: { value: "2026-03-01" },
+    });
+    submit();
+    await waitFor(() => expect(createProductionPlan).toHaveBeenCalled());
+  });
+
+  it("recusa fim previsto anterior ao plantio", async () => {
+    renderForm("edit", PLAN);
+    fireEvent.change(await screen.findByLabelText("Início previsto da colheita"), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("Início previsto da colheita"), {
+      target: { value: "2026-01-10" },
+    });
+    fireEvent.change(screen.getByLabelText("Fim previsto da colheita"), {
+      target: { value: "2026-01-20" },
+    });
+    submit();
+    expect(await screen.findByText("A data final não pode ser anterior ao plantio")).toBeTruthy();
+    expect(updateProductionPlan).not.toHaveBeenCalled();
   });
 });

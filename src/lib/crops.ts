@@ -17,6 +17,7 @@ export type Crop = {
   unit: MeasurementUnit | null;
   unitWeightKg: number | null;
   updatedAt?: string;
+  createdAt?: string;
 };
 
 // O PATCH /crops/{id} substitui tudo: omitir um campo grava null. Por isso
@@ -42,6 +43,8 @@ type CropApiResponse = {
   harvestType?: string | null;
   unit?: string | null;
   unitWeightKg?: number | string | null;
+  updatedAt?: string | null;
+  createdAt?: string | null;
 };
 
 function numOrNull(value: number | string | null | undefined): number | null {
@@ -73,6 +76,8 @@ export function mapCrop(raw: CropApiResponse): Crop {
     harvestType: parseHarvestType(raw.harvestType),
     unit: parseMeasurementUnit(raw.unit),
     unitWeightKg: numOrNull(raw.unitWeightKg),
+    ...(raw.updatedAt ? { updatedAt: raw.updatedAt } : {}),
+    ...(raw.createdAt ? { createdAt: raw.createdAt } : {}),
   };
 }
 

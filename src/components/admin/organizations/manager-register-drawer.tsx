@@ -20,6 +20,7 @@ import {
   parseManagerRegisterFieldErrors,
   registerManager,
 } from "@/lib/organizations";
+import { TEXT_MAX_LENGTH, isValidEmail, onlyDigits } from "@/lib/validation";
 
 type Props = {
   /** Organização de destino — sem seletor, já contextual à linha clicada. */
@@ -70,6 +71,9 @@ function validateField(
       default:
         return "Campo obrigatório";
     }
+  }
+  if (field === "email" && !isValidEmail(values.email)) {
+    return "Informe um e-mail válido";
   }
   return null;
 }
@@ -142,7 +146,7 @@ export function ManagerRegisterDrawer({
         fullName: values.fullName.trim(),
         email: values.email.trim(),
         password: values.password,
-        cpf: values.cpf.trim(),
+        cpf: onlyDigits(values.cpf),
         dateOfBirth: values.dateOfBirth,
       });
       setRegisteredName(result.user.fullName);
@@ -244,6 +248,7 @@ export function ManagerRegisterDrawer({
                   <Input
                     id="manager-email"
                     type="email"
+                    maxLength={TEXT_MAX_LENGTH}
                     value={values.email}
                     onChange={(e) => update("email", e.target.value)}
                     onBlur={() => handleBlur("email")}
