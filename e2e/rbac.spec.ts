@@ -236,6 +236,43 @@ test("TECHNICIAN vê o dashboard do técnico na Visão geral, sem o painel de pr
   expect(summaryQueries[0]).toBe("");
 });
 
+test("TECHNICIAN: 403 de comunidade não assistida mostra a mensagem e 'Voltar para Todas' recupera", async ({
+  page,
+}) => {
+  await loginAs(page, "TECHNICIAN");
+  await seedUser(page, "TECHNICIAN");
+  await page.route("**/analytics/technicians/me/summary*", (route) => {
+    if (new URL(route.request().url()).searchParams.has("communityId")) {
+      return route.fulfill({
+        status: 403,
+        contentType: "application/json",
+        body: JSON.stringify({ message: "Comunidade não assistida pelo técnico logado." }),
+      });
+    }
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(TECHNICIAN_SUMMARY) });
+  });
+  await page.route("**/harvests", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) }),
+  );
+  await page.route("**/crops", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) }),
+  );
+  await page.route("**/technicians/me/farmers", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) }),
+  );
+
+  await page.goto("/admin");
+  await expect(page.getByText("Comunidades atendidas")).toBeVisible();
+
+  await page.getByRole("combobox", { name: "Comunidade" }).click();
+  await page.getByRole("option", { name: "Vale Verde" }).click();
+
+  await expect(page.getByText("Comunidade não assistida pelo técnico logado.")).toBeVisible();
+  await page.getByRole("button", { name: "Voltar para Todas" }).click();
+  await expect(page.getByText("Comunidades atendidas")).toBeVisible();
+  await expect(page.getByText("Comunidade não assistida pelo técnico logado.")).toHaveCount(0);
+});
+
 test("erro do painel mostra a mensagem do back e 'Tentar novamente' recupera", async ({
   page,
 }) => {

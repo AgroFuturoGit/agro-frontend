@@ -275,24 +275,55 @@ export function TechnicianDashboard() {
   // Só a resposta da consulta mais recente vale.
   const requestSeq = useRef(0);
 
+  // Safra/cultura para as quais `communityOptions` foram obtidas.
+  const optionsKey = useRef<string | null>(null);
+
   const load = useCallback(async (h: string, c: string, k: string) => {
     const seq = ++requestSeq.current;
     setLoading(true);
     setError(null);
     try {
-      const data = await getTechnicianSummary({
-        harvestId: h === CURRENT ? undefined : h,
+      const harvestParam = h === CURRENT ? undefined : h;
+      const cropParam = k === ALL ? undefined : k;
+      const key = `${h}|${k}`;
+      const toOptions = (data: TechnicianSummary): Option[] =>
+        data.communities.map((x) => ({ value: x.communityId, label: x.communityName }));
+
+      // Com comunidade escolhida a resposta encolhe: se a safra ou a cultura
+      // mudaram, as opções vêm de uma consulta sem `communityId`.
+      const optionsPromise =
+        c !== ALL && optionsKey.current !== key
+          ? getTechnicianSummary({ harvestId: harvestParam, cropId: cropParam })
+              .then(toOptions)
+              .catch(() => null)
+          : null;
+      const mainPromise = getTechnicianSummary({
+        harvestId: harvestParam,
         communityId: c === ALL ? undefined : c,
-        cropId: k === ALL ? undefined : k,
+        cropId: cropParam,
       });
+      mainPromise.catch(() => {});
+
+      if (optionsPromise) {
+        const options = await optionsPromise;
+        if (seq !== requestSeq.current) return;
+        if (options) {
+          setCommunityOptions(options);
+          optionsKey.current = key;
+          if (!options.some((o) => o.value === c)) {
+            // A comunidade não existe neste recorte: volta para "Todas".
+            setCommunityId(ALL);
+            return;
+          }
+        }
+      }
+
+      const data = await mainPromise;
       if (seq !== requestSeq.current) return;
       setSummary(data);
-      // Com filtro de comunidade a lista encolhe: as opções só se renovam
-      // quando a consulta veio sem ele.
       if (c === ALL) {
-        setCommunityOptions(
-          data.communities.map((x) => ({ value: x.communityId, label: x.communityName })),
-        );
+        setCommunityOptions(toOptions(data));
+        optionsKey.current = key;
       }
     } catch (err) {
       if (seq !== requestSeq.current) return;

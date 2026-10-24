@@ -436,6 +436,98 @@ describe("TechnicianDashboard — filtros (UNIT-008)", () => {
     expect(names).toEqual(["Todas", "Alto da Serra", "Vale Verde"]);
   });
 
+  it("trocar a safra com comunidade escolhida renova as opções e volta para 'Todas' se ela sumiu", async () => {
+    vi.mocked(getTechnicianSummary).mockImplementation(async (p) => {
+      const old = p?.harvestId === "h-old";
+      const list = old ? [COMMUNITIES[0]] : COMMUNITIES;
+      const chosen = p?.communityId ? list.filter((x) => x.communityId === p.communityId) : list;
+      return summary({ communities: chosen });
+    });
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+    await choose("Comunidade", "Vale Verde");
+    await waitFor(() =>
+      expect(screen.getByTestId("community-bar-chart").textContent).toBe("Vale Verde"),
+    );
+
+    await choose("Safra", "Safra 2025");
+    await waitFor(() =>
+      expect(getTechnicianSummary).toHaveBeenLastCalledWith({
+        harvestId: "h-old",
+        communityId: undefined,
+        cropId: undefined,
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("community-bar-chart").textContent).toBe("Alto da Serra"),
+    );
+    expect(screen.getByRole("combobox", { name: "Comunidade" }).textContent).toContain("Todas");
+    const trigger = screen.getByRole("combobox", { name: "Comunidade" });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyUp(trigger, { key: "ArrowDown" });
+    expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual([
+      "Todas",
+      "Alto da Serra",
+    ]);
+  });
+
+  it("trocar a cultura com comunidade escolhida mantém a seleção se ela segue nas opções", async () => {
+    vi.mocked(getTechnicianSummary).mockImplementation(async (p) => {
+      const chosen = p?.communityId
+        ? COMMUNITIES.filter((x) => x.communityId === p.communityId)
+        : COMMUNITIES;
+      return summary({ communities: chosen });
+    });
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+    await choose("Comunidade", "Vale Verde");
+    await waitFor(() =>
+      expect(screen.getByTestId("community-bar-chart").textContent).toBe("Vale Verde"),
+    );
+    await choose("Cultura", "Feijão");
+    await waitFor(() =>
+      expect(getTechnicianSummary).toHaveBeenCalledWith({
+        harvestId: undefined,
+        communityId: "c-2",
+        cropId: "k-2",
+      }),
+    );
+    expect(getTechnicianSummary).toHaveBeenCalledWith({
+      harvestId: undefined,
+      communityId: undefined,
+      cropId: "k-2",
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("community-bar-chart").textContent).toBe("Vale Verde"),
+    );
+    expect(screen.getByRole("combobox", { name: "Comunidade" }).textContent).toContain(
+      "Vale Verde",
+    );
+  });
+
+  it("resposta antiga que chega depois da nova não sobrescreve a tela (corrida)", async () => {
+    let resolveFirst: (v: TechnicianSummary) => void = () => {};
+    let resolveSecond: (v: TechnicianSummary) => void = () => {};
+    vi.mocked(getTechnicianSummary)
+      .mockResolvedValueOnce(summary())
+      .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)))
+      .mockReturnValueOnce(new Promise((r) => (resolveSecond = r)));
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+
+    await choose("Safra", "Safra 2025");
+    await choose("Cultura", "Feijão");
+    await waitFor(() => expect(getTechnicianSummary).toHaveBeenCalledTimes(3));
+
+    resolveSecond(summary({ farmers: [farmer("segundo")] }));
+    await screen.findByText("Agricultor segundo");
+    resolveFirst(summary({ farmers: [farmer("primeiro")] }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByText("Agricultor segundo")).toBeTruthy();
+    expect(screen.queryByText("Agricultor primeiro")).toBeNull();
+  });
+
   it("falha em /harvests e /crops não impede o resumo", async () => {
     vi.mocked(listHarvests).mockRejectedValue(new ApiError(500, "x", null));
     vi.mocked(listCrops).mockRejectedValue(new ApiError(500, "x", null));
