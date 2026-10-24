@@ -97,56 +97,56 @@ export function RolesPage() {
           )}
         </div>
       ) : (
-      <Card className="py-0">
-        <Table>
-          <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Perfil</TableHead>
-              <TableHead>Identificador</TableHead>
-              <TableHead>Descrição</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody className="[&_td]:h-12 [&_td]:px-4">
-            {loading ? (
-              Array.from({ length: 4 }).map((_, idx) => (
-                <TableRow key={`skeleton-${idx}`}>
-                  {Array.from({ length: 3 }).map((__, cidx) => (
-                    <TableCell key={cidx}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : roles.length === 0 ? (
+        <Card className="py-0">
+          <Table>
+            <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
               <TableRow className="hover:bg-transparent">
-                <TableCell
-                  colSpan={3}
-                  className="py-12 text-center text-sm text-muted-foreground"
-                >
-                  Nenhum perfil disponível.
-                </TableCell>
+                <TableHead>Perfil</TableHead>
+                <TableHead>Identificador</TableHead>
+                <TableHead>Descrição</TableHead>
               </TableRow>
-            ) : (
-              roles.map((role) => (
-                <TableRow key={role.name}>
-                  <TableCell className="font-medium text-foreground">
-                    <span className="inline-flex items-center gap-2">
-                      <ShieldCheck className="size-4 text-muted-foreground" />
-                      {ROLE_LABELS[role.name] ?? role.name}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {role.name}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {role.description}
+            </TableHeader>
+            <TableBody className="[&_td]:h-12 [&_td]:px-4">
+              {loading ? (
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <TableRow key={`skeleton-${idx}`}>
+                    {Array.from({ length: 3 }).map((__, cidx) => (
+                      <TableCell key={cidx}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : roles.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell
+                    colSpan={3}
+                    className="py-12 text-center text-sm text-muted-foreground"
+                  >
+                    Nenhum perfil disponível.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+              ) : (
+                roles.map((role) => (
+                  <TableRow key={role.name}>
+                    <TableCell className="font-medium text-foreground">
+                      <span className="inline-flex items-center gap-2">
+                        <ShieldCheck className="size-4 text-muted-foreground" />
+                        {ROLE_LABELS[role.name] ?? role.name}
+                      </span>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {role.name}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {role.description}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
       )}
     </div>
   );

@@ -51,7 +51,7 @@ async function loginAsAdmin(page: Page) {
 }
 
 test.describe("Layout responsivo", () => {
-  for (const width of [768, 1366]) {
+  for (const width of [375, 768, 1366]) {
     test(`sem rolagem horizontal e com menu do usuário visível em ${width}px`, async ({ page }) => {
       await loginAsAdmin(page);
       await page.setViewportSize({ width, height: 800 });
@@ -63,7 +63,10 @@ test.describe("Layout responsivo", () => {
           () => document.documentElement.scrollWidth - window.innerWidth,
         );
         expect(overflow, `${path} em ${width}px`).toBeLessThanOrEqual(0);
-        await expect(page.getByText("Adriana Admin").first()).toBeVisible();
+        // O nome fica oculto abaixo de 640px (só o avatar aparece).
+        if (width >= 768) {
+          await expect(page.getByText("Adriana Admin").first()).toBeVisible();
+        }
       }
     });
   }
