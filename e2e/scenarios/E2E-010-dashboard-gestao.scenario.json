@@ -1,0 +1,404 @@
+{
+  "schema_version": 1,
+  "id": "E2E-010",
+  "title": "Dashboard macro-gerencial do gestor e do administrador",
+  "description": "O gestor abre a Visão geral e vê só a sua organização (métricas, ranking, participação por cultura e comparativo entre comunidades) vindos de GET /analytics/organizations/me/summary; o administrador vê o global com comparativo entre organizações e filtra por organização e comunidade; o gestor não vê nada de escopo global.",
+  "feature_slug": "epic6-dashboard-gestao",
+  "ac_refs": [
+    "AC-009",
+    "AC-010"
+  ],
+  "priority": "P0",
+  "tags": [
+    "painel",
+    "gestao",
+    "analytics"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "MANAGER",
+        "credentials_env": {
+          "email": "E2E_MANAGER_EMAIL",
+          "password": "E2E_MANAGER_PASSWORD"
+        }
+      },
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Gestor criado por POST /organizations/{id}/managers (admin) para uma organização com comunidades, agricultores e planos na safra vigente",
+      "Ao menos duas organizações com planos, para o comparativo do admin",
+      "Nomes em E2E_MANAGER_ORG (organização do gestor), E2E_ADMIN_ORG (organização a filtrar), E2E_ADMIN_OTHER_ORG (outra organização, some do comparativo ao filtrar) e E2E_ADMIN_COMMUNITY (comunidade de E2E_ADMIN_ORG com plano)"
+    ]
+  },
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Gestor vê a sua organização: métricas, ranking, participação e comunidades",
+      "as_user": "MANAGER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_MANAGER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_MANAGER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "${env:E2E_MANAGER_ORG}"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Volume previsto"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Taxa de conversão"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "crop-ranking"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "heading",
+            "name": "Participação por cultura"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "management-community-chart"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "communities-table"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Organização"
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin_global_filtra",
+      "title": "Admin vê o global e filtra por organização e comunidade",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "testid",
+            "value": "organizations-table"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Organização"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_ADMIN_ORG}"
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "css",
+            "value": "[data-testid='mgmt-scope-title']"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Comunidade"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_ADMIN_COMMUNITY}"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "mgmt-scope-title"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "${env:E2E_ADMIN_COMMUNITY}"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "${env:E2E_ADMIN_OTHER_ORG}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin_ve_comparativo",
+      "title": "Admin sem filtro vê o global e o comparativo entre organizações",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Todas as organizações"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "heading",
+            "name": "Comparativo entre organizações"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "organizations-table"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Organização"
+          }
+        }
+      ]
+    },
+    {
+      "name": "forbidden",
+      "title": "Gestor não tem filtro de organização nem comparativo entre organizações",
+      "as_user": "MANAGER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_MANAGER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_MANAGER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "communities-table"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Organização"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "testid",
+            "value": "organizations-table"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "heading",
+            "name": "Comparativo entre organizações"
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "A tela do painel não tem formulário.",
+    "empty_state": "Estado vazio coberto em management-dashboard.test.tsx e verificado contra o back real (safra sem planos)."
+  }
+}
