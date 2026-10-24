@@ -397,3 +397,158 @@ describe("ManagementDashboard — estados (UNIT-008)", () => {
     expect(screen.getByText(/alguns minutos/)).toBeTruthy();
   });
 });
+
+describe("ManagementDashboard — paginação das tabelas (6.3)", () => {
+  const crops = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      rankPosition: n - i, // fora de ordem de propósito
+      cropId: `k${n - i}`,
+      cropName: `Cultura ${String(n - i).padStart(2, "0")}`,
+      cropVariety: null,
+      unit: "kg",
+      plansCount: 1,
+      plantedAreaHa: 1,
+      targetKg: 100,
+      realizedKg: 50,
+      conversionRatePct: 50,
+      productionSharePct: 5,
+    }));
+  const communities = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      communityId: `c-${i + 1}`,
+      communityName: `Comunidade ${String(i + 1).padStart(2, "0")}`,
+      organizationId: "o-1",
+      organizationName: "Cooperativa Sol",
+      activeFarmersCount: 1,
+      compliantFarmersCount: 1,
+      complianceRatePct: 100,
+      plansCount: 1,
+      plantedAreaHa: 1,
+      targetKg: 100,
+      realizedKg: 50,
+      conversionRatePct: 50,
+      lastExecutionDate: null,
+    }));
+  const orgs = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      organizationId: `o-${i + 1}`,
+      organizationName: `Organização ${String(i + 1).padStart(2, "0")}`,
+      communitiesCount: 1,
+      activeFarmersCount: 1,
+      compliantFarmersCount: 1,
+      complianceRatePct: 100,
+      plansCount: 1,
+      plantedAreaHa: 1,
+      targetKg: 100,
+      realizedKg: 50,
+      conversionRatePct: 50,
+    }));
+
+  const bodyRows = (id: string) =>
+    within(screen.getByTestId(id)).getAllByRole("row").slice(1);
+
+  it("ranking: 10 por página, rodapé, próxima página começa no 11º e volta", async () => {
+    vi.mocked(getManagerSummary).mockResolvedValue(summary({ cropRanking: crops(25) }));
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("crop-ranking");
+    let rows = bodyRows("crop-ranking");
+    expect(rows).toHaveLength(10);
+    expect(rows[0].textContent).toContain("Cultura 01");
+    expect(screen.getAllByRole("navigation", { name: "Paginação" })).toHaveLength(2);
+    expect(screen.getAllByRole("status")[0].textContent).toBe("Exibindo 1–10 de 25");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Próxima página" })[0]);
+    rows = bodyRows("crop-ranking");
+    expect(rows[0].textContent).toContain("11");
+    expect(rows[0].textContent).toContain("Cultura 11");
+    expect(screen.getAllByRole("status")[0].textContent).toBe("Exibindo 11–20 de 25");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Próxima página" })[0]);
+    expect(bodyRows("crop-ranking")).toHaveLength(5);
+    fireEvent.click(screen.getAllByRole("button", { name: "Página anterior" })[0]);
+    expect(screen.getAllByRole("status")[0].textContent).toBe("Exibindo 11–20 de 25");
+  });
+
+  it("totais, contagens e gráficos usam a lista inteira, não a página", async () => {
+    vi.mocked(getManagerSummary).mockResolvedValue(
+      summary({ cropRanking: crops(25), communities: communities(12), totalPlansCount: 77 }),
+    );
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("crop-ranking");
+    expect(screen.getByText("77")).toBeTruthy();
+    expect(screen.getByTestId("crop-share-chart").textContent?.split(",")).toHaveLength(25);
+    expect(screen.getByTestId("management-community-chart").textContent?.split(",")).toHaveLength(12);
+  });
+
+  it("comunidades e organizações paginam de forma independente", async () => {
+    vi.mocked(getGlobalSummary).mockResolvedValue(
+      globalSummary({ communities: communities(12), organizations: orgs(11) }),
+    );
+    render(<ManagementDashboard role="ADMIN" />);
+    await screen.findByTestId("communities-table");
+    expect(bodyRows("communities-table")).toHaveLength(10);
+    expect(bodyRows("organizations-table")).toHaveLength(10);
+    // ordem na tela: ranking, comunidades, organizações
+    const nexts = screen.getAllByRole("button", { name: "Próxima página" });
+    fireEvent.click(nexts[2]);
+    expect(bodyRows("organizations-table")).toHaveLength(1);
+    expect(bodyRows("communities-table")).toHaveLength(10);
+    fireEvent.click(screen.getAllByRole("button", { name: "Próxima página" })[1]);
+    expect(bodyRows("communities-table")).toHaveLength(2);
+  });
+
+  it("trocar o filtro volta para a primeira página", async () => {
+    vi.mocked(getManagerSummary).mockResolvedValue(summary({ cropRanking: crops(25) }));
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("crop-ranking");
+    fireEvent.click(screen.getAllByRole("button", { name: "Próxima página" })[0]);
+    expect(screen.getAllByRole("status")[0].textContent).toBe("Exibindo 11–20 de 25");
+    await waitFor(() => expect(listHarvests).toHaveBeenCalled());
+    await choose("Safra", "Safra 2025");
+    await waitFor(() =>
+      expect(screen.getAllByRole("status")[0].textContent).toBe("Exibindo 1–10 de 25"),
+    );
+  });
+
+  it("recarregar ('Tentar novamente') volta para a primeira página; lista que encolhe não deixa página vazia", async () => {
+    vi.mocked(getManagerSummary)
+      .mockReset()
+      .mockResolvedValueOnce(summary({ cropRanking: crops(11) }))
+      .mockRejectedValueOnce(new ApiError(500, "Falha no servidor", null))
+      .mockResolvedValueOnce(summary({ cropRanking: crops(10) }));
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("crop-ranking");
+    fireEvent.click(screen.getAllByRole("button", { name: "Próxima página" })[0]);
+    expect(bodyRows("crop-ranking")).toHaveLength(1);
+    await waitFor(() => expect(listHarvests).toHaveBeenCalled());
+    await choose("Safra", "Safra 2025");
+    fireEvent.click(await screen.findByRole("button", { name: "Tentar novamente" }));
+    await screen.findByTestId("crop-ranking");
+    expect(bodyRows("crop-ranking")).toHaveLength(10);
+    expect(screen.getAllByRole("status")[0].textContent).toBe("Exibindo 1–10 de 10");
+  });
+
+  it("'Itens por página' altera o tamanho da página", async () => {
+    vi.mocked(getManagerSummary).mockResolvedValue(summary({ cropRanking: crops(25) }));
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("crop-ranking");
+    // Os ids do seletor repetem entre rodapés; usa o primeiro (ranking).
+    const trigger = screen
+      .getAllByRole("combobox")
+      .find((el) => el.id === "per-page-select") as HTMLElement;
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    fireEvent.keyUp(trigger, { key: "ArrowDown" });
+    const target = await screen.findByRole("option", { name: "20" });
+    const options = screen.getAllByRole("option");
+    const highlighted = () =>
+      options.find((o) => o.getAttribute("data-highlighted") !== null) as HTMLElement;
+    for (let i = options.indexOf(highlighted()); i < options.indexOf(target); i += 1) {
+      fireEvent.keyDown(highlighted(), { key: "ArrowDown" });
+      fireEvent.keyUp(highlighted(), { key: "ArrowDown" });
+    }
+    fireEvent.keyDown(target, { key: "Enter" });
+    fireEvent.keyUp(target, { key: "Enter" });
+    await waitFor(() => expect(bodyRows("crop-ranking")).toHaveLength(20));
+  });
+});

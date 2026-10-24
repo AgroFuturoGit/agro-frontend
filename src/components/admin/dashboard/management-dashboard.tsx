@@ -1,10 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  getCoreRowModel,
+  getPaginationRowModel,
+  useReactTable,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+  type Table as ReactTableInstance,
+} from "@tanstack/react-table";
 import { AlertCircle, Sprout } from "lucide-react";
 
 import { CommunityTargetChart } from "@/components/admin/dashboard/community-target-chart";
 import { CropShareChart } from "@/components/admin/dashboard/crop-share-chart";
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,17 +33,12 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
   getGlobalSummary,
   getManagerSummary,
+  type ManagementCropRankingItem,
+  type ManagementCommunityPerformance,
   type ManagementSummary,
+  type ManagementOrganizationSummary,
 } from "@/lib/analytics";
 import { ApiError } from "@/lib/api";
 import { listCommunities } from "@/lib/communities";
@@ -113,120 +119,220 @@ function TableBox({ children }: { children: React.ReactNode }) {
   return <div className="w-full min-w-0 [contain:inline-size]">{children}</div>;
 }
 
-function CropRankingTable({ summary }: { summary: ManagementSummary }) {
+const PAGE_SIZE = 10;
+
+/** Tabela paginada no front (os endpoints devolvem a lista inteira). */
+function usePagedTable<T>(data: T[], columns: ColumnDef<T>[]) {
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: PAGE_SIZE,
+  });
+  // eslint-disable-next-line react-hooks/incompatible-library
+  return useReactTable({
+    data,
+    columns,
+    state: { pagination },
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+}
+
+function MobileCard({
+  title,
+  items,
+}: {
+  title: string;
+  items: [string, string][];
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-4">
+      <p className="font-medium">{title}</p>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+        {items.map(([label, value]) => (
+          <div key={label} className="flex flex-col">
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
+function PagedTable<T>({
+  testId,
+  table,
+  columns,
+  renderMobileCard,
+}: {
+  testId: string;
+  table: ReactTableInstance<T>;
+  columns: ColumnDef<T>[];
+  renderMobileCard: (row: Row<T>) => React.ReactNode;
+}) {
   return (
     <TableBox>
-      <Table data-testid="crop-ranking">
-        <TableHeader>
-          <TableRow>
-            <TableHead>#</TableHead>
-            <TableHead>Cultura</TableHead>
-            <TableHead>Planos</TableHead>
-            <TableHead>Área (ha)</TableHead>
-            <TableHead>Meta (kg)</TableHead>
-            <TableHead>Colhido (kg)</TableHead>
-            <TableHead>Conversão</TableHead>
-            <TableHead>Participação</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {[...summary.cropRanking]
-            .sort((a, b) => a.rankPosition - b.rankPosition)
-            .map((c, i) => (
-              <TableRow key={`${c.cropId ?? c.cropName}-${c.cropVariety ?? ""}-${i}`}>
-                <TableCell>{c.rankPosition}</TableCell>
-                <TableCell className="font-medium">
-                  {c.cropName}
-                  {c.cropVariety ? ` (${c.cropVariety})` : ""}
-                </TableCell>
-                <TableCell>{formatNumber(c.plansCount)}</TableCell>
-                <TableCell>{formatNumber(c.plantedAreaHa)}</TableCell>
-                <TableCell>{formatNumber(c.targetKg)}</TableCell>
-                <TableCell>{formatNumber(c.realizedKg)}</TableCell>
-                <TableCell>{pct(c.conversionRatePct)}</TableCell>
-                <TableCell>{pct(c.productionSharePct)}</TableCell>
-              </TableRow>
-            ))}
-        </TableBody>
-      </Table>
+      <div className="flex flex-col gap-3">
+        <div data-testid={testId}>
+          <DataTable table={table} columns={columns} renderMobileCard={renderMobileCard} />
+        </div>
+        <DataTablePagination table={table} />
+      </div>
     </TableBox>
+  );
+}
+
+const cropName = (c: ManagementCropRankingItem) =>
+  `${c.cropName}${c.cropVariety ? ` (${c.cropVariety})` : ""}`;
+
+const cropColumns: ColumnDef<ManagementCropRankingItem>[] = [
+  { id: "rank", header: "#", cell: ({ row }) => row.original.rankPosition },
+  {
+    id: "crop",
+    header: "Cultura",
+    cell: ({ row }) => <span className="font-medium">{cropName(row.original)}</span>,
+  },
+  { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+  { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+  { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+  { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+  { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+  { id: "share", header: "Participação", cell: ({ row }) => pct(row.original.productionSharePct) },
+];
+
+function CropRankingTable({ summary }: { summary: ManagementSummary }) {
+  const data = useMemo(
+    () => [...summary.cropRanking].sort((a, b) => a.rankPosition - b.rankPosition),
+    [summary.cropRanking],
+  );
+  const table = usePagedTable(data, cropColumns);
+  return (
+    <PagedTable
+      testId="crop-ranking"
+      table={table}
+      columns={cropColumns}
+      renderMobileCard={(row) => {
+        const c = row.original;
+        return (
+          <MobileCard
+            title={`${c.rankPosition}. ${cropName(c)}`}
+            items={[
+              ["Planos", formatNumber(c.plansCount)],
+              ["Área (ha)", formatNumber(c.plantedAreaHa)],
+              ["Meta (kg)", formatNumber(c.targetKg)],
+              ["Colhido (kg)", formatNumber(c.realizedKg)],
+              ["Conversão", pct(c.conversionRatePct)],
+              ["Participação", pct(c.productionSharePct)],
+            ]}
+          />
+        );
+      }}
+    />
   );
 }
 
 function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
   const global = summary.scope === "GLOBAL";
+  const columns = useMemo<ColumnDef<ManagementCommunityPerformance>[]>(
+    () => [
+      {
+        id: "community",
+        header: "Comunidade",
+        cell: ({ row }) => <span className="font-medium">{row.original.communityName}</span>,
+      },
+      ...(global
+        ? [
+            {
+              id: "organization",
+              header: "Organização",
+              cell: ({ row }: { row: Row<ManagementCommunityPerformance> }) =>
+                row.original.organizationName ?? "—",
+            },
+          ]
+        : []),
+      { id: "farmers", header: "Agricultores ativos", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
+      { id: "compliance", header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
+      { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+      { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+      { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+      { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+      { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+      { id: "last", header: "Último apontamento", cell: ({ row }) => formatPlanDate(row.original.lastExecutionDate) },
+    ],
+    [global],
+  );
+  const table = usePagedTable(summary.communities, columns);
   return (
-    <TableBox>
-      <Table data-testid="communities-table">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Comunidade</TableHead>
-            {global && <TableHead>Organização</TableHead>}
-            <TableHead>Agricultores ativos</TableHead>
-            <TableHead>Em dia</TableHead>
-            <TableHead>Planos</TableHead>
-            <TableHead>Área (ha)</TableHead>
-            <TableHead>Meta (kg)</TableHead>
-            <TableHead>Colhido (kg)</TableHead>
-            <TableHead>Conversão</TableHead>
-            <TableHead>Último apontamento</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {summary.communities.map((c) => (
-            <TableRow key={c.communityId}>
-              <TableCell className="font-medium">{c.communityName}</TableCell>
-              {global && <TableCell>{c.organizationName ?? "—"}</TableCell>}
-              <TableCell>{formatNumber(c.activeFarmersCount)}</TableCell>
-              <TableCell>{pct(c.complianceRatePct)}</TableCell>
-              <TableCell>{formatNumber(c.plansCount)}</TableCell>
-              <TableCell>{formatNumber(c.plantedAreaHa)}</TableCell>
-              <TableCell>{formatNumber(c.targetKg)}</TableCell>
-              <TableCell>{formatNumber(c.realizedKg)}</TableCell>
-              <TableCell>{pct(c.conversionRatePct)}</TableCell>
-              <TableCell>{formatPlanDate(c.lastExecutionDate)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableBox>
+    <PagedTable
+      testId="communities-table"
+      table={table}
+      columns={columns}
+      renderMobileCard={(row) => {
+        const c = row.original;
+        return (
+          <MobileCard
+            title={c.communityName}
+            items={[
+              ...(global ? ([["Organização", c.organizationName ?? "—"]] as [string, string][]) : []),
+              ["Agricultores ativos", formatNumber(c.activeFarmersCount)],
+              ["Em dia", pct(c.complianceRatePct)],
+              ["Planos", formatNumber(c.plansCount)],
+              ["Área (ha)", formatNumber(c.plantedAreaHa)],
+              ["Meta (kg)", formatNumber(c.targetKg)],
+              ["Colhido (kg)", formatNumber(c.realizedKg)],
+              ["Conversão", pct(c.conversionRatePct)],
+              ["Último apontamento", formatPlanDate(c.lastExecutionDate)],
+            ]}
+          />
+        );
+      }}
+    />
   );
 }
 
+const organizationColumns: ColumnDef<ManagementOrganizationSummary>[] = [
+  {
+    id: "organization",
+    header: "Organização",
+    cell: ({ row }) => <span className="font-medium">{row.original.organizationName}</span>,
+  },
+  { id: "communities", header: "Comunidades", cell: ({ row }) => formatNumber(row.original.communitiesCount) },
+  { id: "farmers", header: "Agricultores", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
+  { id: "compliance", header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
+  { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+  { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+  { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+  { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+  { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+];
+
 function OrganizationsTable({ summary }: { summary: ManagementSummary }) {
+  const table = usePagedTable(summary.organizations, organizationColumns);
   return (
-    <TableBox>
-      <Table data-testid="organizations-table">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Organização</TableHead>
-            <TableHead>Comunidades</TableHead>
-            <TableHead>Agricultores</TableHead>
-            <TableHead>Em dia</TableHead>
-            <TableHead>Planos</TableHead>
-            <TableHead>Área (ha)</TableHead>
-            <TableHead>Meta (kg)</TableHead>
-            <TableHead>Colhido (kg)</TableHead>
-            <TableHead>Conversão</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {summary.organizations.map((o) => (
-            <TableRow key={o.organizationId}>
-              <TableCell className="font-medium">{o.organizationName}</TableCell>
-              <TableCell>{formatNumber(o.communitiesCount)}</TableCell>
-              <TableCell>{formatNumber(o.activeFarmersCount)}</TableCell>
-              <TableCell>{pct(o.complianceRatePct)}</TableCell>
-              <TableCell>{formatNumber(o.plansCount)}</TableCell>
-              <TableCell>{formatNumber(o.plantedAreaHa)}</TableCell>
-              <TableCell>{formatNumber(o.targetKg)}</TableCell>
-              <TableCell>{formatNumber(o.realizedKg)}</TableCell>
-              <TableCell>{pct(o.conversionRatePct)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableBox>
+    <PagedTable
+      testId="organizations-table"
+      table={table}
+      columns={organizationColumns}
+      renderMobileCard={(row) => {
+        const o = row.original;
+        return (
+          <MobileCard
+            title={o.organizationName}
+            items={[
+              ["Comunidades", formatNumber(o.communitiesCount)],
+              ["Agricultores", formatNumber(o.activeFarmersCount)],
+              ["Em dia", pct(o.complianceRatePct)],
+              ["Planos", formatNumber(o.plansCount)],
+              ["Área (ha)", formatNumber(o.plantedAreaHa)],
+              ["Meta (kg)", formatNumber(o.targetKg)],
+              ["Colhido (kg)", formatNumber(o.realizedKg)],
+              ["Conversão", pct(o.conversionRatePct)],
+            ]}
+          />
+        );
+      }}
+    />
   );
 }
 
