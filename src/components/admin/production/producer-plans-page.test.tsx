@@ -5,6 +5,7 @@ import { ProducerPlansPage } from "@/components/admin/production/producer-plans-
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
+import { listFamilyMembers, listFinancings } from "@/lib/farmer-social";
 import { getMyProducer, listProducers, type Producer } from "@/lib/producers";
 import {
   deleteProductionPlan,
@@ -43,6 +44,14 @@ vi.mock("@/lib/production", async () => {
     listProductionPlans: vi.fn(),
     deleteProductionPlan: vi.fn(),
   };
+});
+
+vi.mock("@/lib/farmer-social", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/farmer-social")>(
+      "@/lib/farmer-social",
+    );
+  return { ...actual, listFamilyMembers: vi.fn(), listFinancings: vi.fn() };
 });
 
 vi.mock("@/lib/auth", async () => {
@@ -158,6 +167,8 @@ beforeEach(() => {
   vi.mocked(getCommunity).mockResolvedValue(COMMUNITY);
   vi.mocked(listProducers).mockResolvedValue([MY_PRODUCER, OTHER_PRODUCER]);
   vi.mocked(listProductionPlans).mockResolvedValue([]);
+  vi.mocked(listFamilyMembers).mockResolvedValue([]);
+  vi.mocked(listFinancings).mockResolvedValue([]);
   vi.mocked(deleteProductionPlan).mockResolvedValue(undefined);
 });
 
@@ -383,5 +394,62 @@ describe("ProducerPlansPage — erro de API e recuperação", () => {
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+  });
+});
+
+describe("ProducerPlansPage — seções de dados sociais (UNIT-002 / UNIT-007)", () => {
+  it("monta composição familiar e financiamentos do agricultor da URL", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(
+      await screen.findByText("Nenhum membro familiar cadastrado"),
+    ).toBeTruthy();
+    expect(await screen.findByText("Nenhum financiamento cadastrado")).toBeTruthy();
+    expect(listFamilyMembers).toHaveBeenCalledWith("producer-1");
+    expect(listFinancings).toHaveBeenCalledWith("producer-1");
+  });
+
+  it("falha nas duas seções não derruba a lista de planos", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(listFamilyMembers).mockRejectedValue(
+      new ApiError(403, "Sem assistência nesta comunidade.", null),
+    );
+    vi.mocked(listFinancings).mockRejectedValue(
+      new ApiError(403, "Sem assistência nesta comunidade.", null),
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(await screen.findAllByText("Sem assistência nesta comunidade.")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Editar plano" })).toBeTruthy();
+  });
+
+  it("MANAGER: seções aparecem sem nenhuma ação de escrita", async () => {
+    loginAs("MANAGER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(listFamilyMembers).mockResolvedValue([
+      { id: "m-1", farmerId: "producer-1", name: "Maria", kinship: "Esposa", age: 40, createdAt: null, updatedAt: null },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText("Maria")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Adicionar/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Editar Maria" })).toBeNull();
+  });
+
+  it("FARMER de outro cadastro: as seções não chegam a carregar", async () => {
+    loginAs("FARMER");
+    renderPage("producer-2");
+
+    await waitFor(() => expect(router.replace).toHaveBeenCalled());
+    expect(listFamilyMembers).not.toHaveBeenCalled();
+    expect(listFinancings).not.toHaveBeenCalled();
   });
 });

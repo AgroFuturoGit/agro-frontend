@@ -26,6 +26,8 @@ import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
+import { FinancingSection } from "@/components/admin/producers/financing-section";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
@@ -545,6 +547,16 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       />
 
       <DataTablePagination table={table} />
+
+      {/* Dados sociais do agricultor: carregam e falham de forma independente
+          dos planos. Escrita: ADMIN, TECHNICIAN e FARMER (o back decide o
+          resto); MANAGER e role desconhecida só leem. */}
+      {guardPassed && (
+        <>
+          <FamilyCompositionSection farmerId={producerId} canWrite={canWrite} />
+          <FinancingSection farmerId={producerId} canWrite={canWrite} />
+        </>
+      )}
 
       {canWrite && guardPassed && (
         <PlanFormDrawer

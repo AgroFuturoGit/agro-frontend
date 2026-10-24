@@ -2,7 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  MessageSquareWarning,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -46,6 +55,7 @@ import {
   type DecisionMode,
 } from "./execution-decision-dialog";
 import { ExecutionFormDrawer } from "./execution-form-drawer";
+import { ExecutionOccurrencesSheet } from "./execution-occurrences-sheet";
 import { ExecutionStatusBadge } from "./execution-status-badge";
 import { ContinuousHarvestChart } from "./harvest-timeline-chart";
 
@@ -111,6 +121,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<ProductionExecution | null>(
     null,
   );
+  const [occurrencesTarget, setOccurrencesTarget] =
+    useState<ProductionExecution | null>(null);
   const [decision, setDecision] = useState<{
     mode: DecisionMode;
     execution: ProductionExecution;
@@ -315,15 +327,25 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
     const actionsColumn = columnHelper.display({
       id: "actions",
-      header: "Ações",
+      // Só "Ocorrências" (leitura, 4 roles) ⇒ o cabeçalho não sugere escrita.
+      header: canWrite || canDecide ? "Ações" : "Ocorrências",
       cell: ({ row }) => {
         const execution = row.original;
         const edit = canEditExecution(currentRole, execution);
         const remove = canDelete && canDeleteExecution(currentRole, execution);
         const decide = canDecideExecution(currentRole, execution);
-        if (!edit && !remove && !decide) return null;
         return (
           <div className="inline-flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Ocorrências do apontamento"
+              title="Ocorrências"
+              onClick={() => setOccurrencesTarget(execution)}
+            >
+              <MessageSquareWarning />
+            </Button>
             {decide && (
               <>
                 <Button
@@ -376,9 +398,11 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       },
     });
 
-    return (
-      canWrite || canDecide ? [...baseColumns, actionsColumn] : baseColumns
-    ) as ColumnDef<ProductionExecution, unknown>[];
+    // "Ocorrências" é leitura liberada às 4 roles: a coluna sempre existe.
+    return [...baseColumns, actionsColumn] as ColumnDef<
+      ProductionExecution,
+      unknown
+    >[];
   }, [canWrite, canDelete, canDecide, currentRole, loading, formatQuantity]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -417,54 +441,61 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               />
             </div>
           </div>
-          {(edit || remove || decide) && (
-            <div className="flex shrink-0 flex-wrap justify-end gap-1">
-              {decide && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDecision({ mode: "validate", execution })}
-                  >
-                    <Check />
-                    Validar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDecision({ mode: "reject", execution })}
-                  >
-                    <X />
-                    Rejeitar
-                  </Button>
-                </>
-              )}
-              {edit && (
+          <div className="flex shrink-0 flex-wrap justify-end gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOccurrencesTarget(execution)}
+            >
+              <MessageSquareWarning />
+              Ocorrências
+            </Button>
+            {decide && (
+              <>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setEditTarget(execution)}
+                  onClick={() => setDecision({ mode: "validate", execution })}
                 >
-                  <Pencil />
-                  Editar
+                  <Check />
+                  Validar
                 </Button>
-              )}
-              {remove && (
                 <Button
                   type="button"
                   variant="outline"
-                  size="icon-sm"
-                  aria-label="Excluir apontamento"
-                  onClick={() => setDeleteTarget(execution)}
+                  size="sm"
+                  onClick={() => setDecision({ mode: "reject", execution })}
                 >
-                  <Trash2 />
+                  <X />
+                  Rejeitar
                 </Button>
-              )}
-            </div>
-          )}
+              </>
+            )}
+            {edit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditTarget(execution)}
+              >
+                <Pencil />
+                Editar
+              </Button>
+            )}
+            {remove && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Excluir apontamento"
+                onClick={() => setDeleteTarget(execution)}
+              >
+                <Trash2 />
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
     );
@@ -613,6 +644,15 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
         <DataTablePagination table={table} />
       </div>
+
+      <ExecutionOccurrencesSheet
+        execution={occurrencesTarget}
+        open={occurrencesTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setOccurrencesTarget(null);
+        }}
+        canWrite={canWrite}
+      />
 
       {canWrite && (
         <>

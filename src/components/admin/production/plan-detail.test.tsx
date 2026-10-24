@@ -14,6 +14,7 @@ import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getHarvestTimeline } from "@/lib/analytics";
 import { getMyProducer, listProducers } from "@/lib/producers";
+import { listOccurrences } from "@/lib/occurrences";
 import {
   deleteProductionExecution,
   getProductionComparison,
@@ -47,6 +48,11 @@ vi.mock("@/lib/analytics", () => ({
     }),
   ),
 }));
+vi.mock("@/lib/occurrences", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/occurrences")>("@/lib/occurrences");
+  return { ...actual, listOccurrences: vi.fn() };
+});
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: vi.fn(() => false) }));
 
 vi.mock("@/lib/production", async () => {
@@ -808,5 +814,102 @@ describe("PlanDetail — status com motivo e data da decisão (UNIT-004)", () =>
     ).toBeTruthy();
     expect(screen.getByText("Decidido em 12/05/2026")).toBeTruthy();
     expect(screen.getByText("Decidido em 14/05/2026")).toBeTruthy();
+  });
+});
+
+describe("PlanDetail — ocorrências do apontamento (UNIT-006)", () => {
+  const TWO = [
+    { ...EXECUTIONS[0], id: "execution-a", harvestedAt: "2026-04-02" },
+    { ...EXECUTIONS[0], id: "execution-b", harvestedAt: "2026-06-20" },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(listOccurrences).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it.each(["ADMIN", "TECHNICIAN", "MANAGER", "FARMER"] as const)(
+    "%s: cada apontamento tem a ação Ocorrências, que abre o do apontamento certo",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(listProductionExecutions).mockResolvedValue(TWO);
+
+      renderPlanDetail();
+
+      await screen.findByText("20/06/2026");
+      const buttons = screen.getAllByRole("button", {
+        name: "Ocorrências do apontamento",
+      });
+      expect(buttons).toHaveLength(2);
+      // Mais recente primeiro: a primeira linha é a execution-b.
+      fireEvent.click(buttons[0]);
+      await waitFor(() => expect(listOccurrences).toHaveBeenCalledWith("execution-b"));
+      const sheet = await screen.findByRole("dialog");
+      expect(sheet).toHaveAttribute("data-slot", "sheet-content");
+      expect(sheet.textContent).toContain("Ocorrências do apontamento");
+      expect(
+        await screen.findByText("Nenhuma ocorrência registrada neste apontamento"),
+      ).toBeTruthy();
+    },
+  );
+
+  it("mobile: o card também tem Ocorrências e abre o Sheet", async () => {
+    loginAs("MANAGER");
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    vi.mocked(listProductionExecutions).mockResolvedValue(TWO);
+
+    renderPlanDetail();
+
+    await screen.findByText("20/06/2026");
+    const buttons = screen.getAllByRole("button", { name: "Ocorrências" });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[1]);
+    await waitFor(() => expect(listOccurrences).toHaveBeenCalledWith("execution-a"));
+  });
+
+  it("MANAGER: o Sheet abre sem nenhuma ação de escrita de ocorrência", async () => {
+    loginAs("MANAGER");
+    vi.mocked(listProductionExecutions).mockResolvedValue(TWO);
+    vi.mocked(listOccurrences).mockResolvedValue([
+      {
+        id: "o-1",
+        executionId: "execution-b",
+        logType: "PEST",
+        description: "Lagarta",
+        weatherObservation: null,
+        evidenceUrl: null,
+        createdAt: null,
+        updatedAt: null,
+      },
+    ]);
+
+    renderPlanDetail();
+
+    await screen.findByText("20/06/2026");
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Ocorrências do apontamento" })[0],
+    );
+    expect(await screen.findByText("Lagarta")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Adicionar ocorrência/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Editar ocorrência/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Excluir ocorrência/ })).toBeNull();
+  });
+
+  it("FARMER: o Sheet oferece Adicionar ocorrência", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue(TWO);
+
+    renderPlanDetail();
+
+    await screen.findByText("20/06/2026");
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Ocorrências do apontamento" })[0],
+    );
+    expect(
+      await screen.findByRole("button", { name: "Adicionar ocorrência" }),
+    ).toBeTruthy();
   });
 });
