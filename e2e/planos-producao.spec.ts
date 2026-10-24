@@ -475,6 +475,29 @@ test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", (
       }),
     );
 
+    // Feature 6.4: os pontos vêm de GET /analytics/plans/:id/timeline.
+    const granularities: string[] = [];
+    await page.route(`**/analytics/plans/${plan.id}/timeline*`, (route) => {
+      const granularity = new URL(route.request().url()).searchParams.get("granularity") ?? "WEEK";
+      granularities.push(granularity);
+      const points =
+        granularity === "MONTH"
+          ? [
+              { date: "2026-05-01", expectedValue: 1000, actualValue: 105, pendingValue: 0 },
+              { date: "2026-06-01", expectedValue: 800, actualValue: 0, pendingValue: 40 },
+            ]
+          : [
+              { date: "2026-05-04", expectedValue: 221.05, actualValue: 105, pendingValue: 0 },
+              { date: "2026-05-11", expectedValue: 221.05, actualValue: 0, pendingValue: 0 },
+              { date: "2026-06-01", expectedValue: 221.05, actualValue: 0, pendingValue: 40 },
+            ];
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ planId: plan.id, harvestType: "CONTINUOUS", granularity, unit: "kg", points }),
+      });
+    });
+
     await page.goto(
       `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}/planos/${plan.id}`,
     );
@@ -499,6 +522,8 @@ test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", (
       "MONTH",
     );
     await expect(page.getByRole("button", { name: "Mês" })).toHaveAttribute("aria-pressed", "true");
+    expect(granularities[0]).toBe("WEEK");
+    expect(granularities).toContain("MONTH");
   });
 });
 
@@ -571,6 +596,19 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
     });
     await page.route(`**/production-plans/${PLAN_ID}/executions`, (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(executions) }),
+    );
+    await page.route(`**/analytics/plans/${PLAN_ID}/timeline*`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          planId: PLAN_ID,
+          harvestType: "SINGLE",
+          granularity: "WEEK",
+          unit: "kg",
+          points: [{ date: "2026-06-29", expectedValue: 15000, actualValue: 0, pendingValue: 0 }],
+        }),
+      }),
     );
   }
 

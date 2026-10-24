@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "E2E-006",
   "title": "Painel de produção na Visão geral por perfil",
-  "description": "Cada perfil abre a Visão geral e vê meta, realizado e percentual do seu recorte (GET /production/dashboard); apenas quem não é agricultor vê a tabela por comunidade.",
+  "description": "Administrador, gestor e técnico abrem a Visão geral e veem meta, realizado, percentual e a tabela por comunidade do seu recorte (GET /production/dashboard). O agricultor tem o próprio dashboard (Feature 6.1), coberto pelo E2E-007.",
   "feature_slug": "epic5-validacao-e-painel",
   "ac_refs": [
     "AC-010"
@@ -37,19 +37,12 @@
           "email": "E2E_TECH_EMAIL",
           "password": "E2E_TECH_PASSWORD"
         }
-      },
-      {
-        "role": "FARMER",
-        "credentials_env": {
-          "email": "E2E_FARMER_EMAIL",
-          "password": "E2E_FARMER_PASSWORD"
-        }
       }
     ],
     "state": [
       "Backend develop rodando com as migrations aplicadas",
-      "Nomes de exibição dos usuários em E2E_ADMIN_NAME, E2E_MANAGER_NAME, E2E_TECH_NAME e E2E_FARMER_NAME (botão do menu do usuário)",
-      "Planos com apontamentos validados no recorte de cada perfil; textos esperados da meta em kg (ex.: 40.000 kg) em E2E_ADMIN_EXPECTED_META, E2E_MANAGER_EXPECTED_META, E2E_TECH_EXPECTED_META e E2E_FARMER_EXPECTED_META, e do gauge (ex.: 45% da meta alcançada) em E2E_<PERFIL>_EXPECTED_GAUGE"
+      "Nomes de exibição dos usuários em E2E_ADMIN_NAME, E2E_MANAGER_NAME e E2E_TECH_NAME (botão do menu do usuário)",
+      "Planos com apontamentos validados no recorte de cada perfil; textos esperados da meta em kg (ex.: 40.000 kg) em E2E_ADMIN_EXPECTED_META, E2E_MANAGER_EXPECTED_META e E2E_TECH_EXPECTED_META, e do gauge (ex.: 45% da meta alcançada) em E2E_<PERFIL>_EXPECTED_GAUGE"
     ]
   },
   "setup_steps": [
@@ -289,92 +282,6 @@
             "value": "columnheader",
             "name": "Comunidade"
           }
-        }
-      ]
-    },
-    {
-      "name": "agricultor",
-      "title": "Agricultor vê só os próprios totais, sem tabela por comunidade",
-      "as_user": "FARMER",
-      "steps": [
-        {
-          "action": "click",
-          "target": {
-            "by": "role",
-            "value": "button",
-            "name": "${env:E2E_ADMIN_NAME}"
-          }
-        },
-        {
-          "action": "click",
-          "target": {
-            "by": "role",
-            "value": "menuitem",
-            "name": "Sair"
-          }
-        },
-        {
-          "action": "wait",
-          "value": "/login",
-          "note": "logout"
-        },
-        {
-          "action": "fill",
-          "target": {
-            "by": "label",
-            "value": "E-mail"
-          },
-          "value": "${env:E2E_FARMER_EMAIL}"
-        },
-        {
-          "action": "fill",
-          "target": {
-            "by": "css",
-            "value": "#password"
-          },
-          "value": "${env:E2E_FARMER_PASSWORD}"
-        },
-        {
-          "action": "click",
-          "target": {
-            "by": "role",
-            "value": "button",
-            "name": "Entrar"
-          }
-        },
-        {
-          "action": "wait",
-          "value": "/admin",
-          "note": "aguarda o redirecionamento pós-login"
-        },
-        {
-          "action": "goto",
-          "value": "/admin"
-        }
-      ],
-      "assertions": [
-        {
-          "expect": "visible",
-          "target": {
-            "by": "text",
-            "value": "${env:E2E_FARMER_EXPECTED_META}"
-          }
-        },
-        {
-          "expect": "visible",
-          "target": {
-            "by": "role",
-            "value": "img",
-            "name": "${env:E2E_FARMER_EXPECTED_GAUGE}"
-          }
-        },
-        {
-          "expect": "count",
-          "target": {
-            "by": "role",
-            "value": "table"
-          },
-          "value": 0
         }
       ]
     }

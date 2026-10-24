@@ -20,8 +20,8 @@ test.describe('E2E-006 Painel de produção na Visão geral por perfil', () => {
   test.use({ baseURL: process.env['E2E_BASE_URL'] });
   // Preconditions (arrange before running):
   //   - Backend develop rodando com as migrations aplicadas
-  //   - Nomes de exibição dos usuários em E2E_ADMIN_NAME, E2E_MANAGER_NAME, E2E_TECH_NAME e E2E_FARMER_NAME (botão do menu do usuário)
-  //   - Planos com apontamentos validados no recorte de cada perfil; textos esperados da meta em kg (ex.: 40.000 kg) em E2E_ADMIN_EXPECTED_META, E2E_MANAGER_EXPECTED_META, E2E_TECH_EXPECTED_META e E2E_FARMER_EXPECTED_META, e do gauge (ex.: 45% da meta alcançada) em E2E_<PERFIL>_EXPECTED_GAUGE
+  //   - Nomes de exibição dos usuários em E2E_ADMIN_NAME, E2E_MANAGER_NAME e E2E_TECH_NAME (botão do menu do usuário)
+  //   - Planos com apontamentos validados no recorte de cada perfil; textos esperados da meta em kg (ex.: 40.000 kg) em E2E_ADMIN_EXPECTED_META, E2E_MANAGER_EXPECTED_META e E2E_TECH_EXPECTED_META, e do gauge (ex.: 45% da meta alcançada) em E2E_<PERFIL>_EXPECTED_GAUGE
 
   test('happy_path — Administrador vê o painel com todas as comunidades', {
     tag: ['@P0', '@painel', '@visao-geral', '@perfis'],
@@ -87,30 +87,5 @@ test.describe('E2E-006 Painel de produção na Visão geral por perfil', () => {
     await expect(page.getByText(env('E2E_TECH_EXPECTED_META'))).toBeVisible();
     await expect(page.getByRole('img', { name: env('E2E_TECH_EXPECTED_GAUGE') })).toBeVisible();
     await expect(page.getByRole('columnheader', { name: 'Comunidade' })).toBeVisible();
-  });
-
-  test('agricultor — Agricultor vê só os próprios totais, sem tabela por comunidade', {
-    tag: ['@P0', '@painel', '@visao-geral', '@perfis'],
-    annotation: [{ type: 'E2E', description: 'E2E-006' }, { type: 'AC', description: 'AC-010' }, { type: 'user', description: 'FARMER' }],
-  }, async ({ page }) => {
-    await page.goto('/login');
-    await page.getByLabel('E-mail').fill(env('E2E_ADMIN_EMAIL'));
-    await page.locator('#password').fill(env('E2E_ADMIN_PASSWORD'));
-    await page.getByRole('button', { name: 'Entrar' }).click();
-    // aguarda o redirecionamento pós-login
-    await page.waitForURL(new RegExp(escapeRegExp('/admin')));
-    await page.getByRole('button', { name: env('E2E_ADMIN_NAME') }).click();
-    await page.getByRole('menuitem', { name: 'Sair' }).click();
-    // logout
-    await page.waitForURL(new RegExp(escapeRegExp('/login')));
-    await page.getByLabel('E-mail').fill(env('E2E_FARMER_EMAIL'));
-    await page.locator('#password').fill(env('E2E_FARMER_PASSWORD'));
-    await page.getByRole('button', { name: 'Entrar' }).click();
-    // aguarda o redirecionamento pós-login
-    await page.waitForURL(new RegExp(escapeRegExp('/admin')));
-    await page.goto('/admin');
-    await expect(page.getByText(env('E2E_FARMER_EXPECTED_META'))).toBeVisible();
-    await expect(page.getByRole('img', { name: env('E2E_FARMER_EXPECTED_GAUGE') })).toBeVisible();
-    await expect(page.getByRole('table')).toHaveCount(0);
   });
 });

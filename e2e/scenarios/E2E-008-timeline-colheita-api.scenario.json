@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "id": "E2E-008",
+  "title": "Gráfico de colheita pelo endpoint de timeline",
+  "description": "No detalhe do plano o gráfico vem de GET /analytics/plans/:id/timeline, abre em semana e alterna para mês.",
+  "feature_slug": "epic6-painel-agricultor-e-timeline",
+  "ac_refs": [
+    "AC-011"
+  ],
+  "priority": "P0",
+  "tags": [
+    "grafico",
+    "timeline",
+    "analytics"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "FARMER",
+        "credentials_env": {
+          "email": "E2E_FARMER_EMAIL",
+          "password": "E2E_FARMER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Plano CONTINUOUS do agricultor com janela de colheita e apontamentos; URL do plano em E2E_FARMER_PLAN_PATH"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_FARMER_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "css",
+        "value": "#password"
+      },
+      "value": "${env:E2E_FARMER_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Gráfico abre em semana e alterna para mês",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "${env:E2E_FARMER_PLAN_PATH}"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Colheita por semana, em kg."
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Somente validados contam no realizado oficial."
+          }
+        }
+      ]
+    },
+    {
+      "name": "mes",
+      "title": "Alternar para mês refaz o gráfico",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "${env:E2E_FARMER_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Mês"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Colheita por mês, em kg."
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "A tela do gráfico não tem formulário.",
+    "forbidden": "Permissões de leitura são do back; cobertas em plan-detail.test.tsx.",
+    "empty_state": "Estado vazio coberto em harvest-timeline-chart.test.tsx."
+  }
+}

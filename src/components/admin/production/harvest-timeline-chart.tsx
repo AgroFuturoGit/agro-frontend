@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart, LineChart } from "echarts/charts";
 import {
   AriaComponent,
@@ -12,10 +12,15 @@ import {
 import { init, use as registerEcharts, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getHarvestTimeline } from "@/lib/analytics";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
-  buildHarvestTimeline,
+  hasValidExpectedWindow,
+  type HarvestTimeline,
   type TimelineGranularity,
 } from "@/lib/harvest-timeline";
 import type { ProductionExecution, ProductionPlan } from "@/lib/production";
@@ -129,13 +134,54 @@ type Props = {
  * mês e linha do previsto. SINGLE/nulo: barras simples Previsto × Realizado.
  */
 export function ContinuousHarvestChart({ plan, executions }: Props) {
-  const [choice, setChoice] = useState<TimelineGranularity | null>(null);
+  // BR-007: abre em semana ("siga o back"); o usuário alterna para mês.
+  const [choice, setChoice] = useState<TimelineGranularity>("WEEK");
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ECharts | null>(null);
+  const [data, setData] = useState<Awaited<
+    ReturnType<typeof getHarvestTimeline>
+  > | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const requestRef = useRef(0);
 
-  const timeline = useMemo(
-    () => buildHarvestTimeline(plan, executions, choice ?? undefined),
-    [plan, executions, choice],
+  // BR-008: recarrega quando a lista de apontamentos (ou a granularidade) muda.
+  const load = useCallback(async () => {
+    const request = ++requestRef.current;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getHarvestTimeline(plan.id, choice);
+      if (request === requestRef.current) setData(response);
+    } catch (err) {
+      if (request !== requestRef.current) return;
+      setData(null);
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível carregar o gráfico de colheita.",
+      );
+    } finally {
+      if (request === requestRef.current) setLoading(false);
+    }
+  }, [plan.id, choice]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load, executions]);
+
+  const hasWindow = hasValidExpectedWindow(plan);
+
+  const timeline = useMemo<HarvestTimeline>(
+    () => ({
+      harvestType: data?.harvestType ?? (plan.crop?.harvestType === "CONTINUOUS" ? "CONTINUOUS" : "SINGLE"),
+      granularity: data?.granularity ?? choice,
+      unit: "kg",
+      hasExpectedWindow: hasWindow,
+      points: data?.points ?? [],
+    }),
+    [data, plan.crop?.harvestType, choice, hasWindow],
   );
 
   const isContinuous = timeline.harvestType === "CONTINUOUS";
@@ -154,13 +200,15 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
     };
   }, [points]);
 
-  const isEmpty = isContinuous
-    ? points.length === 0
-    : points.length === 0 && plan.expectedYield <= 0;
+  const isEmpty =
+    !loading &&
+    !error &&
+    (isContinuous
+      ? points.length === 0
+      : points.length === 0 && plan.expectedYield <= 0);
+  const showChart = !error && !isEmpty && data !== null;
 
-  const hasExpected = isContinuous
-    ? timeline.hasExpectedWindow
-    : plan.expectedYield > 0;
+  const hasExpected = isContinuous ? hasWindow : plan.expectedYield > 0;
 
   const ariaLabel = buildChartSummary({
     hasExpected,
@@ -171,7 +219,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
     to: plan.expectedHarvestEnd ?? points[points.length - 1]?.date ?? null,
   });
 
-  const themeVersion = useThemeVersion(containerRef, !isEmpty);
+  const themeVersion = useThemeVersion(containerRef, showChart);
   // Quantos pontos cabem na largura atual. Quando muda (girar o celular,
   // recolher a sidebar), a option é refeita para ligar/desligar o dataZoom.
   const [pointCapacity, setPointCapacity] = useState(0);
@@ -180,7 +228,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   // BR-015: init no mount, resize via ResizeObserver, dispose no unmount.
   useEffect(() => {
     const container = containerRef.current;
-    if (isEmpty || !container) return;
+    if (!showChart || !container) return;
     const chart = init(container, undefined, { renderer: "canvas" });
     chartRef.current = chart;
     const observer = new ResizeObserver(() => {
@@ -194,13 +242,13 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
       chart.dispose();
       chartRef.current = null;
     };
-  }, [isEmpty]);
+  }, [showChart]);
 
   // setOption a cada mudança de dados, granularidade ou tema.
   useEffect(() => {
     const chart = chartRef.current;
     const container = containerRef.current;
-    if (isEmpty || !chart || !container) return;
+    if (!showChart || loading || !chart || !container) return;
     const option = buildHarvestChartOption(timeline, readChartColors(container), {
       expectedYield: plan.expectedYield,
       width: container.clientWidth,
@@ -208,7 +256,29 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
     });
     chart.setOption(option, true);
     appliedCapacityRef.current = Math.floor(container.clientWidth / MIN_POINT_WIDTH);
-  }, [isEmpty, timeline, plan.expectedYield, ariaLabel, themeVersion, pointCapacity]);
+  }, [showChart, loading, timeline, plan.expectedYield, ariaLabel, themeVersion, pointCapacity]);
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="py-4">
+          <div
+            role="alert"
+            className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          >
+            <span>{error}</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => load()}>
+              Tentar novamente
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loading && data === null) {
+    return <Skeleton className="h-80 w-full rounded-xl" aria-label="Carregando gráfico" />;
+  }
 
   if (isEmpty) {
     return (
@@ -220,7 +290,8 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
     );
   }
 
-  const active = timeline.granularity;
+  const active = choice;
+  const refreshing = loading && data !== null;
 
   return (
     <Card>
@@ -273,17 +344,35 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
           </p>
         )}
 
-        <div
-          ref={containerRef}
-          role="img"
-          aria-label={ariaLabel}
-          data-mode={isContinuous ? "composite" : "simple"}
-          data-granularity={isContinuous ? active : undefined}
-          data-points={isContinuous ? points.length : 2}
-          data-has-window={String(hasExpected)}
-          style={{ height: CHART_HEIGHT }}
-          className="w-full max-w-full"
-        />
+        {/*
+          Recarga com dados já na tela (troca Semana/Mês ou novo apontamento):
+          o gráfico anterior fica esmaecido e marcado como ocupado até a
+          resposta chegar, em vez de parecer já atualizado.
+        */}
+        <div className="relative" aria-busy={refreshing}>
+          <div
+            ref={containerRef}
+            role="img"
+            aria-label={ariaLabel}
+            data-mode={isContinuous ? "composite" : "simple"}
+            data-granularity={isContinuous ? active : undefined}
+            data-points={isContinuous ? points.length : 2}
+            data-has-window={String(hasExpected)}
+            style={{ height: CHART_HEIGHT }}
+            className={cn(
+              "w-full max-w-full transition-opacity",
+              refreshing && "opacity-40",
+            )}
+          />
+          {refreshing && (
+            <p
+              role="status"
+              className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground"
+            >
+              Atualizando gráfico…
+            </p>
+          )}
+        </div>
 
         <p className="text-xs text-muted-foreground">
           Somente validados contam no realizado oficial.
