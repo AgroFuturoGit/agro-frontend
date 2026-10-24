@@ -42,12 +42,30 @@ export function clearSession() {
   notifyUserChanged();
 }
 
-/** Apaga os caches do Cache Storage (service worker) para não sobrar dado de sessão anterior. */
+/**
+ * Caches de runtime do service worker que podem guardar dado de usuário
+ * (nomes do `defaultCache` do Serwist). O precache (`serwist-precache-*`) e os
+ * caches de assets estáticos ficam intactos.
+ */
+const USER_DATA_CACHES = new Set([
+  "apis",
+  "cross-origin",
+  "next-data",
+  "others",
+  "pages",
+  "pages-rsc",
+  "pages-rsc-prefetch",
+  "static-data-assets",
+]);
+
+/** Apaga os caches de dados em runtime (service worker) para não sobrar dado de sessão anterior. */
 export async function clearAppCaches(): Promise<void> {
   if (typeof caches === "undefined") return;
   try {
     const keys = await caches.keys();
-    await Promise.all(keys.map((key) => caches.delete(key)));
+    await Promise.all(
+      keys.filter((key) => USER_DATA_CACHES.has(key)).map((key) => caches.delete(key)),
+    );
   } catch {
     // Cache Storage indisponível (ex. contexto inseguro): nada a limpar.
   }
@@ -120,6 +138,8 @@ export async function refreshSessionFromServer(): Promise<AuthUser | null> {
     if (!response.ok) return null;
     const me = (await response.json()) as Partial<MeResponse>;
     if (!me?.id || !me.role) return null;
+    // Logout ou troca de sessão durante a requisição: descarta a resposta.
+    if (readTokenFromCookie() !== token) return null;
     const stored = readUserFromStorage();
     const user: AuthUser = {
       ...stored,

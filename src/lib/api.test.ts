@@ -116,6 +116,47 @@ describe("conferência de sessão no apiRequest (UNIT-001)", () => {
     expect(goToLogin).not.toHaveBeenCalled();
   });
 
+  for (const status of [502, 503, 504]) {
+    it(`${status} no /auth/me não encerra a sessão`, async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => (String(url).endsWith("/auth/me") ? res(status) : res(403))),
+      );
+
+      await expect(apiRequest("/users")).rejects.toBeInstanceOf(ApiError);
+
+      expect(readTokenFromCookie()).toBe("tok");
+      expect(goToLogin).not.toHaveBeenCalled();
+    });
+  }
+
+  for (const [label, init] of [
+    ["vazio", { status: 500, body: "" }],
+    ["JSON inválido", { status: 403, body: "{nao-json" }],
+  ] as const) {
+    it(`corpo de erro ${label} não impede a conferência`, async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) =>
+          String(url).endsWith("/auth/me")
+            ? res(401)
+            : new Response(init.body, {
+                status: init.status,
+                headers: { "content-type": "application/json" },
+              }),
+        ),
+      );
+
+      await expect(apiRequest("/users")).rejects.toMatchObject({
+        status: init.status,
+        message: `Erro ${init.status}`,
+      });
+
+      expect(readTokenFromCookie()).toBeNull();
+      expect(goToLogin).toHaveBeenCalled();
+    });
+  }
+
   it("chamadas simultâneas fazem uma só conferência", async () => {
     const fetchMock = vi.fn(async (url: string) =>
       String(url).endsWith("/auth/me") ? res(500) : res(403),

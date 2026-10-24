@@ -285,6 +285,23 @@ describe("proxy em /login (UNIT-002)", () => {
     expect(new URL(response.headers.get("location")!).pathname).toBe("/admin");
   });
 
+  it.each([502, 503, 504])("%i no /auth/me abre o login sem apagar cookies", async (status) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status })));
+
+    const response = await proxy(loginRequest("/login", "agro_token=x; agro_role=ADMIN"));
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it.each([401, 403])("%i no /auth/me apaga os cookies", async (status) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status })));
+
+    const response = await proxy(loginRequest("/login", "agro_token=x; agro_role=ADMIN"));
+
+    expect(response.headers.get("set-cookie") ?? "").toMatch(/agro_token=;/);
+  });
+
   it("erro de rede abre o login sem apagar cookies", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("net")));
 

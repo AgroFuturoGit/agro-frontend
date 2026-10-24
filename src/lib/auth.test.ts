@@ -64,6 +64,22 @@ describe("refreshSessionFromServer (UNIT-004)", () => {
     expect(getUserSnapshot()?.dateOfBirth).toBe("1990-01-01");
   });
 
+  it("não regrava a sessão se o logout ocorreu durante a requisição", async () => {
+    let resolveFetch!: (r: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockReturnValue(new Promise<Response>((r) => (resolveFetch = r))),
+    );
+
+    const pending = refreshSessionFromServer();
+    clearSession();
+    resolveFetch(jsonResponse(user));
+
+    expect(await pending).toBeNull();
+    expect(document.cookie).not.toContain("agro_token=");
+    expect(getUserSnapshot()).toBeNull();
+  });
+
   it("com localStorage limpo, o usuário volta quando o /auth/me responde", async () => {
     localStorage.clear();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(user)));
@@ -88,17 +104,26 @@ describe("refreshSessionFromServer (UNIT-004)", () => {
 });
 
 describe("clearAppCaches (UNIT-005)", () => {
-  it("apaga todos os caches do Cache Storage", async () => {
+  it("apaga os caches de dados e preserva o precache e os assets", async () => {
     const del = vi.fn().mockResolvedValue(true);
     vi.stubGlobal("caches", {
-      keys: vi.fn().mockResolvedValue(["a", "b"]),
+      keys: vi.fn().mockResolvedValue([
+        "serwist-precache-v2-https://x/",
+        "static-image-assets",
+        "cross-origin",
+        "pages",
+        "next-data",
+      ]),
       delete: del,
     });
 
     await clearAppCaches();
 
-    expect(del).toHaveBeenCalledWith("a");
-    expect(del).toHaveBeenCalledWith("b");
+    expect(del).toHaveBeenCalledWith("cross-origin");
+    expect(del).toHaveBeenCalledWith("pages");
+    expect(del).toHaveBeenCalledWith("next-data");
+    expect(del).not.toHaveBeenCalledWith("serwist-precache-v2-https://x/");
+    expect(del).not.toHaveBeenCalledWith("static-image-assets");
   });
 
   it("não falha sem Cache Storage", async () => {

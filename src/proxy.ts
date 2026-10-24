@@ -118,7 +118,9 @@ async function validateToken(
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(3000),
     });
-    return response.ok ? "valid" : "invalid";
+    if (response.ok) return "valid";
+    // Só 401/403/500 indicam token rejeitado; 502/503/504 etc. são transitórios.
+    return [401, 403, 500].includes(response.status) ? "invalid" : "unknown";
   } catch {
     return "unknown";
   }

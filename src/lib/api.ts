@@ -22,6 +22,8 @@ export const sessionNavigator = {
   },
 };
 
+const SESSION_ERROR_STATUSES = [401, 403, 500];
+
 let sessionCheck: Promise<void> | null = null;
 
 /**
@@ -39,7 +41,8 @@ function checkSession(): Promise<void> {
       const response = await fetch(`${API_URL}/auth/me`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
-      valid = response.ok;
+      // Só 401/403/500 indicam token rejeitado; 502/503/504 etc. são transitórios.
+      valid = response.ok || !SESSION_ERROR_STATUSES.includes(response.status);
     } catch {
       return;
     }
@@ -55,8 +58,6 @@ function checkSession(): Promise<void> {
   });
   return sessionCheck;
 }
-
-const SESSION_ERROR_STATUSES = [401, 403, 500];
 
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
@@ -87,7 +88,13 @@ export async function apiRequest<T = unknown>(
     const isJson = response.headers
       .get("content-type")
       ?.includes("application/json");
-    const payload = isJson ? await response.json() : await response.text();
+    let payload: unknown = null;
+    try {
+      payload = isJson ? await response.json() : await response.text();
+    } catch {
+      // Corpo vazio ou inválido: segue com payload nulo (mensagem "Erro NNN").
+      if (response.ok) throw new SyntaxError("Resposta da API inválida");
+    }
 
     if (!response.ok) {
       const message =

@@ -16,8 +16,8 @@ export function resolvePostLoginPath(from: string | null): string {
   if (
     from &&
     (from === "/admin" || /^\/admin(\/|\?|#)/.test(from)) &&
-    !from.startsWith("//") &&
-    !from.includes("\\")
+    !from.includes("\\") &&
+    !from.split(/[?#]/)[0].split("/").includes("..")
   ) {
     return from;
   }

@@ -68,6 +68,17 @@ describe("LoginForm retorno ao from (UNIT-003)", () => {
     expect(replace).toHaveBeenCalledWith("/admin");
   });
 
+  it.each([
+    ["barra invertida", "%5C%5Cevil.com"],
+    ["/admin com barra invertida", "%2Fadmin%5Cevil"],
+    ["/adminx", "%2Fadminx"],
+    ["/admin/..//evil.com", "%2Fadmin%2F..%2F%2Fevil.com"],
+    ["esquema javascript", "javascript%3Aalert(1)"],
+  ])("recusa from de risco: %s", async (_label, encoded) => {
+    await submitWith(`?from=${encoded}`);
+    expect(replace).toHaveBeenCalledWith("/admin");
+  });
+
   it("sem from vai para /admin", async () => {
     await submitWith("");
     expect(replace).toHaveBeenCalledWith("/admin");

@@ -10,9 +10,12 @@ declare global {
 
 declare const self: WorkerGlobalScope;
 
-const API_ORIGIN = new URL(
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080",
-).origin;
+// O worker não tem `process.env` (o Serwist o compila à parte, sem o DefinePlugin
+// do Next), então a origem da API não é lida de variável: toda requisição para
+// outra origem, ou com `Authorization`, vai direto à rede. Exceção: fontes do
+// Google, que seguem no cache do `defaultCache`. Efeito colateral aceito: outros
+// assets de origem externa também deixam de ser cacheados.
+const CACHEABLE_EXTERNAL_HOSTS = ["fonts.gstatic.com", "fonts.googleapis.com"];
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
@@ -20,9 +23,11 @@ const serwist = new Serwist({
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: [
-    // Respostas autenticadas da API nunca ficam no cache (antes do defaultCache).
+    // Respostas autenticadas ou da API nunca ficam no cache (antes do defaultCache).
     {
-      matcher: ({ url }) => url.origin === API_ORIGIN,
+      matcher: ({ request, sameOrigin, url }) =>
+        request.headers.has("Authorization") ||
+        (!sameOrigin && !CACHEABLE_EXTERNAL_HOSTS.includes(url.hostname)),
       handler: new NetworkOnly(),
     },
     ...defaultCache,
