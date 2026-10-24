@@ -104,10 +104,41 @@ export function resolveAccess(params: {
   return { action: "next" };
 }
 
-export function proxy(request: NextRequest) {
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+
+/**
+ * Confere o token no back. `invalid` só quando o back responde com erro
+ * HTTP; falha de rede é `unknown` e nunca prende o usuário fora do login.
+ */
+async function validateToken(
+  token: string,
+): Promise<"valid" | "invalid" | "unknown"> {
+  try {
+    const response = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(3000),
+    });
+    return response.ok ? "valid" : "invalid";
+  } catch {
+    return "unknown";
+  }
+}
+
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_TOKEN_COOKIE)?.value;
   const role = request.cookies.get(AUTH_ROLE_COOKIE)?.value;
+
+  if (pathname.startsWith("/login") && token) {
+    const status = await validateToken(token);
+    if (status === "invalid") {
+      const response = NextResponse.next();
+      response.cookies.delete({ name: AUTH_TOKEN_COOKIE, path: "/" });
+      response.cookies.delete({ name: AUTH_ROLE_COOKIE, path: "/" });
+      return response;
+    }
+    if (status === "unknown") return NextResponse.next();
+  }
 
   const decision = resolveAccess({ pathname, token, role });
 

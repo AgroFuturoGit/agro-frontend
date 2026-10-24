@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { proxy, resolveAccess } from "@/proxy";
 
@@ -159,23 +159,23 @@ describe("resolveAccess — casos de não-regressão (token/login)", () => {
 });
 
 describe("proxy — tradução para NextResponse (NextRequest real)", () => {
-  it("FARMER sem acesso a /admin/perfis → NextResponse.redirect 307 para /admin", () => {
+  it("FARMER sem acesso a /admin/perfis → NextResponse.redirect 307 para /admin", async () => {
     const request = new NextRequest("http://localhost:3000/admin/perfis", {
       headers: {
         cookie: "agro_token=valid-token; agro_role=FARMER",
       },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:3000/admin");
   });
 
-  it("sem token em /admin/* → NextResponse.redirect 307 para /login?from=...", () => {
+  it("sem token em /admin/* → NextResponse.redirect 307 para /login?from=...", async () => {
     const request = new NextRequest("http://localhost:3000/admin/usuarios");
 
-    const response = proxy(request);
+    const response = await proxy(request);
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(
@@ -183,14 +183,14 @@ describe("proxy — tradução para NextResponse (NextRequest real)", () => {
     );
   });
 
-  it("MANAGER acessando /admin/organizacoes → NextResponse.next (sem redirecionamento no proxy — guarda de ownership é client-side)", () => {
+  it("MANAGER acessando /admin/organizacoes → NextResponse.next (sem redirecionamento no proxy — guarda de ownership é client-side)", async () => {
     const request = new NextRequest("http://localhost:3000/admin/organizacoes", {
       headers: {
         cookie: "agro_token=valid-token; agro_role=MANAGER",
       },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
 
     // NextResponse.next() não seta status de redirect nem header location.
     expect(response.headers.get("location")).toBeNull();
@@ -210,14 +210,14 @@ describe("proxy — tradução para NextResponse (NextRequest real)", () => {
  * segunda requisição a `/login` já cai no formulário.
  */
 describe("proxy — encerramento de sessão com role obsoleta (anti-loop)", () => {
-  it("agro_role=PRODUCER (obsoleta) + token válido → 307 /login e apaga agro_token e agro_role", () => {
+  it("agro_role=PRODUCER (obsoleta) + token válido → 307 /login e apaga agro_token e agro_role", async () => {
     const request = new NextRequest("http://localhost:3000/admin", {
       headers: {
         cookie: "agro_token=valid-token; agro_role=PRODUCER",
       },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
 
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("http://localhost:3000/login");
@@ -234,25 +234,73 @@ describe("proxy — encerramento de sessão com role obsoleta (anti-loop)", () =
     expect(setCookies[1]).toContain("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
   });
 
-  it("o ciclo não existe mais: após a limpeza, /login sem token segue para o formulário", () => {
+  it("o ciclo não existe mais: após a limpeza, /login sem token segue para o formulário", async () => {
     // Estado do browser depois do response acima: os dois cookies expirados.
     const request = new NextRequest("http://localhost:3000/login");
 
-    const response = proxy(request);
+    const response = await proxy(request);
 
     expect(response.headers.get("location")).toBeNull();
   });
 
-  it("role válida não dispara limpeza de sessão (redirect de RBAC preserva os cookies)", () => {
+  it("role válida não dispara limpeza de sessão (redirect de RBAC preserva os cookies)", async () => {
     const request = new NextRequest("http://localhost:3000/admin/perfis", {
       headers: {
         cookie: "agro_token=valid-token; agro_role=FARMER",
       },
     });
 
-    const response = proxy(request);
+    const response = await proxy(request);
 
     expect(response.status).toBe(307);
     expect(response.headers.getSetCookie()).toEqual([]);
+  });
+});
+
+function loginRequest(path: string, cookies: string) {
+  return new NextRequest(`http://localhost:3000${path}`, {
+    headers: cookies ? { cookie: cookies } : undefined,
+  });
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("proxy em /login (UNIT-002)", () => {
+  it("token inválido abre o login e apaga os cookies", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 500 })));
+
+    const response = await proxy(loginRequest("/login", "agro_token=ruim; agro_role=ADMIN"));
+
+    expect(response.headers.get("location")).toBeNull();
+    const setCookie = response.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/agro_token=;/);
+    expect(setCookie).toMatch(/agro_role=;/);
+  });
+
+  it("token válido redireciona para /admin", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 200 })));
+
+    const response = await proxy(loginRequest("/login", "agro_token=bom; agro_role=ADMIN"));
+
+    expect(new URL(response.headers.get("location")!).pathname).toBe("/admin");
+  });
+
+  it("erro de rede abre o login sem apagar cookies", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("net")));
+
+    const response = await proxy(loginRequest("/login", "agro_token=x; agro_role=ADMIN"));
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("sem token não chama o back", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await proxy(loginRequest("/login", ""));
+
+    expect(response.headers.get("location")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

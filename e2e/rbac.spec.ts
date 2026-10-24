@@ -10,6 +10,12 @@ const AUTH_ROLE_COOKIE = "agro_role";
  * dependência de um backend real.
  */
 async function loginAs(page: Page, role: string) {
+  // A sessão é conferida em `GET /auth/me` quando a API devolve 401/403/500;
+  // com token falso o back real encerraria a sessão, então o mock responde 200
+  // (corpo sem usuário: o refresh do layout o ignora e mantém a sessão semeada).
+  await page.route("**/auth/me", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+  );
   await page.context().addCookies([
     {
       name: AUTH_TOKEN_COOKIE,

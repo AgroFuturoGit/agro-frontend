@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "id": "E2E-013",
+  "title": "Sessão inválida leva ao login e volta à página pedida",
+  "description": "Com o cookie de sessão adulterado, abrir /admin/usuarios leva ao login com a rota de origem; depois de entrar, o usuário volta para /admin/usuarios. Com o token adulterado, /login abre o formulário em vez de redirecionar.",
+  "feature_slug": "qa-sessao-seguranca",
+  "ac_refs": [
+    "AC-006"
+  ],
+  "priority": "P0",
+  "tags": [
+    "sessao",
+    "login"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/admin/usuarios",
+    "users": [
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "O contexto do navegador começa com o cookie agro_token adulterado (valor inválido), injetado pelo ambiente antes da execução; sem ele o fluxo também passa, pois o proxy manda para o login"
+    ]
+  },
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Sessão inválida em /admin/usuarios leva ao login e, depois de entrar, volta para a página",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "wait",
+          "value": "/login",
+          "note": "a sessão inválida é encerrada e o usuário cai no login"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin/usuarios",
+          "note": "volta para a página pedida"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "url",
+          "value": "/admin/usuarios"
+        }
+      ]
+    },
+    {
+      "name": "login_com_token_adulterado",
+      "title": "Abrir /login com token adulterado mostra o formulário",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/login"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        }
+      ]
+    }
+  ]
+}
