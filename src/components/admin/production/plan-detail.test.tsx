@@ -425,6 +425,23 @@ describe("PlanDetail — erro de API e recuperação", () => {
     expect(queryWriteAffordances().novoApontamento).toBeNull();
   });
 
+  it.each([
+    ["404", new ApiError(404, "Plano não encontrado.", {})],
+    ["400", new ApiError(400, "Requisição inválida", {})],
+    ["Invalid UUID", new ApiError(500, "Invalid UUID string: abc", {})],
+  ])("plano inexistente ou id inválido (%s) mostra 'Plano não encontrado' com link de volta", async (_label, err) => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockRejectedValue(err);
+
+    renderPlanDetail();
+
+    expect(await screen.findByText("Plano não encontrado")).toBeTruthy();
+    const link = screen.getByText(/Voltar para planos/).closest("a");
+    expect(link?.getAttribute("href")).toContain("/produtores/");
+    expect(screen.queryByText("Tentar novamente")).toBeNull();
+    expect(queryWriteAffordances().novoApontamento).toBeNull();
+  });
+
   it("'Tentar novamente' refaz os 3 GET e a tela se recupera", async () => {
     loginAs("FARMER");
     vi.mocked(getProductionPlan)

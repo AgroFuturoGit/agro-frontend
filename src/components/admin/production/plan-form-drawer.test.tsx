@@ -220,3 +220,62 @@ describe("PlanFormDrawer — janela e status (UNIT-010 / AC-011)", () => {
     );
   });
 });
+
+describe("PlanFormDrawer — QA (UNIT-003 / UNIT-004)", () => {
+  it("recusa notação científica na área", async () => {
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: "1e3" } });
+    submit();
+    expect(await screen.findByText("Informe uma área maior que zero")).toBeTruthy();
+    expect(createProductionPlan).not.toHaveBeenCalled();
+  });
+
+  it("recusa plantio fora do intervalo da safra escolhida", async () => {
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Data prevista de plantio"), {
+      target: { value: "2025-12-31" },
+    });
+    submit();
+    expect(
+      await screen.findByText(/O plantio deve estar dentro da safra \(01\/01\/2026 a 31\/12\/2026\)/),
+    ).toBeTruthy();
+    expect(createProductionPlan).not.toHaveBeenCalled();
+  });
+
+  it("aceita plantio dentro da safra", async () => {
+    vi.mocked(createProductionPlan).mockResolvedValue(PLAN);
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    await pick("Safra", "Safra 2026");
+    await pick("Cultivo", "Tomate — Italiano");
+    fireEvent.change(screen.getByLabelText("Área plantada (ha)"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Data prevista de plantio"), {
+      target: { value: "2026-03-01" },
+    });
+    submit();
+    await waitFor(() => expect(createProductionPlan).toHaveBeenCalled());
+  });
+
+  it("recusa fim previsto anterior ao plantio", async () => {
+    renderForm("edit", PLAN);
+    fireEvent.change(await screen.findByLabelText("Início previsto da colheita"), {
+      target: { value: "" },
+    });
+    fireEvent.change(screen.getByLabelText("Início previsto da colheita"), {
+      target: { value: "2026-01-10" },
+    });
+    fireEvent.change(screen.getByLabelText("Fim previsto da colheita"), {
+      target: { value: "2026-01-20" },
+    });
+    submit();
+    expect(await screen.findByText("A data final não pode ser anterior ao plantio")).toBeTruthy();
+    expect(updateProductionPlan).not.toHaveBeenCalled();
+  });
+});

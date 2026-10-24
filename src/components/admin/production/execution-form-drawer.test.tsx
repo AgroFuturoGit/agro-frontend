@@ -251,3 +251,31 @@ describe("ExecutionFormDrawer — aviso de reenvio (UNIT-005)", () => {
     expect(screen.queryByText(WARNING)).toBeNull();
   });
 });
+
+describe("ExecutionFormDrawer — QA (UNIT-003 / UNIT-004)", () => {
+  it("recusa data de colheita no futuro", async () => {
+    renderForm("create", BOX);
+    fireEvent.change(await screen.findByLabelText("Quantidade colhida (caixas)"), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByLabelText("Data da colheita"), {
+      target: { value: "2999-01-01" },
+    });
+    submit();
+    expect(await screen.findByText("A data da colheita não pode ser futura")).toBeTruthy();
+    expect(createProductionExecution).not.toHaveBeenCalled();
+  });
+
+  it("recusa notação científica na quantidade", async () => {
+    renderForm("create", BOX);
+    fireEvent.change(await screen.findByLabelText("Quantidade colhida (caixas)"), {
+      target: { value: "1e3" },
+    });
+    fireEvent.change(screen.getByLabelText("Data da colheita"), {
+      target: { value: "2026-05-10" },
+    });
+    submit();
+    expect(await screen.findByText("Informe uma quantidade maior que zero")).toBeTruthy();
+    expect(createProductionExecution).not.toHaveBeenCalled();
+  });
+});

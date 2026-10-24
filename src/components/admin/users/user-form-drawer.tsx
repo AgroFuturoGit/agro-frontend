@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,12 @@ import {
 import { ApiError } from "@/lib/api";
 import { persistSession, readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
+import {
+  NAME_MIN_LENGTH_MESSAGE,
+  TEXT_MAX_LENGTH,
+  isValidEmail,
+  onlyDigits,
+} from "@/lib/validation";
 import {
   TECHNICIAN_REGISTRATION_TYPES,
   createTechnician,
@@ -59,7 +65,7 @@ const EMPTY = {
   registrationType: "" as TechnicianRegistrationType | "",
   registrationNumber: "",
   specialty: "",
-  role: "ADMIN" as Role,
+  role: "" as Role | "",
 };
 
 export function UserFormDrawer({
@@ -108,9 +114,20 @@ export function UserFormDrawer({
 
   const isTechnician = mode === "create" && values.role === "TECHNICIAN";
 
+  const isDirty = useMemo(() => {
+    if (mode !== "edit" || !user) return true;
+    return (
+      values.fullName.trim() !== user.fullName.trim() || values.role !== user.role
+    );
+  }, [mode, user, values.fullName, values.role]);
+
   function validate(): Record<string, string> {
     const errors: Record<string, string> = {};
+    const name = values.fullName.trim();
+    if (name.length === 1) errors.fullName = NAME_MIN_LENGTH_MESSAGE;
+    if (!values.role) errors.role = "Selecione o papel.";
     if (mode !== "create") return errors;
+    if (!isValidEmail(values.email)) errors.email = "Informe um e-mail válido";
     const cpf = values.cpf.trim();
     if (isTechnician && !cpf) errors.cpf = "Informe o CPF";
     else if (cpf && !isValidCpf(cpf)) errors.cpf = "CPF inválido";
@@ -146,7 +163,7 @@ export function UserFormDrawer({
           fullName: values.fullName.trim(),
           email: values.email.trim(),
           password: values.password,
-          cpf: values.cpf.trim(),
+          cpf: onlyDigits(values.cpf),
           ...(values.registrationType
             ? { registrationType: values.registrationType }
             : {}),
@@ -154,18 +171,18 @@ export function UserFormDrawer({
           ...(specialty ? { specialty } : {}),
         });
       } else if (mode === "create") {
-        const cpf = values.cpf.trim();
+        const cpf = onlyDigits(values.cpf);
         await registerUser({
           fullName: values.fullName.trim(),
           email: values.email.trim(),
           password: values.password,
           ...(cpf ? { cpf } : {}),
-          role: values.role,
+          role: values.role as Role,
         });
       } else if (user) {
         const updated = await adminUpdateUser(user.id, {
           fullName: values.fullName.trim(),
-          role: values.role,
+          role: values.role as Role,
         });
         const stored = readUserFromStorage();
         if (stored && stored.id === user.id) {
@@ -242,9 +259,14 @@ export function UserFormDrawer({
                 value={values.fullName}
                 onChange={(e) => update("fullName", e.target.value)}
                 required
+                maxLength={TEXT_MAX_LENGTH}
                 disabled={submitting}
                 autoComplete="name"
+                aria-invalid={Boolean(fieldErrors.fullName)}
               />
+              {fieldErrors.fullName && (
+                <p className="text-sm text-destructive">{fieldErrors.fullName}</p>
+              )}
             </div>
 
             {isCreate ? (
@@ -257,9 +279,14 @@ export function UserFormDrawer({
                     value={values.email}
                     onChange={(e) => update("email", e.target.value)}
                     required
+                    maxLength={TEXT_MAX_LENGTH}
                     disabled={submitting}
                     autoComplete="email"
+                    aria-invalid={Boolean(fieldErrors.email)}
                   />
+                  {fieldErrors.email && (
+                    <p className="text-sm text-destructive">{fieldErrors.email}</p>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -323,10 +350,14 @@ export function UserFormDrawer({
             <div className="flex flex-col gap-2">
               <Label htmlFor="role">Papel</Label>
               <Select
-                value={values.role}
+                value={values.role || null}
                 onValueChange={(v) => update("role", v as Role)}
               >
-                <SelectTrigger id="role" className="w-full">
+                <SelectTrigger
+                  id="role"
+                  className="w-full"
+                  aria-invalid={Boolean(fieldErrors.role)}
+                >
                   <SelectValue placeholder="Selecione o papel">
                     {(v) =>
                       v ? (ROLE_LABELS[v as Role] ?? v) : "Selecione o papel"
@@ -341,6 +372,9 @@ export function UserFormDrawer({
                   ))}
                 </SelectContent>
               </Select>
+              {fieldErrors.role && (
+                <p className="text-sm text-destructive">{fieldErrors.role}</p>
+              )}
               <p className="text-xs text-muted-foreground">
                 {isCreate
                   ? "Gestores e Agricultores não são criados aqui — use os fluxos de Organização e Comunidade."
@@ -393,6 +427,7 @@ export function UserFormDrawer({
                     id="registrationNumber"
                     value={values.registrationNumber}
                     onChange={(e) => update("registrationNumber", e.target.value)}
+                    maxLength={TEXT_MAX_LENGTH}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.registrationNumber)}
                   />
@@ -409,6 +444,7 @@ export function UserFormDrawer({
                     id="specialty"
                     value={values.specialty}
                     onChange={(e) => update("specialty", e.target.value)}
+                    maxLength={TEXT_MAX_LENGTH}
                     disabled={submitting}
                   />
                 </div>
@@ -425,7 +461,7 @@ export function UserFormDrawer({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || !isDirty}>
               {submitting ? (
                 <>
                   <Loader2 className="animate-spin" />

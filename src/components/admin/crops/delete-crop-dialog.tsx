@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 import {
@@ -27,6 +27,14 @@ export function DeleteCropDialog({ crop, open, onOpenChange, onDeleted }: Props)
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Sempre que o diálogo abre, descarta o erro e o envio da abertura anterior.
+  useEffect(() => {
+    if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setError(null);
+    setSubmitting(false);
+  }, [open]);
+
   async function handleConfirm() {
     if (!crop) return;
     setError(null);
@@ -36,6 +44,8 @@ export function DeleteCropDialog({ crop, open, onOpenChange, onDeleted }: Props)
       onDeleted();
       onOpenChange(false);
     } catch (err) {
+      // Registro já removido: recarrega a lista para refletir o estado real.
+      if (err instanceof ApiError && err.status === 404) onDeleted();
       setError(
         err instanceof ApiError
           ? err.message

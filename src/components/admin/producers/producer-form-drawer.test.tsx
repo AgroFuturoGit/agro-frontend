@@ -168,11 +168,11 @@ describe("ProducerFormDrawer — cadastro por comunidade (spec.md §5)", () => {
     submitForm();
 
     // `communityId` vai como path param (1º argumento), nunca no corpo.
-    // O CPF chega mascarado porque `formatCpf` roda no `onChange`.
+    // A tela mostra o CPF mascarado, mas a API recebe só os dígitos.
     await waitFor(() =>
       expect(registerProducer).toHaveBeenCalledWith("community-1", {
         fullName: "José da Silva",
-        cpf: "529.982.247-25",
+        cpf: VALID_CPF,
         email: "jose@agro.com",
         password: "supersecreta",
         dateOfBirth: "1985-03-10",
@@ -205,7 +205,7 @@ describe("ProducerFormDrawer — cadastro por comunidade (spec.md §5)", () => {
     await waitFor(() =>
       expect(registerProducer).toHaveBeenCalledWith("community-1", {
         fullName: "José da Silva",
-        cpf: "529.982.247-25",
+        cpf: VALID_CPF,
         email: "jose@agro.com",
         password: "supersecreta",
       }),
@@ -522,6 +522,7 @@ describe("ProducerFormDrawer — edição", () => {
       longitude: null,
     });
 
+    change("Nome da mãe", "Maria Souza");
     await user.click(
       await screen.findByRole("button", { name: "Salvar alterações" }),
     );
@@ -554,6 +555,8 @@ describe("ProducerFormDrawer — UF/IBGE legados (CR-003)", () => {
       state: "Alagoas",
       ibgeCode: "123",
     });
+    await screen.findByLabelText("Nome da mãe");
+    change("Nome da mãe", "Maria Souza");
     await user.click(
       await screen.findByRole("button", { name: "Salvar alterações" }),
     );
@@ -581,5 +584,46 @@ describe("ProducerFormDrawer — UF/IBGE legados (CR-003)", () => {
     expect(await screen.findByText("Informe a UF com 2 letras")).toBeTruthy();
     expect(screen.getByText("O código IBGE deve ter 7 dígitos")).toBeTruthy();
     expect(updateProducer).not.toHaveBeenCalled();
+  });
+});
+
+describe("ProducerFormDrawer — QA (UNIT-001 / UNIT-009)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("UNIT-001: o campo mostra a máscara e a API recebe só dígitos", async () => {
+    vi.mocked(registerProducer).mockResolvedValue(REGISTERED_PRODUCER);
+    renderDialog();
+    await screen.findByLabelText("Nome completo");
+    fillRequiredFields();
+    expect((screen.getByLabelText("CPF") as HTMLInputElement).value).toBe("529.982.247-25");
+    await selectCommunity("Comunidade Alfa");
+    submitForm();
+    await waitFor(() =>
+      expect(registerProducer).toHaveBeenCalledWith(
+        "community-1",
+        expect.objectContaining({ cpf: "52998224725" }),
+      ),
+    );
+  });
+
+  it("UNIT-002: campos de texto têm maxLength 255", async () => {
+    renderDialog();
+    for (const label of ["Nome completo", "Nome da mãe", "E-mail"]) {
+      expect((await screen.findByLabelText(label)).getAttribute("maxlength")).toBe("255");
+    }
+  });
+
+  it("UNIT-009: edição só habilita Salvar alterações depois de mudar algo", async () => {
+    renderEditDrawer();
+    const save = (await screen.findByRole("button", {
+      name: "Salvar alterações",
+    })) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+    change("Nome da mãe", "Outro Nome");
+    await waitFor(() => expect(save.disabled).toBe(false));
+    change("Nome da mãe", REGISTERED_PRODUCER.motherName ?? "");
   });
 });

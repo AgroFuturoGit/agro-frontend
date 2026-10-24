@@ -37,6 +37,11 @@ import {
   type CropWritePayload,
   type MeasurementUnit,
 } from "@/lib/crops";
+import {
+  NAME_MIN_LENGTH_MESSAGE,
+  TEXT_MAX_LENGTH,
+  parsePlainDecimal,
+} from "@/lib/validation";
 
 type Mode = "create" | "edit";
 
@@ -108,12 +113,12 @@ function validateField(field: keyof FormValues, value: FormValues): string | nul
     case "name":
     case "variety": {
       const trimmed = value[field].trim();
-      if (trimmed.length < 2) {
-        return field === "name"
-          ? "Informe o nome da cultura"
-          : "Informe a variedade";
+      if (field === "name") {
+        if (trimmed.length === 0) return "Informe o nome da cultura";
+        if (trimmed.length < 2) return NAME_MIN_LENGTH_MESSAGE;
+        return null;
       }
-      return null;
+      return trimmed.length < 2 ? "Informe a variedade" : null;
     }
     case "cycleDays": {
       if (!value.cycleDays.trim()) return null; // opcional
@@ -124,12 +129,8 @@ function validateField(field: keyof FormValues, value: FormValues): string | nul
       return null;
     }
     case "expectedProductivity": {
-      const productivity = Number(value.expectedProductivity);
-      if (
-        !value.expectedProductivity.trim() ||
-        !Number.isFinite(productivity) ||
-        productivity <= 0
-      ) {
+      const productivity = parsePlainDecimal(value.expectedProductivity);
+      if (!Number.isFinite(productivity) || productivity <= 0) {
         return "Informe uma produtividade maior que zero";
       }
       return null;
@@ -143,8 +144,8 @@ function validateField(field: keyof FormValues, value: FormValues): string | nul
     case "unitWeightKg": {
       const unit = parseMeasurementUnit(value.unit);
       if (unit !== "SACK" && unit !== "BOX") return null;
-      const weight = Number(value.unitWeightKg);
-      if (!value.unitWeightKg.trim() || !Number.isFinite(weight) || weight <= 0) {
+      const weight = parsePlainDecimal(value.unitWeightKg);
+      if (!Number.isFinite(weight) || weight <= 0) {
         return "Informe o peso da unidade (maior que zero)";
       }
       return null;
@@ -181,10 +182,10 @@ function buildPayload(values: FormValues): CropWritePayload {
     variety: values.variety.trim(),
     isPriority: values.isPriority,
     cycleDays: values.cycleDays.trim() ? Number(values.cycleDays) : null,
-    expectedProductivity: Number(values.expectedProductivity),
+    expectedProductivity: parsePlainDecimal(values.expectedProductivity),
     harvestType: parseHarvestType(values.harvestType),
     unit,
-    unitWeightKg: Number(fixedWeight ?? values.unitWeightKg),
+    unitWeightKg: parsePlainDecimal(fixedWeight ?? values.unitWeightKg),
   };
 }
 
@@ -359,6 +360,7 @@ export function CropFormDrawer({
                 onChange={(e) => update("name", e.target.value)}
                 onBlur={() => handleBlur("name")}
                 required
+                maxLength={TEXT_MAX_LENGTH}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.name)}
               />
@@ -375,6 +377,7 @@ export function CropFormDrawer({
                 onChange={(e) => update("variety", e.target.value)}
                 onBlur={() => handleBlur("variety")}
                 required
+                maxLength={TEXT_MAX_LENGTH}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.variety)}
               />

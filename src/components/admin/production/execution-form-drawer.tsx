@@ -22,6 +22,7 @@ import {
   updateProductionExecution,
   type ProductionExecution,
 } from "@/lib/production";
+import { isFutureDate, parsePlainDecimal, todayIso } from "@/lib/validation";
 
 export const MISSING_UNIT_WEIGHT_MESSAGE =
   "Cadastre o peso da unidade na cultura antes de registrar apontamentos";
@@ -56,11 +57,14 @@ const EMPTY: FormValues = {
 
 function validate(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
-  const value = Number(values.quantity);
-  if (!values.quantity || !Number.isFinite(value) || value <= 0) {
+  const value = parsePlainDecimal(values.quantity);
+  if (!Number.isFinite(value) || value <= 0) {
     errors.quantity = "Informe uma quantidade maior que zero";
   }
   if (!values.harvestedAt) errors.harvestedAt = "Informe a data da colheita";
+  else if (isFutureDate(values.harvestedAt)) {
+    errors.harvestedAt = "A data da colheita não pode ser futura";
+  }
   return errors;
 }
 
@@ -112,7 +116,7 @@ export function ExecutionFormDrawer({
 
   const factor = unitFactorKg(crop);
   const blocked = factor === null;
-  const quantityNumber = Number(values.quantity);
+  const quantityNumber = parsePlainDecimal(values.quantity);
   const previewKg =
     factor !== null && values.quantity && Number.isFinite(quantityNumber) && quantityNumber > 0
       ? toKg(quantityNumber, factor)
@@ -145,7 +149,7 @@ export function ExecutionFormDrawer({
 
     setSubmitting(true);
     try {
-      const quantity = Number(values.quantity);
+      const quantity = parsePlainDecimal(values.quantity);
       // Se a quantidade não mudou na edição, preserva o kg já gravado (a
       // unidade da cultura pode ter mudado depois do apontamento).
       const quantityKg =
@@ -286,6 +290,7 @@ export function ExecutionFormDrawer({
                 id="execution-date"
                 type="date"
                 value={values.harvestedAt}
+                max={todayIso()}
                 onChange={(e) => update("harvestedAt", e.target.value)}
                 required
                 disabled={submitting}

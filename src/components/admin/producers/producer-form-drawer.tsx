@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import {
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
+import { TEXT_MAX_LENGTH, isValidEmail, onlyDigits } from "@/lib/validation";
 import {
   parseProducerRegisterFieldErrors,
   registerProducer,
@@ -139,7 +140,8 @@ function validateField(
       return values.fullName.trim() ? null : "Informe o nome completo";
     case "email":
       if (mode !== "create") return null;
-      return values.email.trim() ? null : "Informe o e-mail";
+      if (!values.email.trim()) return "Informe o e-mail";
+      return isValidEmail(values.email) ? null : "Informe um e-mail válido";
     case "password":
       if (mode !== "create") return null;
       if (!values.password) return "Informe a senha";
@@ -265,7 +267,9 @@ export function ProducerFormDrawer({
   loadingCommunities = false,
 }: Props) {
   const [values, setValues] = useState<FormValues>(EMPTY);
+  const [initialValues, setInitialValues] = useState<FormValues>(EMPTY);
   const [isCompliant, setIsCompliant] = useState(false);
+  const [initialCompliant, setInitialCompliant] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -276,7 +280,7 @@ export function ProducerFormDrawer({
     setFieldErrors({});
     setFormError(null);
     if (mode === "edit" && producer) {
-      setValues({
+      const next: FormValues = {
         ...EMPTY,
         fullName: producerDisplayName(producer, ""),
         email: producer.user?.email ?? "",
@@ -294,13 +298,27 @@ export function ProducerFormDrawer({
         latitude: producer.latitude != null ? String(producer.latitude) : "",
         longitude: producer.longitude != null ? String(producer.longitude) : "",
         communityId: producer.community?.id ?? "",
-      });
+      };
+      setValues(next);
+      setInitialValues(next);
       setIsCompliant(producer.isCompliant ?? false);
+      setInitialCompliant(producer.isCompliant ?? false);
     } else {
       setValues(EMPTY);
+      setInitialValues(EMPTY);
       setIsCompliant(false);
+      setInitialCompliant(false);
     }
   }, [open, mode, producer]);
+
+  // Na edição, "Salvar alterações" só habilita quando algo mudou.
+  const isDirty = useMemo(() => {
+    if (mode !== "edit") return true;
+    if (isCompliant !== initialCompliant) return true;
+    return (Object.keys(values) as (keyof FormValues)[]).some(
+      (key) => values[key].trim() !== initialValues[key].trim(),
+    );
+  }, [mode, values, initialValues, isCompliant, initialCompliant]);
 
   function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -327,7 +345,7 @@ export function ProducerFormDrawer({
   function buildRegisterPayload(): ProducerRegisterPayload {
     const payload: ProducerRegisterPayload = {
       fullName: values.fullName.trim(),
-      cpf: values.cpf.trim(),
+      cpf: onlyDigits(values.cpf),
       email: values.email.trim(),
       password: values.password,
     };
@@ -502,6 +520,7 @@ export function ProducerFormDrawer({
               >
                 <Input
                   id="producer-full-name"
+                  maxLength={TEXT_MAX_LENGTH}
                   value={values.fullName}
                   onChange={(e) => update("fullName", e.target.value)}
                   onBlur={() => handleBlur("fullName")}
@@ -561,6 +580,7 @@ export function ProducerFormDrawer({
               >
                 <Input
                   id="producer-mother-name"
+                  maxLength={TEXT_MAX_LENGTH}
                   value={values.motherName}
                   onChange={(e) => update("motherName", e.target.value)}
                   disabled={submitting}
@@ -570,6 +590,7 @@ export function ProducerFormDrawer({
               <Field id="producer-phone" label="Telefone">
                 <Input
                   id="producer-phone"
+                  maxLength={TEXT_MAX_LENGTH}
                   type="tel"
                   value={values.phone}
                   onChange={(e) => update("phone", e.target.value)}
@@ -581,6 +602,7 @@ export function ProducerFormDrawer({
               <Field id="producer-education-level" label="Escolaridade">
                 <Input
                   id="producer-education-level"
+                  maxLength={TEXT_MAX_LENGTH}
                   value={values.educationLevel}
                   onChange={(e) => update("educationLevel", e.target.value)}
                   disabled={submitting}
@@ -590,6 +612,7 @@ export function ProducerFormDrawer({
               <Field id="producer-origin" label="Origem" className={FULL_ROW}>
                 <Input
                   id="producer-origin"
+                  maxLength={TEXT_MAX_LENGTH}
                   value={values.origin}
                   onChange={(e) => update("origin", e.target.value)}
                   disabled={submitting}
@@ -603,6 +626,7 @@ export function ProducerFormDrawer({
                   <Field id="producer-email" label="E-mail" error={fieldErrors.email}>
                     <Input
                       id="producer-email"
+                      maxLength={TEXT_MAX_LENGTH}
                       type="email"
                       value={values.email}
                       onChange={(e) => update("email", e.target.value)}
@@ -657,6 +681,7 @@ export function ProducerFormDrawer({
               >
                 <Input
                   id="producer-local-name"
+                  maxLength={TEXT_MAX_LENGTH}
                   value={values.localName}
                   onChange={(e) => update("localName", e.target.value)}
                   disabled={submitting}
@@ -667,6 +692,7 @@ export function ProducerFormDrawer({
               <Field id="producer-street" label="Rua" className={FULL_ROW}>
                 <Input
                   id="producer-street"
+                  maxLength={TEXT_MAX_LENGTH}
                   value={values.street}
                   onChange={(e) => update("street", e.target.value)}
                   disabled={submitting}
@@ -682,6 +708,7 @@ export function ProducerFormDrawer({
                 <Field id="producer-city" label="Cidade">
                   <Input
                     id="producer-city"
+                    maxLength={TEXT_MAX_LENGTH}
                     value={values.city}
                     onChange={(e) => update("city", e.target.value)}
                     disabled={submitting}
@@ -779,7 +806,7 @@ export function ProducerFormDrawer({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || !isDirty}>
               {submitting ? (
                 <>
                   <Loader2 className="animate-spin" />
