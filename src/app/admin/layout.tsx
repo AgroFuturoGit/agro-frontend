@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Sprout } from "lucide-react";
 
+import { SessionRefresher } from "@/components/admin/session-refresher";
 import { SidebarNav } from "@/components/admin/sidebar-nav";
 import { UserMenu } from "@/components/admin/user-menu";
 import {
@@ -21,6 +22,7 @@ export default function AdminLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="light bg-background text-foreground">
+      <SessionRefresher />
       <TooltipProvider>
         <SidebarProvider>
           <Sidebar collapsible="icon">
