@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { SidebarNav } from "@/components/admin/sidebar-nav";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import * as auth from "@/lib/auth";
 import type { AuthUser } from "@/lib/auth";
 
@@ -149,4 +149,63 @@ describe("SidebarNav — RBAC de navegação", () => {
       expect(screen.queryByText("Usuários")).toBeNull();
     },
   );
+});
+
+function OpenMobileProbe() {
+  const { openMobile, setOpenMobile } = useSidebar();
+  return (
+    <div>
+      <span data-testid="open-mobile">{String(openMobile)}</span>
+      <button type="button" onClick={() => setOpenMobile(true)}>
+        abrir menu
+      </button>
+    </div>
+  );
+}
+
+describe("SidebarNav — menu do celular", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    // volta ao polyfill de desktop usado pelos demais testes
+    window.matchMedia = ((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+  });
+
+  it("UNIT-001: clicar num item do menu fecha o menu no celular", async () => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    mockRole("ADMIN");
+    render(
+      <SidebarProvider>
+        <OpenMobileProbe />
+        <SidebarNav />
+      </SidebarProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "abrir menu" }));
+    expect(screen.getByTestId("open-mobile").textContent).toBe("true");
+
+    const link = await screen.findByRole("link", { name: /Organizações/i });
+    link.addEventListener("click", (e) => e.preventDefault());
+    fireEvent.click(link);
+
+    expect(screen.getByTestId("open-mobile").textContent).toBe("false");
+  });
 });

@@ -277,3 +277,66 @@ describe("UsersPage — integração com UserFormDrawer e DeleteUserDialog", () 
     ).toBeTruthy();
   });
 });
+
+describe("UsersPage — cartões no celular", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  function setMobile(matches: boolean) {
+    window.matchMedia = ((query: string) => ({
+      matches,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+  }
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    window.matchMedia = originalMatchMedia;
+  });
+
+  it("UNIT-002: ADMIN vê cartões (sem tabela) com Editar e Excluir por usuário", async () => {
+    setMobile(true);
+    await mockRole("ADMIN");
+    await mockUsers(USERS);
+
+    await renderUsersPage();
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("ana@agro.com")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Editar usuário" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: "Excluir usuário" })).toHaveLength(3);
+  });
+
+  it("UNIT-002: MANAGER vê os cartões sem nenhuma ação de escrita", async () => {
+    setMobile(true);
+    await mockRole("MANAGER");
+    await mockUsers(USERS);
+
+    await renderUsersPage();
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Bruno Lima")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Editar usuário" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Excluir usuário" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Novo usuário/ })).toBeNull();
+  });
+
+  it("UNIT-002: clicar em Editar no cartão abre o drawer do usuário certo", async () => {
+    setMobile(true);
+    const user = userEvent.setup();
+    await mockRole("ADMIN");
+    await mockUsers(USERS);
+
+    await renderUsersPage();
+
+    await user.click(screen.getAllByRole("button", { name: "Editar usuário" })[1]);
+
+    expect(await screen.findByDisplayValue("Bruno Lima")).toBeTruthy();
+  });
+});
