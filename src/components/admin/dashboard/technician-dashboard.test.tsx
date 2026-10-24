@@ -354,6 +354,60 @@ describe("TechnicianDashboard — gráfico e tabela (UNIT-006/007)", () => {
   });
 });
 
+function manyFarmers(n: number) {
+  return Array.from({ length: n }, (_, i) => farmer(`f${String(i + 1).padStart(2, "0")}`));
+}
+
+describe("TechnicianDashboard — paginação da tabela de agricultores", () => {
+  it("mostra 10 por página com o rodapé, navega e troca itens por página; totais seguem na lista inteira", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(summary({ farmers: manyFarmers(25) }));
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+    expect(screen.getByText("Agricultor f01")).toBeTruthy();
+    expect(screen.getByText("Agricultor f10")).toBeTruthy();
+    expect(screen.queryByText("Agricultor f11")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 1–10 de 25");
+    expect(screen.getByText("Agricultores assistidos").parentElement?.textContent).toContain("3");
+
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(screen.getByText("Agricultor f11")).toBeTruthy();
+    expect(screen.queryByText("Agricultor f01")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 11–20 de 25");
+
+    await choose("Itens por página:", "50");
+    expect(screen.getByText("Agricultor f25")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 1–25 de 25");
+  });
+
+  it("trocar o filtro volta para a primeira página", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(summary({ farmers: manyFarmers(25) }));
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 11–20 de 25");
+    await choose("Cultura", "Feijão");
+    await waitFor(() =>
+      expect(getTechnicianSummary).toHaveBeenLastCalledWith({
+        harvestId: undefined,
+        communityId: undefined,
+        cropId: "k-2",
+      }),
+    );
+    await screen.findByText("Agricultor f01");
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 1–10 de 25");
+  });
+
+  it("no mobile, 10 cartões por página com o rodapé", async () => {
+    mobile.value = true;
+    vi.mocked(getTechnicianSummary).mockResolvedValue(summary({ farmers: manyFarmers(12) }));
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+    expect(screen.getAllByTestId("farmer-card")).toHaveLength(10);
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(screen.getAllByTestId("farmer-card")).toHaveLength(2);
+  });
+});
+
 describe("TechnicianDashboard — mobile (UNIT-007)", () => {
   it("troca a tabela por cartões de agricultor", async () => {
     mobile.value = true;

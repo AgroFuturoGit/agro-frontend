@@ -4,14 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, Sprout } from "lucide-react";
 import {
   getCoreRowModel,
+  getPaginationRowModel,
   useReactTable,
   type ColumnDef,
+  type PaginationState,
   type Row,
 } from "@tanstack/react-table";
 
 import { CommunityBarChart } from "@/components/admin/dashboard/community-bar-chart";
 import { WarningCard } from "@/components/admin/dashboard/warning-card";
 import { DataTable } from "@/components/data-table/data-table";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -203,11 +206,18 @@ function FarmerMobileCard({ farmer }: { farmer: TechnicianFarmerSummary }) {
 }
 
 function FarmersTable({ farmers }: { farmers: TechnicianFarmerSummary[] }) {
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: farmers,
     columns: farmerColumns,
+    state: { pagination },
+    onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
   // `contain: inline-size` impede que as 11 colunas alarguem a página: a
   // tabela rola na horizontal dentro do próprio contêiner.
@@ -221,6 +231,7 @@ function FarmersTable({ farmers }: { farmers: TechnicianFarmerSummary[] }) {
           <FarmerMobileCard farmer={row.original} />
         )}
       />
+      <DataTablePagination table={table} />
     </div>
   );
 }
