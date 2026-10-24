@@ -59,6 +59,98 @@ export type HarvestTimelineResponse = {
   points: TimelinePoint[];
 };
 
+export type WarningType =
+  | "INACTIVE_EXECUTIONS"
+  | "LOW_YIELD_RISK"
+  | "HARVEST_OVERDUE";
+
+export type WarningSeverity = "MEDIUM" | "HIGH";
+
+export type TechnicianWarning = {
+  planId: string;
+  farmerId: string | null;
+  farmerName: string | null;
+  communityId: string | null;
+  communityName: string | null;
+  cropId: string | null;
+  cropName: string;
+  cropVariety: string | null;
+  planStatus: PlanStatus;
+  progressStatus: ProgressStatus;
+  warningTypes: WarningType[];
+  severity: WarningSeverity;
+  message: string;
+  targetKg: number;
+  realizedKg: number;
+  pendingKg: number;
+  expectedPaceKg: number;
+  completionPct: number;
+  lastExecutionDate: string | null;
+  daysWithoutExecution: number | null;
+  expectedHarvestStart: string | null;
+  expectedHarvestEnd: string | null;
+};
+
+export type TechnicianCommunitySummary = {
+  communityId: string;
+  communityName: string;
+  assistedFarmersCount: number;
+  farmersWithPlansCount: number;
+  plansCount: number;
+  plantedAreaHa: number;
+  targetKg: number;
+  realizedKg: number;
+  pendingKg: number;
+  completionPct: number;
+  warningsCount: number;
+};
+
+export type TechnicianFarmerSummary = {
+  farmerId: string;
+  farmerName: string;
+  communityId: string | null;
+  communityName: string | null;
+  isCompliant: boolean;
+  plansCount: number;
+  activePlansCount: number;
+  plantedAreaHa: number;
+  targetKg: number;
+  realizedKg: number;
+  pendingKg: number;
+  completionPct: number;
+  lastExecutionDate: string | null;
+  warningsCount: number;
+};
+
+export type TechnicianSummary = {
+  technicianId: string | null;
+  technicianName: string | null;
+  currentHarvest: FarmerSummary["currentHarvest"];
+  appliedCommunityId: string | null;
+  appliedCropId: string | null;
+  isEmpty: boolean;
+  totalAssistedCommunitiesCount: number;
+  totalAssistedFarmersCount: number;
+  totalPlansCount: number;
+  activePlansCount: number;
+  totalPlantedAreaHa: number;
+  totalTargetKg: number;
+  totalRealizedKg: number;
+  totalPendingKg: number;
+  pendingExecutionsCount: number;
+  overallCompletionPct: number;
+  totalWarningsCount: number;
+  warnings: TechnicianWarning[];
+  communities: TechnicianCommunitySummary[];
+  farmers: TechnicianFarmerSummary[];
+};
+
+export type TechnicianSummaryParams = {
+  harvestId?: string;
+  communityId?: string;
+  cropId?: string;
+};
+
 type Raw = Record<string, unknown>;
 
 /** BigDecimal pode chegar como number ou string; nulo/ inválido vira 0. */
@@ -181,4 +273,151 @@ export function getHarvestTimeline(
     `/analytics/plans/${encodeURIComponent(planId)}/timeline?granularity=${granularity}`,
     { method: "GET" },
   ).then(mapTimeline);
+}
+
+const WARNING_TYPES: WarningType[] = [
+  "INACTIVE_EXECUTIONS",
+  "LOW_YIELD_RISK",
+  "HARVEST_OVERDUE",
+];
+
+function list(value: unknown): Raw[] {
+  return Array.isArray(value) ? (value as Raw[]) : [];
+}
+
+function nullableNumber(value: unknown): number | null {
+  return value === null || value === undefined ? null : toNumber(value);
+}
+
+// Sem `planId` o alerta não tem chave nem link: é descartado.
+function mapWarning(raw: Raw): TechnicianWarning | null {
+  const planId = str(raw.planId);
+  if (!planId) return null;
+  const types = Array.isArray(raw.warningTypes)
+    ? WARNING_TYPES.filter((t) => (raw.warningTypes as unknown[]).includes(t))
+    : [];
+  return {
+    planId,
+    farmerId: str(raw.farmerId),
+    farmerName: str(raw.farmerName),
+    communityId: str(raw.communityId),
+    communityName: str(raw.communityName),
+    cropId: str(raw.cropId),
+    cropName: str(raw.cropName) ?? "Cultura",
+    cropVariety: str(raw.cropVariety),
+    planStatus: (str(raw.planStatus) ?? "PLANNED") as PlanStatus,
+    progressStatus: PROGRESS.find((p) => p === raw.progressStatus) ?? "NOT_STARTED",
+    warningTypes: types,
+    severity: raw.severity === "HIGH" ? "HIGH" : "MEDIUM",
+    message: str(raw.message) ?? "",
+    targetKg: toNumber(raw.targetKg),
+    realizedKg: toNumber(raw.realizedKg),
+    pendingKg: toNumber(raw.pendingKg),
+    expectedPaceKg: toNumber(raw.expectedPaceKg),
+    completionPct: toNumber(raw.completionPct),
+    lastExecutionDate: str(raw.lastExecutionDate),
+    daysWithoutExecution: nullableNumber(raw.daysWithoutExecution),
+    expectedHarvestStart: str(raw.expectedHarvestStart),
+    expectedHarvestEnd: str(raw.expectedHarvestEnd),
+  };
+}
+
+function mapCommunity(raw: Raw): TechnicianCommunitySummary | null {
+  const communityId = str(raw.communityId);
+  if (!communityId) return null;
+  return {
+    communityId,
+    communityName: str(raw.communityName) ?? "Comunidade",
+    assistedFarmersCount: toNumber(raw.assistedFarmersCount),
+    farmersWithPlansCount: toNumber(raw.farmersWithPlansCount),
+    plansCount: toNumber(raw.plansCount),
+    plantedAreaHa: toNumber(raw.plantedAreaHa),
+    targetKg: toNumber(raw.targetKg),
+    realizedKg: toNumber(raw.realizedKg),
+    pendingKg: toNumber(raw.pendingKg),
+    completionPct: toNumber(raw.completionPct),
+    warningsCount: toNumber(raw.warningsCount),
+  };
+}
+
+function mapTechnicianFarmer(raw: Raw): TechnicianFarmerSummary | null {
+  const farmerId = str(raw.farmerId);
+  if (!farmerId) return null;
+  return {
+    farmerId,
+    farmerName: str(raw.farmerName) ?? "Agricultor",
+    communityId: str(raw.communityId),
+    communityName: str(raw.communityName),
+    isCompliant: Boolean(raw.isCompliant),
+    plansCount: toNumber(raw.plansCount),
+    activePlansCount: toNumber(raw.activePlansCount),
+    plantedAreaHa: toNumber(raw.plantedAreaHa),
+    targetKg: toNumber(raw.targetKg),
+    realizedKg: toNumber(raw.realizedKg),
+    pendingKg: toNumber(raw.pendingKg),
+    completionPct: toNumber(raw.completionPct),
+    lastExecutionDate: str(raw.lastExecutionDate),
+    warningsCount: toNumber(raw.warningsCount),
+  };
+}
+
+export function mapTechnicianSummary(raw: Raw): TechnicianSummary {
+  const harvest = raw.currentHarvest as Raw | null | undefined;
+  const warnings = list(raw.warnings)
+    .map(mapWarning)
+    .filter((w): w is TechnicianWarning => w !== null);
+  const communities = list(raw.communities)
+    .map(mapCommunity)
+    .filter((c): c is TechnicianCommunitySummary => c !== null);
+  const farmers = list(raw.farmers)
+    .map(mapTechnicianFarmer)
+    .filter((f): f is TechnicianFarmerSummary => f !== null);
+  return {
+    technicianId: str(raw.technicianId),
+    technicianName: str(raw.technicianName),
+    currentHarvest: harvest
+      ? {
+          id: String(harvest.id),
+          label: str(harvest.label) ?? "",
+          startDate: str(harvest.startDate),
+          endDate: str(harvest.endDate),
+        }
+      : null,
+    appliedCommunityId: str(raw.appliedCommunityId),
+    appliedCropId: str(raw.appliedCropId),
+    isEmpty: Boolean(raw.isEmpty),
+    totalAssistedCommunitiesCount: toNumber(raw.totalAssistedCommunitiesCount),
+    totalAssistedFarmersCount: toNumber(raw.totalAssistedFarmersCount),
+    totalPlansCount: toNumber(raw.totalPlansCount),
+    activePlansCount: toNumber(raw.activePlansCount),
+    totalPlantedAreaHa: toNumber(raw.totalPlantedAreaHa),
+    totalTargetKg: toNumber(raw.totalTargetKg),
+    totalRealizedKg: toNumber(raw.totalRealizedKg),
+    totalPendingKg: toNumber(raw.totalPendingKg),
+    pendingExecutionsCount: toNumber(raw.pendingExecutionsCount),
+    overallCompletionPct: toNumber(raw.overallCompletionPct),
+    totalWarningsCount:
+      raw.totalWarningsCount === undefined
+        ? warnings.length
+        : toNumber(raw.totalWarningsCount),
+    warnings,
+    communities,
+    farmers,
+  };
+}
+
+/**
+ * `GET /analytics/technicians/me/summary` (só TECHNICIAN); cada filtro só vai
+ * na query se informado.
+ */
+export function getTechnicianSummary(params: TechnicianSummaryParams = {}) {
+  const query = new URLSearchParams();
+  if (params.harvestId) query.set("harvestId", params.harvestId);
+  if (params.communityId) query.set("communityId", params.communityId);
+  if (params.cropId) query.set("cropId", params.cropId);
+  const qs = query.toString();
+  return apiRequest<Raw>(
+    `/analytics/technicians/me/summary${qs ? `?${qs}` : ""}`,
+    { method: "GET" },
+  ).then(mapTechnicianSummary);
 }
