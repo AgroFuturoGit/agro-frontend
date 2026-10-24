@@ -7,6 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -222,5 +223,56 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
     const dialog = await screen.findByRole("alertdialog");
     fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
     expect(await within(dialog).findByText("Sem acesso.")).toBeInTheDocument();
+  });
+
+  describe("paginação", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ ...MARIA, id: `m-${i + 1}`, name: `Membro ${String(i + 1).padStart(2, "0")}` }));
+
+    it("mostra 10 por página com o rodapé, navega e troca o tamanho", async () => {
+      vi.mocked(listFamilyMembers).mockResolvedValue(many);
+      render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+      await screen.findByText("Membro 01");
+      expect(screen.getByText("Membro 10")).toBeInTheDocument();
+      expect(screen.queryByText("Membro 11")).toBeNull();
+      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
+        "Exibindo 1–10 de 12",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+      expect(screen.getByText("Membro 11")).toBeInTheDocument();
+      expect(screen.getByText("Membro 12")).toBeInTheDocument();
+      expect(screen.queryByText("Membro 01")).toBeNull();
+      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
+        "Exibindo 11–12 de 12",
+      );
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("combobox"));
+      await user.click(await screen.findByRole("option", { name: "20" }));
+      expect(await screen.findByText("Membro 01")).toBeInTheDocument();
+      expect(screen.getByText("Membro 12")).toBeInTheDocument();
+    });
+
+    it("totais usam a lista inteira, não a página", async () => {
+      vi.mocked(listFamilyMembers).mockResolvedValue(many);
+      render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+      await screen.findByText("Membro 01");
+      expect(screen.getByText("(12 membros)")).toBeInTheDocument();
+    });
+
+    it("exclusão da última linha da segunda página volta à primeira, sem página vazia", async () => {
+      const eleven = many.slice(0, 11);
+      vi.mocked(listFamilyMembers).mockResolvedValueOnce(eleven).mockResolvedValue(eleven.slice(0, 10));
+      vi.mocked(deleteFamilyMember).mockResolvedValue(undefined);
+      render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+      await screen.findByText("Membro 01");
+      fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+      fireEvent.click(screen.getByRole("button", { name: "Excluir Membro 11" }));
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
+      await waitFor(() => expect(deleteFamilyMember).toHaveBeenCalledWith("m-11"));
+      expect(await screen.findByText("Membro 01")).toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
+        "Exibindo 1–10 de 10",
+      );
+    });
   });
 });

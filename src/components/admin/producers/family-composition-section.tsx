@@ -1,6 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  getCoreRowModel,
+  getPaginationRowModel,
+  useReactTable,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+} from "@tanstack/react-table";
 import { AlertCircle, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
@@ -23,18 +31,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { ApiError } from "@/lib/api";
 import {
   createFamilyMember,
@@ -84,7 +85,6 @@ function ErrorBox({ message }: { message: string }) {
 }
 
 export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
-  const isMobile = useIsMobile();
   const [members, setMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,6 +100,11 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -118,7 +123,6 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
   }, [farmerId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
@@ -236,6 +240,65 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
     );
   }
 
+  const columns: ColumnDef<FamilyMember>[] = [
+    {
+      accessorKey: "name",
+      header: "Nome",
+      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+    },
+    {
+      accessorKey: "kinship",
+      header: "Parentesco",
+      cell: ({ row }) => (
+        <span className="text-muted-foreground">{row.original.kinship}</span>
+      ),
+    },
+    {
+      accessorKey: "age",
+      header: () => <div className="text-right">Idade</div>,
+      cell: ({ row }) => (
+        <div className="text-right tabular-nums">{row.original.age}</div>
+      ),
+    },
+    ...(canWrite
+      ? [
+          {
+            id: "actions",
+            header: "Ações",
+            cell: ({ row }: { row: Row<FamilyMember> }) =>
+              actions(row.original, false),
+          } satisfies ColumnDef<FamilyMember>,
+        ]
+      : []),
+  ];
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: members,
+    columns,
+    state: { pagination },
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  function renderMobileCard(row: Row<FamilyMember>) {
+    const member = row.original;
+    return (
+      <Card key={member.id} className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium">{member.name}</p>
+            <p className="text-sm text-muted-foreground">
+              {member.kinship} · {member.age} {member.age === 1 ? "ano" : "anos"}
+            </p>
+          </div>
+          {actions(member, true)}
+        </div>
+      </Card>
+    );
+  }
+
   function renderBody() {
     if (loading) return <Skeleton className="h-24 w-full rounded-xl" />;
     if (error) {
@@ -261,53 +324,15 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
         </p>
       );
     }
-    if (isMobile) {
-      return (
-        <div className="flex flex-col gap-2">
-          {members.map((member) => (
-            <Card key={member.id} className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium">{member.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {member.kinship} · {member.age}{" "}
-                    {member.age === 1 ? "ano" : "anos"}
-                  </p>
-                </div>
-                {actions(member, true)}
-              </div>
-            </Card>
-          ))}
-        </div>
-      );
-    }
     return (
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Parentesco</TableHead>
-              <TableHead className="text-right">Idade</TableHead>
-              {canWrite && <TableHead>Ações</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {members.map((member) => (
-              <TableRow key={member.id}>
-                <TableCell className="font-medium">{member.name}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {member.kinship}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {member.age}
-                </TableCell>
-                {canWrite && <TableCell>{actions(member, false)}</TableCell>}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <>
+        <DataTable
+          table={table}
+          columns={columns}
+          renderMobileCard={renderMobileCard}
+        />
+        <DataTablePagination table={table} />
+      </>
     );
   }
 

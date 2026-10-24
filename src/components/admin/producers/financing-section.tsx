@@ -1,6 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import {
+  getCoreRowModel,
+  getPaginationRowModel,
+  useReactTable,
+  type ColumnDef,
+  type PaginationState,
+  type Row,
+} from "@tanstack/react-table";
 import { AlertCircle, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
@@ -23,18 +31,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DataTable } from "@/components/data-table/data-table";
+import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { ApiError } from "@/lib/api";
 import {
   FINANCING_STATUSES,
@@ -115,7 +116,6 @@ function amountToInput(amount: number): string {
 }
 
 export function FinancingSection({ farmerId, canWrite }: Props) {
-  const isMobile = useIsMobile();
   const [items, setItems] = useState<Financing[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,6 +131,11 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -149,7 +154,6 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
   }, [farmerId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 
@@ -267,6 +271,69 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
     );
   }
 
+  const columns: ColumnDef<Financing>[] = [
+    {
+      accessorKey: "description",
+      header: "Descrição",
+      cell: ({ row }) => (
+        <span className="font-medium">{row.original.description}</span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: "Situação",
+      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+    },
+    {
+      accessorKey: "amount",
+      header: () => <div className="text-right">Valor</div>,
+      cell: ({ row }) => (
+        <div className="text-right tabular-nums">
+          {formatCurrency(row.original.amount)}
+        </div>
+      ),
+    },
+    ...(canWrite
+      ? [
+          {
+            id: "actions",
+            header: "Ações",
+            cell: ({ row }: { row: Row<Financing> }) => actions(row.original, false),
+          } satisfies ColumnDef<Financing>,
+        ]
+      : []),
+  ];
+
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const table = useReactTable({
+    data: items,
+    columns,
+    state: { pagination },
+    onPaginationChange: setPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+  });
+
+  function renderMobileCard(row: Row<Financing>) {
+    const item = row.original;
+    return (
+      <Card key={item.id} className="p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium">{item.description}</p>
+            <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+              {formatCurrency(item.amount)}
+            </p>
+            <div className="mt-1">
+              <StatusBadge status={item.status} />
+            </div>
+          </div>
+          {actions(item, true)}
+        </div>
+      </Card>
+    );
+  }
+
   function renderBody() {
     if (loading) return <Skeleton className="h-24 w-full rounded-xl" />;
     if (error) {
@@ -292,55 +359,15 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
         </p>
       );
     }
-    if (isMobile) {
-      return (
-        <div className="flex flex-col gap-2">
-          {items.map((item) => (
-            <Card key={item.id} className="p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium">{item.description}</p>
-                  <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-                    {formatCurrency(item.amount)}
-                  </p>
-                  <div className="mt-1">
-                    <StatusBadge status={item.status} />
-                  </div>
-                </div>
-                {actions(item, true)}
-              </div>
-            </Card>
-          ))}
-        </div>
-      );
-    }
     return (
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Descrição</TableHead>
-              <TableHead>Situação</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              {canWrite && <TableHead>Ações</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.description}</TableCell>
-                <TableCell>
-                  <StatusBadge status={item.status} />
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatCurrency(item.amount)}
-                </TableCell>
-                {canWrite && <TableCell>{actions(item, false)}</TableCell>}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <>
+        <DataTable
+          table={table}
+          columns={columns}
+          renderMobileCard={renderMobileCard}
+        />
+        <DataTablePagination table={table} />
+      </>
     );
   }
 

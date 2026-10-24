@@ -7,6 +7,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { FinancingSection } from "@/components/admin/producers/financing-section";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -229,5 +230,58 @@ describe("FinancingSection — formulário (UNIT-005)", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
     await waitFor(() => expect(deleteFinancing).toHaveBeenCalledWith("fin-2"));
     await waitFor(() => expect(listFinancings).toHaveBeenCalledTimes(2));
+  });
+
+  describe("paginação", () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({ ...PRONAF, id: `fin-${i + 1}`, description: `Financiamento ${String(i + 1).padStart(2, "0")}`, amount: 100 }));
+
+    it("mostra 10 por página com o rodapé, navega e troca o tamanho", async () => {
+      vi.mocked(listFinancings).mockResolvedValue(many);
+      render(<FinancingSection farmerId="f-1" canWrite={false} />);
+      await screen.findByText("Financiamento 01");
+      expect(screen.getByText("Financiamento 10")).toBeInTheDocument();
+      expect(screen.queryByText("Financiamento 11")).toBeNull();
+      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
+        "Exibindo 1–10 de 12",
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+      expect(screen.getByText("Financiamento 11")).toBeInTheDocument();
+      expect(screen.getByText("Financiamento 12")).toBeInTheDocument();
+      expect(screen.queryByText("Financiamento 01")).toBeNull();
+      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
+        "Exibindo 11–12 de 12",
+      );
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("combobox"));
+      await user.click(await screen.findByRole("option", { name: "20" }));
+      expect(await screen.findByText("Financiamento 01")).toBeInTheDocument();
+      expect(screen.getByText("Financiamento 12")).toBeInTheDocument();
+    });
+
+    it("totais usam a lista inteira, não a página", async () => {
+      vi.mocked(listFinancings).mockResolvedValue(many);
+      render(<FinancingSection farmerId="f-1" canWrite={false} />);
+      await screen.findByText("Financiamento 01");
+      expect(screen.getByTestId("financing-total")).toHaveTextContent(
+        /Total financiado: R\$\s1\.200,00/,
+      );
+    });
+
+    it("exclusão da última linha da segunda página volta à primeira, sem página vazia", async () => {
+      const eleven = many.slice(0, 11);
+      vi.mocked(listFinancings).mockResolvedValueOnce(eleven).mockResolvedValue(eleven.slice(0, 10));
+      vi.mocked(deleteFinancing).mockResolvedValue(undefined);
+      render(<FinancingSection farmerId="f-1" canWrite />);
+      await screen.findByText("Financiamento 01");
+      fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+      fireEvent.click(screen.getByRole("button", { name: "Excluir Financiamento 11" }));
+      const dialog = await screen.findByRole("alertdialog");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
+      await waitFor(() => expect(deleteFinancing).toHaveBeenCalledWith("fin-11"));
+      expect(await screen.findByText("Financiamento 01")).toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
+        "Exibindo 1–10 de 10",
+      );
+    });
   });
 });
