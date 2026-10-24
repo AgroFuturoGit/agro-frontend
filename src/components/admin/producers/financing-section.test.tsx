@@ -77,6 +77,21 @@ describe("FinancingSection — leitura (UNIT-003)", () => {
     );
   });
 
+  it("total financiado exclui rejeitados e cancelados e inclui os demais", async () => {
+    vi.mocked(listFinancings).mockResolvedValue([
+      { ...PRONAF, id: "a", status: "PENDING", amount: 100 },
+      { ...PRONAF, id: "b", status: "IN_ANALYSIS", amount: 200 },
+      { ...PRONAF, id: "c", status: "APPROVED", amount: 300 },
+      { ...PRONAF, id: "d", status: "PAID", amount: 400 },
+      { ...PRONAF, id: "e", status: "REJECTED", amount: 5000 },
+      { ...PRONAF, id: "f", status: "CANCELED", amount: 7000 },
+    ]);
+    render(<FinancingSection farmerId="f-1" canWrite={false} />);
+    expect(await screen.findByTestId("financing-total")).toHaveTextContent(
+      /Total financiado: R\$\s1\.000,00/,
+    );
+  });
+
   it("mostra o estado vazio, sem total", async () => {
     vi.mocked(listFinancings).mockResolvedValue([]);
     render(<FinancingSection farmerId="f-1" canWrite />);

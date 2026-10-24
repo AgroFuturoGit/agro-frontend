@@ -344,7 +344,10 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
     );
   }
 
-  const total = items.reduce((sum, item) => sum + item.amount, 0);
+  // Rejeitados e cancelados não são dinheiro financiado.
+  const total = items
+    .filter((item) => item.status !== "REJECTED" && item.status !== "CANCELED")
+    .reduce((sum, item) => sum + item.amount, 0);
   const showTotal = !loading && !error && items.length > 0;
 
   return (

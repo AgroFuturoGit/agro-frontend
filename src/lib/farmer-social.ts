@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api";
+import { apiRequest, parseFieldErrors } from "@/lib/api";
 
 // ----- Composição familiar -----
 
@@ -187,35 +187,20 @@ export function formatCurrency(value: number): string {
 }
 
 /**
- * Converte o texto digitado em reais ("1.234,56", "1234,5", "1234.50") em
- * número; devolve `null` quando não é um número válido.
+ * Converte o texto digitado em reais no padrão brasileiro (ponto é milhar,
+ * vírgula é decimal): "1.234" -> 1234, "1.234,56" -> 1234.56, "12,5" -> 12.5.
+ * Devolve `null` quando a entrada é inválida ou ambígua (ex.: "12.5").
  */
 export function parseAmountInput(text: string): number | null {
   const raw = text.trim().replace(/^R\$\s*/, "");
   if (!raw) return null;
-  let normalized = raw;
-  if (raw.includes(",")) {
-    normalized = raw.replace(/\./g, "").replace(",", ".");
-  }
-  if (!/^\d+(\.\d+)?$/.test(normalized)) return null;
-  const value = Number(normalized);
+  const [intPart, decPart, ...rest] = raw.split(",");
+  if (rest.length > 0) return null;
+  if (!/^(\d+|\d{1,3}(\.\d{3})+)$/.test(intPart)) return null;
+  if (decPart !== undefined && !/^\d+$/.test(decPart)) return null;
+  const value = Number(`${intPart.replace(/\./g, "")}${decPart ? `.${decPart}` : ""}`);
   return Number.isFinite(value) ? value : null;
 }
 
-/** Backend devolve erros de validação como "campo: mensagem; campo: mensagem". */
-export function parseSocialFieldErrors(
-  payload: unknown,
-): Record<string, string> {
-  const errors: Record<string, string> = {};
-  if (!payload || typeof payload !== "object") return errors;
-  const message = (payload as Record<string, unknown>).message;
-  if (typeof message !== "string") return errors;
-  for (const part of message.split(";")) {
-    const colonIdx = part.indexOf(":");
-    if (colonIdx === -1) continue;
-    const field = part.slice(0, colonIdx).trim();
-    const msg = part.slice(colonIdx + 1).trim();
-    if (field && msg) errors[field] = msg;
-  }
-  return errors;
-}
+/** Erros de validação por campo (parser único em `lib/api`). */
+export const parseSocialFieldErrors = parseFieldErrors;

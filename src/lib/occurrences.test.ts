@@ -10,7 +10,10 @@ import {
   updateOccurrence,
 } from "@/lib/occurrences";
 
-vi.mock("@/lib/api", () => ({ apiRequest: vi.fn() }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  apiRequest: vi.fn(),
+}));
 
 const apiRequestMock = vi.mocked(apiRequest);
 

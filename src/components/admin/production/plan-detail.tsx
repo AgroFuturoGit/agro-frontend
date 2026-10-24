@@ -442,59 +442,59 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap justify-end gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setOccurrencesTarget(execution)}
-              >
-                <MessageSquareWarning />
-                Ocorrências
-              </Button>
-              {decide && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDecision({ mode: "validate", execution })}
-                  >
-                    <Check />
-                    Validar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDecision({ mode: "reject", execution })}
-                  >
-                    <X />
-                    Rejeitar
-                  </Button>
-                </>
-              )}
-              {edit && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOccurrencesTarget(execution)}
+            >
+              <MessageSquareWarning />
+              Ocorrências
+            </Button>
+            {decide && (
+              <>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setEditTarget(execution)}
+                  onClick={() => setDecision({ mode: "validate", execution })}
                 >
-                  <Pencil />
-                  Editar
+                  <Check />
+                  Validar
                 </Button>
-              )}
-              {remove && (
                 <Button
                   type="button"
                   variant="outline"
-                  size="icon-sm"
-                  aria-label="Excluir apontamento"
-                  onClick={() => setDeleteTarget(execution)}
+                  size="sm"
+                  onClick={() => setDecision({ mode: "reject", execution })}
                 >
-                  <Trash2 />
+                  <X />
+                  Rejeitar
                 </Button>
-              )}
+              </>
+            )}
+            {edit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditTarget(execution)}
+              >
+                <Pencil />
+                Editar
+              </Button>
+            )}
+            {remove && (
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Excluir apontamento"
+                onClick={() => setDeleteTarget(execution)}
+              >
+                <Trash2 />
+              </Button>
+            )}
           </div>
         </div>
       </Card>

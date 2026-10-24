@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { AlertCircle, ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
@@ -126,20 +126,26 @@ export function ExecutionOccurrencesSheet({
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Sequência da última carga: respostas de apontamento ou carga antigos são descartadas.
+  const loadSeq = useRef(0);
+
   const refresh = useCallback(async () => {
     if (!executionId) return;
+    const seq = ++loadSeq.current;
     setLoading(true);
     setError(null);
     try {
-      setItems(await listOccurrences(executionId));
+      const data = await listOccurrences(executionId);
+      if (seq === loadSeq.current) setItems(data);
     } catch (err) {
+      if (seq !== loadSeq.current) return;
       setError(
         err instanceof ApiError
           ? err.message
           : "Não foi possível carregar as ocorrências.",
       );
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [executionId]);
 

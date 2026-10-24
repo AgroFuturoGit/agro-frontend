@@ -17,7 +17,10 @@ import {
   updateFinancing,
 } from "@/lib/farmer-social";
 
-vi.mock("@/lib/api", () => ({ apiRequest: vi.fn() }));
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  apiRequest: vi.fn(),
+}));
 
 const apiRequestMock = vi.mocked(apiRequest);
 
@@ -146,7 +149,13 @@ describe("financiamentos — chamadas, rótulos e moeda (UNIT-001)", () => {
   it("converte o valor digitado, aceitando vírgula decimal", () => {
     expect(parseAmountInput("1.234,56")).toBe(1234.56);
     expect(parseAmountInput("1234,5")).toBe(1234.5);
-    expect(parseAmountInput("1234.50")).toBe(1234.5);
+    expect(parseAmountInput("1.234")).toBe(1234);
+    expect(parseAmountInput("1234")).toBe(1234);
+    expect(parseAmountInput("12,5")).toBe(12.5);
+    expect(parseAmountInput("1.234.567,89")).toBe(1234567.89);
+    expect(parseAmountInput("12.5")).toBeNull();
+    expect(parseAmountInput("1234.50")).toBeNull();
+    expect(parseAmountInput("1,2,3")).toBeNull();
     expect(parseAmountInput("R$ 10")).toBe(10);
     expect(parseAmountInput("")).toBeNull();
     expect(parseAmountInput("abc")).toBeNull();

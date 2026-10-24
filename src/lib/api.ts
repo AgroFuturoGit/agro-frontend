@@ -61,3 +61,19 @@ export async function apiRequest<T = unknown>(
     loadingStore.stop();
   }
 }
+
+/** Backend devolve erros de validação como "campo: mensagem; campo: mensagem". */
+export function parseFieldErrors(payload: unknown): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (!payload || typeof payload !== "object") return errors;
+  const message = (payload as Record<string, unknown>).message;
+  if (typeof message !== "string") return errors;
+  for (const part of message.split(";")) {
+    const colonIdx = part.indexOf(":");
+    if (colonIdx === -1) continue;
+    const field = part.slice(0, colonIdx).trim();
+    const msg = part.slice(colonIdx + 1).trim();
+    if (field && msg) errors[field] = msg;
+  }
+  return errors;
+}

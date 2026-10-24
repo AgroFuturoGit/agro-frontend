@@ -95,6 +95,40 @@ describe("ExecutionOccurrencesSheet — leitura (UNIT-006)", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("ignora a resposta atrasada de outro apontamento", async () => {
+    let resolveFirst: (v: FieldOccurrence[]) => void = () => {};
+    vi.mocked(listOccurrences).mockImplementation((id: string) =>
+      id === "exec-1"
+        ? new Promise<FieldOccurrence[]>((r) => {
+            resolveFirst = r;
+          })
+        : Promise.resolve([
+            { ...PEST, id: "o-2", executionId: "exec-2", description: "Chuva de granizo" },
+          ]),
+    );
+    const { rerender } = render(
+      <ExecutionOccurrencesSheet
+        execution={EXECUTION}
+        open
+        onOpenChange={vi.fn()}
+        canWrite={false}
+      />,
+    );
+    rerender(
+      <ExecutionOccurrencesSheet
+        execution={{ ...EXECUTION, id: "exec-2" }}
+        open
+        onOpenChange={vi.fn()}
+        canWrite={false}
+      />,
+    );
+    expect(await screen.findByText("Chuva de granizo")).toBeInTheDocument();
+    resolveFirst([PEST]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText("Lagarta do cartucho")).toBeNull();
+    expect(screen.getByText("Chuva de granizo")).toBeInTheDocument();
+  });
+
   it("evidência fora de http(s) não vira link", async () => {
     vi.mocked(listOccurrences).mockResolvedValue([
       { ...PEST, evidenceUrl: "javascript:alert(1)" },
