@@ -2,11 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   isEndBeforeStart,
   isFutureDate,
-  isPlainDecimal,
+  isDecimalBr,
+  isPositiveIntegerDigits,
   isValidEmail,
   isYearInRange,
   onlyDigits,
-  parsePlainDecimal,
+  parseDecimalBr,
   todayIso,
 } from "@/lib/validation";
 
@@ -15,13 +16,27 @@ describe("validation", () => {
     expect(onlyDigits("529.982.247-25")).toBe("52998224725");
   });
 
-  it("isPlainDecimal recusa notação científica e texto", () => {
-    for (const ok of ["1", "10.5", "10,5", "0.01"]) expect(isPlainDecimal(ok)).toBe(true);
-    for (const bad of ["1e3", "1E3", "abc", "-1", "+1", "1.", ".5", "", "1 2", "Infinity"]) {
-      expect(isPlainDecimal(bad)).toBe(false);
+  it("parseDecimalBr usa ponto como milhar e vírgula como decimal", () => {
+    expect(parseDecimalBr("1.234")).toBe(1234);
+    expect(parseDecimalBr("1.234,5")).toBe(1234.5);
+    expect(parseDecimalBr("12,5")).toBe(12.5);
+    expect(parseDecimalBr("1234")).toBe(1234);
+    expect(parseDecimalBr("0,01")).toBe(0.01);
+  });
+
+  it("parseDecimalBr recusa entrada ambígua ou inválida", () => {
+    for (const bad of ["12.5", "1e3", "1E3", "0x10", "abc", "-1", "+1", "1.", ".5", "", "1 2", "Infinity", "1,2,3"]) {
+      expect(parseDecimalBr(bad)).toBeNaN();
+      expect(isDecimalBr(bad)).toBe(false);
     }
-    expect(parsePlainDecimal("10,5")).toBe(10.5);
-    expect(parsePlainDecimal("1e3")).toBeNaN();
+    expect(isDecimalBr("10,5")).toBe(true);
+  });
+
+  it("isPositiveIntegerDigits aceita só inteiro positivo em dígitos", () => {
+    expect(isPositiveIntegerDigits("120")).toBe(true);
+    for (const bad of ["1e3", "0x10", "0", "-1", "1,5", "1.5", "", "abc"]) {
+      expect(isPositiveIntegerDigits(bad)).toBe(false);
+    }
   });
 
   it("isValidEmail exige domínio com ponto", () => {

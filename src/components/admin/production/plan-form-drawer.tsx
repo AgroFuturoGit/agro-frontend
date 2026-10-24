@@ -34,7 +34,11 @@ import {
   type PlanStatus,
   type ProductionPlan,
 } from "@/lib/production";
-import { parsePlainDecimal } from "@/lib/validation";
+import {
+  MIN_POSITIVE_AMOUNT,
+  formatDecimalInput,
+  parseDecimalBr,
+} from "@/lib/validation";
 
 type Mode = "create" | "edit";
 
@@ -73,8 +77,8 @@ function parseStatus(value: string): PlanStatus | null {
 
 /** Meta em kg = área (ha) × produtividade (kg/ha); null se faltar dado. */
 function computeTarget(area: string, productivity: number | null): number | null {
-  const parsedArea = parsePlainDecimal(area);
-  if (!Number.isFinite(parsedArea) || parsedArea <= 0) return null;
+  const parsedArea = parseDecimalBr(area);
+  if (!Number.isFinite(parsedArea) || parsedArea < MIN_POSITIVE_AMOUNT) return null;
   if (productivity === null || productivity <= 0) return null;
   return parsedArea * productivity;
 }
@@ -104,12 +108,16 @@ function validate(
   }
   if (isCreate && !values.harvestId) errors.harvestId = "Selecione a safra";
   if (isCreate && !values.cropId) errors.cropId = "Selecione o cultivo";
-  const area = parsePlainDecimal(values.plantedArea);
-  if (!Number.isFinite(area) || area <= 0) {
-    errors.plantedArea = "Informe uma área maior que zero";
+  const area = parseDecimalBr(values.plantedArea);
+  if (!Number.isFinite(area) || area < MIN_POSITIVE_AMOUNT) {
+    errors.plantedArea =
+      "Informe uma área válida (use vírgula nos decimais; mínimo 0,01)";
   }
   // Plantio dentro do intervalo da safra (só valida o que a safra informa).
-  if (values.plannedPlantingDate && harvestRange) {
+  // Na edição, só se a data mudou: dado antigo inalterado não bloqueia.
+  const plantingChanged =
+    isCreate || values.plannedPlantingDate !== (original?.plannedPlantingDate ?? "");
+  if (values.plannedPlantingDate && harvestRange && plantingChanged) {
     const { startDate, endDate } = harvestRange;
     const before = startDate && values.plannedPlantingDate < startDate;
     const after = endDate && values.plannedPlantingDate > endDate;
@@ -160,7 +168,7 @@ export function PlanFormDrawer({
       setValues({
         harvestId: plan.harvest?.id ?? "",
         cropId: plan.crop?.id ?? "",
-        plantedArea: String(plan.plantedArea ?? ""),
+        plantedArea: formatDecimalInput(plan.plantedArea),
         status: plan.status ?? "",
         expectedHarvestStart: plan.expectedHarvestStart ?? "",
         expectedHarvestEnd: plan.expectedHarvestEnd ?? "",
@@ -197,7 +205,7 @@ export function PlanFormDrawer({
     if (isCreate) return true;
     if (!plan) return false;
     return (
-      values.plantedArea !== String(plan.plantedArea ?? "") ||
+      values.plantedArea !== formatDecimalInput(plan.plantedArea) ||
       values.status !== (plan.status ?? "") ||
       values.expectedHarvestStart !== (plan.expectedHarvestStart ?? "") ||
       values.expectedHarvestEnd !== (plan.expectedHarvestEnd ?? "") ||
@@ -250,7 +258,7 @@ export function PlanFormDrawer({
 
     setSubmitting(true);
     try {
-      const plantedArea = parsePlainDecimal(values.plantedArea);
+      const plantedArea = parseDecimalBr(values.plantedArea);
       const plannedPlantingDate = values.plannedPlantingDate || null;
       const expectedHarvestStart = values.expectedHarvestStart || null;
       const expectedHarvestEnd = values.expectedHarvestEnd || null;
@@ -409,10 +417,8 @@ export function PlanFormDrawer({
                 <Label htmlFor="plan-area">Área plantada (ha)</Label>
                 <Input
                   id="plan-area"
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.01"
-                  min="0.01"
                   value={values.plantedArea}
                   onChange={(e) => update("plantedArea", e.target.value)}
                   required

@@ -14,20 +14,38 @@ export function onlyDigits(value: string): string {
   return value.replace(/\D/g, "");
 }
 
-const DECIMAL_PATTERN = /^\d+(?:[.,]\d+)?$/;
+/** Valor mínimo de área e quantidade (mesmo `@DecimalMin` do back). */
+export const MIN_POSITIVE_AMOUNT = 0.01;
+
+const BR_DECIMAL_PATTERN = /^(\d+|\d{1,3}(?:\.\d{3})+)(?:,(\d+))?$/;
 
 /**
- * Número decimal simples: só dígitos com separador (ponto ou vírgula).
- * Recusa notação científica (`1e3`), sinal, espaços e texto.
+ * Lê um número no padrão brasileiro (ponto é milhar, vírgula é decimal):
+ * "1.234" -> 1234, "1.234,5" -> 1234.5, "12,5" -> 12.5, "1234" -> 1234.
+ * Entrada ambígua ou inválida ("12.5", "1e3", "0x10", sinal, texto) -> NaN.
  */
-export function isPlainDecimal(value: string): boolean {
-  return DECIMAL_PATTERN.test(value.trim());
+export function parseDecimalBr(value: string): number {
+  const match = BR_DECIMAL_PATTERN.exec(value.trim());
+  if (!match) return Number.NaN;
+  const int = match[1].replace(/\./g, "");
+  return Number(match[2] ? `${int}.${match[2]}` : int);
 }
 
-/** Converte um decimal simples em número; retorna NaN se não for válido. */
-export function parsePlainDecimal(value: string): number {
-  if (!isPlainDecimal(value)) return Number.NaN;
-  return Number(value.trim().replace(",", "."));
+/** Número para exibir/editar em campo de texto no padrão BR (12.5 -> "12,5"). */
+export function formatDecimalInput(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value).replace(".", ",");
+}
+
+/** Verdadeiro quando `parseDecimalBr` aceita o texto. */
+export function isDecimalBr(value: string): boolean {
+  return !Number.isNaN(parseDecimalBr(value));
+}
+
+/** Inteiro positivo só em dígitos (recusa "1e3", "0x10", sinal). */
+export function isPositiveIntegerDigits(value: string): boolean {
+  const trimmed = value.trim();
+  return /^\d+$/.test(trimmed) && Number(trimmed) > 0;
 }
 
 /** E-mail com parte local, `@` e domínio com ponto (recusa `x@x`). */

@@ -109,7 +109,7 @@ describe("ExecutionFormDrawer — conversão (UNIT-011 / AC-012)", () => {
   it("TON multiplica por 1000 e cultura sem unidade (legado) é tratada como kg", async () => {
     renderForm("create", { ...BOX, unit: "TON", unitWeightKg: 1000 });
     fireEvent.change(await screen.findByLabelText("Quantidade colhida (t)"), {
-      target: { value: "1.5" },
+      target: { value: "1,5" },
     });
     expect((screen.getByLabelText("Peso em kg") as HTMLInputElement).value).toBe("1.500 kg");
     cleanup();
@@ -275,7 +275,61 @@ describe("ExecutionFormDrawer — QA (UNIT-003 / UNIT-004)", () => {
       target: { value: "2026-05-10" },
     });
     submit();
-    expect(await screen.findByText("Informe uma quantidade maior que zero")).toBeTruthy();
+    expect(await screen.findByText(/Informe uma quantidade válida/)).toBeTruthy();
     expect(createProductionExecution).not.toHaveBeenCalled();
+  });
+
+  it("recusa quantidade abaixo de 0,01 e ponto decimal ambíguo", async () => {
+    renderForm("create", BOX);
+    const quantity = await screen.findByLabelText("Quantidade colhida (caixas)");
+    fireEvent.change(screen.getByLabelText("Data da colheita"), {
+      target: { value: "2026-05-10" },
+    });
+    for (const bad of ["0,001", "12.5"]) {
+      fireEvent.change(quantity, { target: { value: bad } });
+      submit();
+      expect(await screen.findByText(/Informe uma quantidade válida/)).toBeTruthy();
+    }
+    expect(createProductionExecution).not.toHaveBeenCalled();
+  });
+
+  it("aceita '1.234' como 1234 e '12,5' como 12,5", async () => {
+    vi.mocked(createProductionExecution).mockResolvedValue(EXECUTION);
+    renderForm("create", BOX);
+    fireEvent.change(await screen.findByLabelText("Quantidade colhida (caixas)"), {
+      target: { value: "1.234" },
+    });
+    fireEvent.change(screen.getByLabelText("Data da colheita"), {
+      target: { value: "2026-05-10" },
+    });
+    submit();
+    await waitFor(() => expect(createProductionExecution).toHaveBeenCalled());
+    expect(vi.mocked(createProductionExecution).mock.calls[0][1].quantity).toBe(1234);
+    cleanup();
+
+    renderForm("edit", BOX, { ...EXECUTION, quantity: 12.5 });
+    expect(
+      ((await screen.findByLabelText("Quantidade colhida (caixas)")) as HTMLInputElement).value,
+    ).toBe("12,5");
+  });
+
+  it("apontamento legado com data futura salva outras mudanças; mudar a data futura é recusado", async () => {
+    vi.mocked(updateProductionExecution).mockResolvedValue(EXECUTION);
+    renderForm("edit", BOX, { ...EXECUTION, harvestedAt: "2999-01-01" });
+    fireEvent.change(await screen.findByLabelText("Quantidade colhida (caixas)"), {
+      target: { value: "13" },
+    });
+    submit();
+    await waitFor(() => expect(updateProductionExecution).toHaveBeenCalled());
+    cleanup();
+
+    vi.mocked(updateProductionExecution).mockClear();
+    renderForm("edit", BOX, { ...EXECUTION, harvestedAt: "2999-01-01" });
+    fireEvent.change(await screen.findByLabelText("Data da colheita"), {
+      target: { value: "2999-02-01" },
+    });
+    submit();
+    expect(await screen.findByText("A data da colheita não pode ser futura")).toBeTruthy();
+    expect(updateProductionExecution).not.toHaveBeenCalled();
   });
 });

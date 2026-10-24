@@ -103,13 +103,12 @@ function canDecideExecution(role: Role | null, execution: ProductionExecution) {
   );
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Só o GET do próprio plano respondendo 404 indica plano inexistente. */
 function isPlanNotFound(err: unknown): boolean {
-  if (!(err instanceof ApiError)) return false;
-  return (
-    err.status === 404 ||
-    err.status === 400 ||
-    /invalid uuid/i.test(err.message)
-  );
+  return err instanceof ApiError && err.status === 404;
 }
 
 export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
@@ -122,7 +121,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [executions, setExecutions] = useState<ProductionExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Id inexistente ou inválido (404, 400 ou "Invalid UUID"): tela amigável.
+  // Id inexistente (404 do GET do plano) ou fora do formato UUID: tela amigável.
   const [notFound, setNotFound] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -242,9 +241,18 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     setLoading(true);
     setError(null);
     setNotFound(false);
+    if (!UUID_PATTERN.test(planId)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    let planFailed = false;
     try {
       const [planData, comparisonData, executionsData] = await Promise.all([
-        getProductionPlan(planId),
+        getProductionPlan(planId).catch((err: unknown) => {
+          planFailed = true;
+          throw err;
+        }),
         getProductionComparison(planId),
         listProductionExecutions(planId),
       ]);
@@ -252,7 +260,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       setComparison(comparisonData);
       setExecutions(executionsData);
     } catch (err) {
-      if (isPlanNotFound(err)) {
+      if (planFailed && isPlanNotFound(err)) {
         setNotFound(true);
         return;
       }

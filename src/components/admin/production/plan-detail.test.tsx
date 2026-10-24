@@ -184,7 +184,9 @@ function loginAs(role: Role) {
 
 /** Wrapper com os 3 novos parâmetros de rota — `planId` continua o único
  * argumento variável nos testes existentes. */
-function renderPlanDetail(planId = "plan-1") {
+const PLAN_UUID = "3f2b8c1e-7a4d-4e9b-9c6a-1d2e3f4a5b6c";
+
+function renderPlanDetail(planId = PLAN_UUID) {
   return render(
     <PlanDetail
       orgId="org-1"
@@ -425,13 +427,11 @@ describe("PlanDetail — erro de API e recuperação", () => {
     expect(queryWriteAffordances().novoApontamento).toBeNull();
   });
 
-  it.each([
-    ["404", new ApiError(404, "Plano não encontrado.", {})],
-    ["400", new ApiError(400, "Requisição inválida", {})],
-    ["Invalid UUID", new ApiError(500, "Invalid UUID string: abc", {})],
-  ])("plano inexistente ou id inválido (%s) mostra 'Plano não encontrado' com link de volta", async (_label, err) => {
+  it("plano inexistente (404 do GET do plano) mostra 'Plano não encontrado' com link de volta", async () => {
     loginAs("ADMIN");
-    vi.mocked(getProductionPlan).mockRejectedValue(err);
+    vi.mocked(getProductionPlan).mockRejectedValue(
+      new ApiError(404, "Plano não encontrado.", {}),
+    );
 
     renderPlanDetail();
 
@@ -440,6 +440,43 @@ describe("PlanDetail — erro de API e recuperação", () => {
     expect(link?.getAttribute("href")).toContain("/produtores/");
     expect(screen.queryByText("Tentar novamente")).toBeNull();
     expect(queryWriteAffordances().novoApontamento).toBeNull();
+  });
+
+  it("id fora do formato UUID mostra 'Plano não encontrado' sem chamar a API", async () => {
+    loginAs("ADMIN");
+
+    renderPlanDetail("abc");
+
+    expect(await screen.findByText("Plano não encontrado")).toBeTruthy();
+    expect(getProductionPlan).not.toHaveBeenCalled();
+  });
+
+  it("400 de validação em outro GET mostra a mensagem do back, não 'Plano não encontrado'", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockResolvedValue(PLAN);
+    vi.mocked(getProductionComparison).mockRejectedValue(
+      new ApiError(400, "Parâmetro inválido no comparativo", {}),
+    );
+
+    renderPlanDetail();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Parâmetro inválido no comparativo");
+    expect(screen.queryByText("Plano não encontrado")).toBeNull();
+    expect(screen.getByText("Tentar novamente")).toBeTruthy();
+  });
+
+  it("400 no GET do próprio plano mostra a mensagem do back", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockRejectedValue(
+      new ApiError(400, "Requisição inválida", {}),
+    );
+
+    renderPlanDetail();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Requisição inválida");
+    expect(screen.queryByText("Plano não encontrado")).toBeNull();
   });
 
   it("'Tentar novamente' refaz os 3 GET e a tela se recupera", async () => {
