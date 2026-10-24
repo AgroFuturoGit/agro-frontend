@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "id": "E2E-009",
+  "title": "Dashboard do técnico na Visão geral",
+  "description": "O técnico abre a Visão geral e vê indicadores, alertas, gráfico e tabela vindos de GET /analytics/technicians/me/summary, filtra por comunidade e cultura e abre um plano pelo alerta.",
+  "feature_slug": "epic6-dashboard-tecnico",
+  "ac_refs": [
+    "AC-010"
+  ],
+  "priority": "P0",
+  "tags": [
+    "painel",
+    "tecnico",
+    "analytics"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "TECHNICIAN",
+        "credentials_env": {
+          "email": "E2E_TECHNICIAN_EMAIL",
+          "password": "E2E_TECHNICIAN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Técnico criado por POST /technicians (admin) e vinculado a duas comunidades com agricultores e planos na safra vigente",
+      "Ao menos um plano da safra vigente gera alerta (ex.: janela de colheita vencida sem apontamentos)",
+      "Nomes em E2E_TECHNICIAN_COMMUNITY (comunidade assistida a filtrar), E2E_TECHNICIAN_OTHER_COMMUNITY (outra assistida, some ao filtrar) e E2E_TECHNICIAN_CROP (cultura com plano na comunidade filtrada); nome (ou início) do agricultor com alerta em E2E_TECHNICIAN_ALERT_FARMER"
+    ]
+  },
+  "setup_steps": [
+    {
+      "action": "fill",
+      "target": {
+        "by": "label",
+        "value": "E-mail"
+      },
+      "value": "${env:E2E_TECHNICIAN_EMAIL}"
+    },
+    {
+      "action": "fill",
+      "target": {
+        "by": "css",
+        "value": "#password"
+      },
+      "value": "${env:E2E_TECHNICIAN_PASSWORD}"
+    },
+    {
+      "action": "click",
+      "target": {
+        "by": "role",
+        "value": "button",
+        "name": "Entrar"
+      }
+    },
+    {
+      "action": "wait",
+      "value": "/admin",
+      "note": "aguarda o redirecionamento pós-login"
+    }
+  ],
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Técnico vê indicadores, alertas, gráfico e tabela da carteira",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Comunidades atendidas"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Realizado (validado)"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Pendente de validação"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "testid",
+            "value": "community-bar-chart"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Alertas ("
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "columnheader",
+            "name": "Agricultor"
+          }
+        }
+      ]
+    },
+    {
+      "name": "filtra_comunidade_cultura",
+      "title": "Filtrar por comunidade e por cultura refaz o resumo",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Comunidade"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_TECHNICIAN_COMMUNITY}"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Cultura"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_TECHNICIAN_CROP}"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "heading",
+            "name": "Agricultores"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "${env:E2E_TECHNICIAN_OTHER_COMMUNITY}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "abre_plano_pelo_alerta",
+      "title": "O alerta leva ao detalhe do plano",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "goto",
+          "value": "/admin"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "link",
+            "name": "Ver plano de ${env:E2E_TECHNICIAN_ALERT_FARMER}"
+          },
+          "note": "link do alerta do agricultor indicado"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "url",
+          "value": "/planos/"
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Apontamentos de colheita"
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "A tela do painel não tem formulário.",
+    "forbidden": "A tela só oferece comunidades assistidas; o 403 de comunidade não assistida é verificado contra o back real na execução (chamada à API e UI com a consulta redirecionada) e coberto em technician-dashboard.test.tsx.",
+    "empty_state": "Estado vazio coberto em technician-dashboard.test.tsx."
+  }
+}

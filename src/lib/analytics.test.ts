@@ -4,6 +4,8 @@ import { apiRequest } from "@/lib/api";
 import {
   getFarmerSummary,
   getHarvestTimeline,
+  getTechnicianSummary,
+  mapTechnicianSummary,
   mapFarmerSummary,
   mapTimeline,
 } from "@/lib/analytics";
@@ -122,5 +124,83 @@ describe("analytics — mappers (UNIT-001)", () => {
       plans: [{ cropName: "Sem id" }, { planId: "p-9", cropName: "Milho" }],
     });
     expect(summary.plans.map((p) => p.planId)).toEqual(["p-9"]);
+  });
+});
+
+describe("analytics — resumo do técnico (UNIT-001)", () => {
+  it("sem filtros não envia query", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({});
+    await getTechnicianSummary();
+    expect(apiRequest).toHaveBeenCalledWith("/analytics/technicians/me/summary", {
+      method: "GET",
+    });
+  });
+
+  it("envia só os parâmetros informados", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({});
+    await getTechnicianSummary({ communityId: "c-1", cropId: "k-1" });
+    expect(vi.mocked(apiRequest).mock.calls[0][0]).toBe(
+      "/analytics/technicians/me/summary?communityId=c-1&cropId=k-1",
+    );
+    await getTechnicianSummary({ harvestId: "h 1" });
+    expect(vi.mocked(apiRequest).mock.calls[1][0]).toBe(
+      "/analytics/technicians/me/summary?harvestId=h+1",
+    );
+  });
+
+  it("converte números string/number, nulos e tolera listas ausentes", () => {
+    const s = mapTechnicianSummary({
+      technicianName: "Téc",
+      currentHarvest: { id: 7, label: "Safra 2026" },
+      isEmpty: false,
+      totalAssistedCommunitiesCount: 2,
+      totalPlantedAreaHa: "12.50",
+      totalTargetKg: 1000,
+      totalRealizedKg: "400.00",
+      totalPendingKg: null,
+      overallCompletionPct: "40.00",
+      totalWarningsCount: 1,
+      warnings: [
+        { cropName: "sem plano" },
+        {
+          planId: "p-1",
+          farmerName: "Zé",
+          warningTypes: ["LOW_YIELD_RISK", "???", "INACTIVE_EXECUTIONS"],
+          severity: "HIGH",
+          message: "m",
+          completionPct: "10.5",
+          daysWithoutExecution: null,
+        },
+      ],
+      communities: [{ communityName: "sem id" }, { communityId: "c-1", targetKg: "5" }],
+      farmers: [
+        { farmerName: "sem id" },
+        { farmerId: "f-1", isCompliant: true, warningsCount: "2" },
+      ],
+    });
+    expect(s.currentHarvest?.id).toBe("7");
+    expect(s.totalPlantedAreaHa).toBe(12.5);
+    expect(s.totalRealizedKg).toBe(400);
+    expect(s.totalPendingKg).toBe(0);
+    expect(s.warnings).toHaveLength(1);
+    expect(s.warnings[0].warningTypes).toEqual(["INACTIVE_EXECUTIONS", "LOW_YIELD_RISK"]);
+    expect(s.warnings[0].severity).toBe("HIGH");
+    expect(s.warnings[0].completionPct).toBe(10.5);
+    expect(s.warnings[0].daysWithoutExecution).toBeNull();
+    expect(s.communities.map((c) => c.communityId)).toEqual(["c-1"]);
+    expect(s.communities[0].targetKg).toBe(5);
+    expect(s.farmers).toHaveLength(1);
+    expect(s.farmers[0].isCompliant).toBe(true);
+    expect(s.farmers[0].warningsCount).toBe(2);
+  });
+
+  it("resposta vazia vira listas vazias e zeros", () => {
+    const s = mapTechnicianSummary({});
+    expect(s.warnings).toEqual([]);
+    expect(s.communities).toEqual([]);
+    expect(s.farmers).toEqual([]);
+    expect(s.currentHarvest).toBeNull();
+    expect(s.totalWarningsCount).toBe(0);
+    expect(s.isEmpty).toBe(false);
   });
 });

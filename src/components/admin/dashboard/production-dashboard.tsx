@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Sprout, Users } from "lucide-react";
 
 import { FarmerDashboard } from "@/components/admin/dashboard/farmer-dashboard";
+import { TechnicianDashboard } from "@/components/admin/dashboard/technician-dashboard";
 import { ComparisonSummary } from "@/components/admin/production/comparison-summary";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,8 +31,8 @@ import {
 } from "@/lib/production";
 
 /**
- * Visão geral: o agricultor vê o dashboard da Feature 6.1; os demais perfis,
- * o painel de produção abaixo. Sem role conhecida nada renderiza (falha fechado).
+ * Visão geral: o agricultor vê o dashboard da Feature 6.1; o técnico, o da
+ * 6.2; ADMIN e MANAGER, o painel de produção abaixo. Sem role conhecida nada renderiza (falha fechado).
  */
 export function ProductionDashboard() {
   const [role, setRole] = useState<Role | null | undefined>(undefined);
@@ -43,13 +44,14 @@ export function ProductionDashboard() {
 
   if (!role) return null;
   if (role === "FARMER") return <FarmerDashboard />;
+  if (role === "TECHNICIAN") return <TechnicianDashboard />;
   return <StaffDashboard />;
 }
 
 /**
- * Painel de ADMIN, MANAGER e TECHNICIAN: números de `GET /production/dashboard`. O recorte
+ * Painel de ADMIN e MANAGER: números de `GET /production/dashboard`. O recorte
  * (agricultor, técnico, gestor, admin) é aplicado pelo back; o front só decide
- * se mostra a quebra por comunidade (todos menos FARMER).
+ * se mostra a quebra por comunidade (ADMIN e MANAGER).
  */
 function StaffDashboard() {
   const [data, setData] = useState<Dashboard | null>(null);

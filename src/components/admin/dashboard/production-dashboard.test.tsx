@@ -21,6 +21,10 @@ vi.mock("@/components/admin/dashboard/farmer-dashboard", () => ({
   FarmerDashboard: () => <div data-testid="farmer-dashboard" />,
 }));
 
+vi.mock("@/components/admin/dashboard/technician-dashboard", () => ({
+  TechnicianDashboard: () => <div data-testid="technician-dashboard" />,
+}));
+
 const DASHBOARD: Dashboard = {
   farmerCount: 3,
   planCount: 4,
@@ -71,7 +75,7 @@ afterEach(() => {
 });
 
 describe("ProductionDashboard — números e recorte por perfil (UNIT-007)", () => {
-  it.each(["ADMIN", "MANAGER", "TECHNICIAN"] as const)(
+  it.each(["ADMIN", "MANAGER"] as const)(
     "%s: totais e tabela por comunidade, com 'Sem comunidade'",
     async (role) => {
       loginAs(role);
@@ -98,7 +102,7 @@ describe("ProductionDashboard — números e recorte por perfil (UNIT-007)", () 
     expect(screen.queryByRole("table")).toBeNull();
   });
 
-  it.each(["ADMIN", "MANAGER", "TECHNICIAN"] as const)(
+  it.each(["ADMIN", "MANAGER"] as const)(
     "%s: não vê o dashboard do agricultor",
     async (role) => {
       loginAs(role);
@@ -108,11 +112,36 @@ describe("ProductionDashboard — números e recorte por perfil (UNIT-007)", () 
     },
   );
 
+  it("TECHNICIAN: vê o dashboard da 6.2 e não chama o painel de produção", async () => {
+    loginAs("TECHNICIAN");
+    render(<ProductionDashboard />);
+
+    expect(await screen.findByTestId("technician-dashboard")).toBeTruthy();
+    expect(screen.queryByTestId("farmer-dashboard")).toBeNull();
+    expect(getProductionDashboard).not.toHaveBeenCalled();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it.each(["ADMIN", "MANAGER", "FARMER"] as const)(
+    "%s: não vê o dashboard do técnico",
+    async (role) => {
+      loginAs(role);
+      render(<ProductionDashboard />);
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("farmer-dashboard") ?? screen.queryByText("Planos de produção"),
+        ).toBeTruthy(),
+      );
+      expect(screen.queryByTestId("technician-dashboard")).toBeNull();
+    },
+  );
+
   it("role desconhecida: nada renderiza (falha fechado)", async () => {
     loginAs(null);
     const { container } = render(<ProductionDashboard />);
     await new Promise((r) => setTimeout(r, 20));
     expect(container.innerHTML).toBe("");
+    expect(screen.queryByTestId("technician-dashboard")).toBeNull();
     expect(getProductionDashboard).not.toHaveBeenCalled();
   });
 
