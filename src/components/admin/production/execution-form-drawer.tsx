@@ -26,6 +26,9 @@ import {
 export const MISSING_UNIT_WEIGHT_MESSAGE =
   "Cadastre o peso da unidade na cultura antes de registrar apontamentos";
 
+export const RESUBMIT_WARNING =
+  "Alterar quantidade ou data reenvia o apontamento para validação.";
+
 type Mode = "create" | "edit";
 
 type Props = {
@@ -159,11 +162,25 @@ export function ExecutionFormDrawer({
       if (isCreate) {
         await createProductionExecution(planId, payload);
       } else if (execution) {
-        await updateProductionExecution(execution.id, payload);
+        // Com a versão que estava na tela, o back recusa (409) se alguém
+        // mudou o apontamento depois — em vez de sobrescrever em silêncio.
+        await updateProductionExecution(execution.id, {
+          ...payload,
+          baseUpdatedAt: execution.updatedAt,
+        });
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        // A lista por trás do drawer está desatualizada: recarrega para o
+        // usuário ver a versão atual antes de tentar de novo.
+        onSaved();
+        setFormError(
+          "Este apontamento foi alterado por outra pessoa enquanto você editava. Os dados foram atualizados; feche e abra a edição novamente para continuar.",
+        );
+        return;
+      }
       setFormError(
         err instanceof ApiError
           ? err.message
@@ -204,6 +221,22 @@ export function ExecutionFormDrawer({
                 </div>
               )}
             </div>
+
+            {!isCreate && execution?.status === "REJECTED" && (
+              <div
+                role="status"
+                className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+              >
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <span>{RESUBMIT_WARNING}</span>
+              </div>
+            )}
+
+            {!isCreate && execution?.status === "REJECTED" && execution.rejectionReason && (
+              <p className="text-sm text-muted-foreground">
+                Motivo da rejeição: {execution.rejectionReason}
+              </p>
+            )}
 
             {blocked && (
               <div

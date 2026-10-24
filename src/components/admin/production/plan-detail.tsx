@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -41,6 +41,10 @@ import {
 
 import { ComparisonSummary } from "./comparison-summary";
 import { DeleteExecutionDialog } from "./delete-execution-dialog";
+import {
+  ExecutionDecisionDialog,
+  type DecisionMode,
+} from "./execution-decision-dialog";
 import { ExecutionFormDrawer } from "./execution-form-drawer";
 import { ExecutionStatusBadge } from "./execution-status-badge";
 import { ContinuousHarvestChart } from "./harvest-timeline-chart";
@@ -60,11 +64,33 @@ type BreadcrumbNames = {
 
 const columnHelper = createColumnHelper<ProductionExecution>();
 
-// Apontamento já revisado não se edita nem se exclui: o PUT preserva o
-// status quando o corpo não o envia, então mudar a quantidade de um
-// VALIDATED alteraria o realizado sem nova validação (CR-003).
-function isReviewed(execution: ProductionExecution) {
-  return execution.status === "VALIDATED" || execution.status === "REJECTED";
+// Matriz de ações por role × status (segue o back `develop`):
+// - PENDING: ADMIN/TECHNICIAN/FARMER editam e excluem; ADMIN/TECHNICIAN/MANAGER
+//   decidem (validar/rejeitar).
+// - REJECTED: só o FARMER edita (correção — mudar quantidade/data volta para
+//   PENDING no back); ninguém exclui.
+// - VALIDATED: travado para todos (mudar a quantidade alteraria o realizado
+//   sem nova validação, CR-003).
+function canEditExecution(role: Role | null, execution: ProductionExecution) {
+  if (execution.status === "PENDING") {
+    return role === "ADMIN" || role === "TECHNICIAN" || role === "FARMER";
+  }
+  if (execution.status === "REJECTED") return role === "FARMER";
+  return false;
+}
+
+function canDeleteExecution(role: Role | null, execution: ProductionExecution) {
+  return (
+    execution.status === "PENDING" &&
+    (role === "ADMIN" || role === "TECHNICIAN" || role === "FARMER")
+  );
+}
+
+function canDecideExecution(role: Role | null, execution: ProductionExecution) {
+  return (
+    execution.status === "PENDING" &&
+    (role === "ADMIN" || role === "TECHNICIAN" || role === "MANAGER")
+  );
 }
 
 export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
@@ -85,6 +111,10 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<ProductionExecution | null>(
     null,
   );
+  const [decision, setDecision] = useState<{
+    mode: DecisionMode;
+    execution: ProductionExecution;
+  } | null>(null);
 
   // Mais recente primeiro — mesma ordem da tabela manual anterior.
   const [sorting, setSorting] = useState<SortingState>([
@@ -178,6 +208,12 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   // Mesmo conjunto de roles da escrita em geral; mantido como constante
   // própria porque é o gate citado nos testes desta tela.
   const canDelete = canWrite;
+  // Validar/rejeitar: `@PreAuthorize` de `POST /production-executions/{id}/validate`
+  // e `/reject` é ADMIN/TECHNICIAN/MANAGER. Role null (primeiro render) → false.
+  const canDecide =
+    currentRole === "ADMIN" ||
+    currentRole === "TECHNICIAN" ||
+    currentRole === "MANAGER";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -268,7 +304,11 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         header: "Status",
         enableSorting: false,
         cell: ({ row }) => (
-          <ExecutionStatusBadge status={row.original.status} />
+          <ExecutionStatusBadge
+            status={row.original.status}
+            rejectionReason={row.original.rejectionReason}
+            decidedAt={row.original.validatedAt}
+          />
         ),
       }),
     ];
@@ -276,38 +316,70 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     const actionsColumn = columnHelper.display({
       id: "actions",
       header: "Ações",
-      cell: ({ row }) =>
-        isReviewed(row.original) ? null : (
+      cell: ({ row }) => {
+        const execution = row.original;
+        const edit = canEditExecution(currentRole, execution);
+        const remove = canDelete && canDeleteExecution(currentRole, execution);
+        const decide = canDecideExecution(currentRole, execution);
+        if (!edit && !remove && !decide) return null;
+        return (
           <div className="inline-flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Editar apontamento"
-              onClick={() => setEditTarget(row.original)}
-            >
-              <Pencil />
-            </Button>
-            {canDelete && (
+            {decide && (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Validar apontamento"
+                  onClick={() => setDecision({ mode: "validate", execution })}
+                  className="text-primary hover:text-primary"
+                >
+                  <Check />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Rejeitar apontamento"
+                  onClick={() => setDecision({ mode: "reject", execution })}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <X />
+                </Button>
+              </>
+            )}
+            {edit && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Editar apontamento"
+                onClick={() => setEditTarget(execution)}
+              >
+                <Pencil />
+              </Button>
+            )}
+            {remove && (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
                 aria-label="Excluir apontamento"
-                onClick={() => setDeleteTarget(row.original)}
+                onClick={() => setDeleteTarget(execution)}
                 className="text-destructive hover:text-destructive"
               >
                 <Trash2 />
               </Button>
             )}
           </div>
-        ),
+        );
+      },
     });
 
     return (
-      canWrite ? [...baseColumns, actionsColumn] : baseColumns
+      canWrite || canDecide ? [...baseColumns, actionsColumn] : baseColumns
     ) as ColumnDef<ProductionExecution, unknown>[];
-  }, [canWrite, canDelete, loading, formatQuantity]);
+  }, [canWrite, canDelete, canDecide, currentRole, loading, formatQuantity]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -323,6 +395,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
   function renderMobileCard(row: Row<ProductionExecution>) {
     const execution = row.original;
+    const edit = canEditExecution(currentRole, execution);
+    const remove = canDelete && canDeleteExecution(currentRole, execution);
+    const decide = canDecideExecution(currentRole, execution);
     return (
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3">
@@ -335,21 +410,49 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               {formatNumber(execution.quantityKg)} kg
             </p>
             <div className="mt-1">
-              <ExecutionStatusBadge status={execution.status} />
+              <ExecutionStatusBadge
+                status={execution.status}
+                rejectionReason={execution.rejectionReason}
+                decidedAt={execution.validatedAt}
+              />
             </div>
           </div>
-          {canWrite && !isReviewed(execution) && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setEditTarget(execution)}
-              >
-                <Pencil />
-                Editar
-              </Button>
-              {canDelete && (
+          {(edit || remove || decide) && (
+            <div className="flex shrink-0 flex-wrap justify-end gap-1">
+              {decide && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDecision({ mode: "validate", execution })}
+                  >
+                    <Check />
+                    Validar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDecision({ mode: "reject", execution })}
+                  >
+                    <X />
+                    Rejeitar
+                  </Button>
+                </>
+              )}
+              {edit && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditTarget(execution)}
+                >
+                  <Pencil />
+                  Editar
+                </Button>
+              )}
+              {remove && (
                 <Button
                   type="button"
                   variant="outline"
@@ -534,6 +637,19 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             onSaved={refresh}
           />
         </>
+      )}
+
+      {canDecide && (
+        <ExecutionDecisionDialog
+          mode={decision?.mode ?? "validate"}
+          execution={decision?.execution ?? null}
+          unit={cropUnit}
+          open={decision !== null}
+          onOpenChange={(open) => {
+            if (!open) setDecision(null);
+          }}
+          onDecided={refresh}
+        />
       )}
 
       {canDelete && (

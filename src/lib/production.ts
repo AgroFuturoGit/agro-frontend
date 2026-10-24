@@ -57,7 +57,37 @@ export type ProductionExecution = {
   harvestedAt: string | null;
   status: ExecutionStatus | null;
   notes: string | null;
+  /** Motivo informado ao rejeitar (opcional no back). */
+  rejectionReason: string | null;
+  /** UUID de quem decidiu — o back não devolve o nome. */
+  validatedBy: string | null;
+  /** Momento da decisão (validação ou rejeição). */
+  validatedAt: string | null;
   createdAt: string | null;
+  /** Versão do apontamento; volta no PUT como `baseUpdatedAt`. */
+  updatedAt: string | null;
+};
+
+export type CommunityDashboardRow = {
+  communityId: string | null;
+  communityName: string;
+  farmerCount: number;
+  planCount: number;
+  expectedYield: number;
+  actualYield: number;
+  difference: number;
+  percentageRealized: number;
+};
+
+/** Painel de produção (`GET /production/dashboard`), valores em kg. */
+export type ProductionDashboard = {
+  farmerCount: number;
+  planCount: number;
+  expectedYield: number;
+  actualYield: number;
+  difference: number;
+  percentageRealized: number;
+  communities: CommunityDashboardRow[];
 };
 
 export type ProductionComparison = {
@@ -96,6 +126,11 @@ export type ProductionExecutionWritePayload = {
   quantityKg: number;
   harvestedAt: string;
   notes?: string | null;
+  /**
+   * Versão que o usuário tinha na tela ao editar. O back recusa com 409 se o
+   * apontamento mudou depois disso (ex.: um técnico decidiu nesse meio-tempo).
+   */
+  baseUpdatedAt?: string | null;
 };
 
 // ----- Tipos de resposta da API -----
@@ -126,7 +161,26 @@ type ExecutionApiResponse = {
   harvestedAt: string | null;
   status?: string | null;
   notes?: string | null;
+  rejectionReason?: string | null;
+  validatedBy?: string | null;
+  validatedAt?: string | null;
   createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+type DashboardRowApiResponse = {
+  communityId?: string | null;
+  communityName?: string | null;
+  farmerCount?: number | string | null;
+  planCount?: number | string | null;
+  expectedYield?: number | string | null;
+  actualYield?: number | string | null;
+  difference?: number | string | null;
+  percentageRealized?: number | string | null;
+};
+
+type DashboardApiResponse = DashboardRowApiResponse & {
+  communities?: DashboardRowApiResponse[] | null;
 };
 
 type ComparisonApiResponse = {
@@ -195,7 +249,37 @@ function mapExecution(raw: ExecutionApiResponse): ProductionExecution {
     harvestedAt: raw.harvestedAt ?? null,
     status: parseExecutionStatus(raw.status),
     notes: raw.notes ?? null,
+    rejectionReason: raw.rejectionReason ?? null,
+    validatedBy: raw.validatedBy ?? null,
+    validatedAt: raw.validatedAt ?? null,
     createdAt: raw.createdAt ?? null,
+    updatedAt: raw.updatedAt ?? null,
+  };
+}
+
+function mapDashboardRow(raw: DashboardRowApiResponse): CommunityDashboardRow {
+  return {
+    communityId: raw.communityId ?? null,
+    communityName: raw.communityName ?? "Sem comunidade",
+    farmerCount: num(raw.farmerCount),
+    planCount: num(raw.planCount),
+    expectedYield: num(raw.expectedYield),
+    actualYield: num(raw.actualYield),
+    difference: num(raw.difference),
+    percentageRealized: num(raw.percentageRealized),
+  };
+}
+
+function mapDashboard(raw: DashboardApiResponse): ProductionDashboard {
+  const row = mapDashboardRow(raw);
+  return {
+    farmerCount: row.farmerCount,
+    planCount: row.planCount,
+    expectedYield: row.expectedYield,
+    actualYield: row.actualYield,
+    difference: row.difference,
+    percentageRealized: row.percentageRealized,
+    communities: (raw.communities ?? []).map(mapDashboardRow),
   };
 }
 
@@ -281,6 +365,35 @@ export function deleteProductionExecution(executionId: string) {
   return apiRequest<void>(`/production-executions/${executionId}`, {
     method: "DELETE",
   });
+}
+
+// ----- Decisão sobre o apontamento (ADMIN / TECHNICIAN / MANAGER) -----
+
+export function validateProductionExecution(executionId: string) {
+  return apiRequest<ExecutionApiResponse>(
+    `/production-executions/${executionId}/validate`,
+    { method: "POST" },
+  ).then(mapExecution);
+}
+
+/** O motivo é opcional no back: sem texto, o corpo vai sem `reason`. */
+export function rejectProductionExecution(
+  executionId: string,
+  reason?: string | null,
+) {
+  const trimmed = reason?.trim();
+  return apiRequest<ExecutionApiResponse>(
+    `/production-executions/${executionId}/reject`,
+    { method: "POST", body: trimmed ? { reason: trimmed } : {} },
+  ).then(mapExecution);
+}
+
+// ----- Painel -----
+
+export function getProductionDashboard() {
+  return apiRequest<DashboardApiResponse>("/production/dashboard", {
+    method: "GET",
+  }).then(mapDashboard);
 }
 
 // ----- Comparação previsto vs realizado -----

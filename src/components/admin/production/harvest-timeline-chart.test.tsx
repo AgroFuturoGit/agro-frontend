@@ -78,6 +78,10 @@ function exec(
     status,
     notes: null,
     createdAt: null,
+    rejectionReason: null,
+    validatedBy: null,
+    validatedAt: null,
+    updatedAt: null,
   };
 }
 
