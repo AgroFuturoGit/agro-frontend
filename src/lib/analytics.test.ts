@@ -4,6 +4,10 @@ import { apiRequest } from "@/lib/api";
 import {
   getFarmerSummary,
   getHarvestTimeline,
+  getGlobalSummary,
+  getManagerSummary,
+  getOrganizationSummary,
+  mapManagementSummary,
   getTechnicianSummary,
   mapTechnicianSummary,
   mapFarmerSummary,
@@ -202,5 +206,89 @@ describe("analytics — resumo do técnico (UNIT-001)", () => {
     expect(s.currentHarvest).toBeNull();
     expect(s.totalWarningsCount).toBe(0);
     expect(s.isEmpty).toBe(false);
+  });
+
+  it("mapManagementSummary descarta currentHarvest sem id", () => {
+    const s = mapManagementSummary({ currentHarvest: { label: "2026" } });
+    expect(s.currentHarvest).toBeNull();
+  });
+});
+
+describe("analytics — resumo da gestão (UNIT-001)", () => {
+  it("getManagerSummary usa organizations/me e só envia os filtros informados", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({});
+    await getManagerSummary();
+    await getManagerSummary({ harvestId: "h-1", communityId: "c-1", organizationId: "o-9" });
+    expect(vi.mocked(apiRequest).mock.calls[0][0]).toBe("/analytics/organizations/me/summary");
+    expect(vi.mocked(apiRequest).mock.calls[1][0]).toBe(
+      "/analytics/organizations/me/summary?harvestId=h-1&communityId=c-1",
+    );
+  });
+
+  it("getGlobalSummary envia harvest, organização e comunidade", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({});
+    await getGlobalSummary();
+    await getGlobalSummary({ harvestId: "h 1", organizationId: "o-1", communityId: "c-1" });
+    expect(vi.mocked(apiRequest).mock.calls[0][0]).toBe("/analytics/global/summary");
+    expect(vi.mocked(apiRequest).mock.calls[1][0]).toBe(
+      "/analytics/global/summary?harvestId=h+1&organizationId=o-1&communityId=c-1",
+    );
+  });
+
+  it("getOrganizationSummary usa o id na URL", async () => {
+    vi.mocked(apiRequest).mockResolvedValue({});
+    await getOrganizationSummary("o-1", { communityId: "c-2" });
+    expect(vi.mocked(apiRequest).mock.calls[0][0]).toBe(
+      "/analytics/organizations/o-1/summary?communityId=c-2",
+    );
+  });
+
+  it("mapManagementSummary converte números, nulos e escopo", () => {
+    const s = mapManagementSummary({
+      scope: "GLOBAL",
+      organizationId: null,
+      organizationName: null,
+      currentHarvest: { id: "h-1", label: "2026", startDate: "2026-01-01", endDate: "2026-12-31" },
+      isEmpty: false,
+      totalOrganizationsCount: 2,
+      totalFarmersCount: "10",
+      compliantFarmersCount: 4,
+      complianceRatePct: "40.00",
+      totalTargetKg: "1000.50",
+      totalRealizedKg: null,
+      overallConversionRatePct: "12.34",
+      cropRanking: [
+        { rankPosition: 1, cropId: "k", cropName: "Milho", plansCount: 2, targetKg: "500.00", realizedKg: "50.00", conversionRatePct: "10.00", productionSharePct: "60.00" },
+      ],
+      communities: [
+        { communityId: "c-1", communityName: "Serra", organizationName: "Coop", activeFarmersCount: 3, lastExecutionDate: "2026-05-01" },
+        { communityName: "sem id" },
+      ],
+      organizations: [{ organizationId: "o-1", organizationName: "Coop", communitiesCount: 1, conversionRatePct: "5.5" }],
+    });
+    expect(s.scope).toBe("GLOBAL");
+    expect(s.totalFarmersCount).toBe(10);
+    expect(s.totalTargetKg).toBe(1000.5);
+    expect(s.totalRealizedKg).toBe(0);
+    expect(s.overallConversionRatePct).toBe(12.34);
+    expect(s.cropRanking[0]).toMatchObject({ cropName: "Milho", targetKg: 500, productionSharePct: 60, cropVariety: null });
+    expect(s.communities).toHaveLength(1);
+    expect(s.communities[0].lastExecutionDate).toBe("2026-05-01");
+    expect(s.organizations[0].conversionRatePct).toBe(5.5);
+  });
+
+  it("tolera listas ausentes e assume escopo da organização", () => {
+    const s = mapManagementSummary({});
+    expect(s.scope).toBe("ORGANIZATION");
+    expect(s.cropRanking).toEqual([]);
+    expect(s.communities).toEqual([]);
+    expect(s.organizations).toEqual([]);
+    expect(s.currentHarvest).toBeNull();
+    expect(s.isEmpty).toBe(false);
+  });
+
+  it("mapManagementSummary descarta currentHarvest sem id", () => {
+    const s = mapManagementSummary({ currentHarvest: { label: "2026" } });
+    expect(s.currentHarvest).toBeNull();
   });
 });

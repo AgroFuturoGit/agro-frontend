@@ -1,38 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertCircle, Sprout, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { FarmerDashboard } from "@/components/admin/dashboard/farmer-dashboard";
+import { ManagementDashboard } from "@/components/admin/dashboard/management-dashboard";
 import { TechnicianDashboard } from "@/components/admin/dashboard/technician-dashboard";
-import { ComparisonSummary } from "@/components/admin/production/comparison-summary";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
-import {
-  formatNumber,
-  getProductionDashboard,
-  type ProductionDashboard as Dashboard,
-} from "@/lib/production";
 
 /**
  * Visão geral: o agricultor vê o dashboard da Feature 6.1; o técnico, o da
- * 6.2; ADMIN e MANAGER, o painel de produção abaixo. Sem role conhecida nada renderiza (falha fechado).
+ * 6.2; ADMIN e MANAGER, o macro-gerencial da 6.3 (global e da organização). Sem
+ * role conhecida nada renderiza (falha fechado).
  */
 export function ProductionDashboard() {
   const [role, setRole] = useState<Role | null | undefined>(undefined);
@@ -45,176 +23,6 @@ export function ProductionDashboard() {
   if (!role) return null;
   if (role === "FARMER") return <FarmerDashboard />;
   if (role === "TECHNICIAN") return <TechnicianDashboard />;
-  return <StaffDashboard />;
-}
-
-/**
- * Painel de ADMIN e MANAGER: números de `GET /production/dashboard`. O recorte
- * (agricultor, técnico, gestor, admin) é aplicado pelo back; o front só decide
- * se mostra a quebra por comunidade (ADMIN e MANAGER).
- */
-function StaffDashboard() {
-  const [data, setData] = useState<Dashboard | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setData(await getProductionDashboard());
-    } catch (err) {
-      setData(null);
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar o painel de produção.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
-
-  if (loading) {
-    return (
-      <div
-        className="flex flex-col gap-4"
-        aria-busy="true"
-        aria-label="Carregando painel"
-      >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-24 rounded-xl" />
-        </div>
-        <Skeleton className="h-40 w-full rounded-xl" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div
-        role="alert"
-        className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-      >
-        <div className="flex items-start gap-2">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={() => load()}>
-          Tentar novamente
-        </Button>
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
-  if (data.planCount === 0) {
-    return (
-      <Card className="border-dashed bg-transparent ring-0 shadow-none">
-        <CardHeader className="items-center text-center">
-          <CardTitle className="text-base">
-            Nenhum plano de produção no seu recorte
-          </CardTitle>
-          <CardDescription>
-            Quando houver planos de produção com apontamentos validados, a meta
-            e o realizado aparecem aqui.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardDescription className="flex items-center justify-between">
-              <span>Agricultores</span>
-              <Users className="size-4" aria-hidden />
-            </CardDescription>
-            <CardTitle className="text-3xl font-semibold tracking-tight tabular-nums">
-              {formatNumber(data.farmerCount)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardDescription className="flex items-center justify-between">
-              <span>Planos de produção</span>
-              <Sprout className="size-4" aria-hidden />
-            </CardDescription>
-            <CardTitle className="text-3xl font-semibold tracking-tight tabular-nums">
-              {formatNumber(data.planCount)}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      <ComparisonSummary
-        comparison={{
-          productionPlanId: "",
-          expectedYield: data.expectedYield,
-          totalActualYield: data.actualYield,
-          difference: data.difference,
-          percentageRealized: data.percentageRealized,
-        }}
-      />
-      <p className="text-sm text-muted-foreground">
-        Previsto é a meta de colheita dos planos; o realizado considera apenas
-        apontamentos validados.
-      </p>
-
-        <div className="flex flex-col gap-3">
-          <h3 className="text-lg font-semibold tracking-tight">
-            Por comunidade
-          </h3>
-          <Card className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Comunidade</TableHead>
-                  <TableHead className="text-right">Agricultores</TableHead>
-                  <TableHead className="text-right">Planos</TableHead>
-                  <TableHead className="text-right">Meta (kg)</TableHead>
-                  <TableHead className="text-right">Realizado (kg)</TableHead>
-                  <TableHead className="text-right">% realizado</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.communities.map((row) => (
-                  <TableRow key={row.communityId ?? "sem-comunidade"}>
-                    <TableCell className="font-medium">
-                      {row.communityName}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.farmerCount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.planCount)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.expectedYield)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.actualYield)}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {formatNumber(row.percentageRealized)}%
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        </div>
-    </div>
-  );
+  if (role === "MANAGER" || role === "ADMIN") return <ManagementDashboard role={role} />;
+  return null;
 }

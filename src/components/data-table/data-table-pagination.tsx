@@ -1,6 +1,7 @@
 "use client";
 
 import type { Table as ReactTableInstance } from "@tanstack/react-table";
+import { useId } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export function DataTablePagination<TData>({
   table,
   perPageOptions = [10, 20, 30, 50],
 }: DataTablePaginationProps<TData>) {
+  const perPageId = useId();
   const { pageIndex, pageSize } = table.getState().pagination;
   const total = table.getFilteredRowModel().rows.length;
   const from = total === 0 ? 0 : pageIndex * pageSize + 1;
@@ -69,9 +71,9 @@ export function DataTablePagination<TData>({
         </Button>
       </div>
       <div className="flex items-center gap-2">
-        <label htmlFor="per-page-select">Itens por página:</label>
+        <label htmlFor={perPageId}>Itens por página:</label>
         <Select value={String(pageSize)} onValueChange={(v) => table.setPageSize(Number(v))}>
-          <SelectTrigger id="per-page-select" size="sm" className="min-w-[68px]">
+          <SelectTrigger id={perPageId} size="sm" className="min-w-[68px]">
             <SelectValue>{(v) => v}</SelectValue>
           </SelectTrigger>
           <SelectContent>

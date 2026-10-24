@@ -1,54 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { BarChart } from "echarts/charts";
-import {
-  AriaComponent,
-  GridComponent,
-  LegendComponent,
-  TooltipComponent,
-} from "echarts/components";
-import {
-  init,
-  use as registerEcharts,
-  type ECharts,
-  type EChartsCoreOption,
-} from "echarts/core";
-import { CanvasRenderer } from "echarts/renderers";
+import { useMemo } from "react";
+import type { EChartsCoreOption } from "echarts/core";
 
 import type { TechnicianCommunitySummary } from "@/lib/analytics";
-import { formatNumber } from "@/lib/production";
 
-registerEcharts([
-  BarChart,
-  GridComponent,
-  TooltipComponent,
-  LegendComponent,
-  AriaComponent,
-  CanvasRenderer,
-]);
+import {
+  CHART_HEIGHT,
+  escapeHtml,
+  kg,
+  useEchart,
+  type ChartColors,
+} from "./chart-utils";
 
-const CHART_HEIGHT = 320;
-
-export type CommunityChartColors = {
-  target: string;
-  realized: string;
-  pending: string;
-  text: string;
-  grid: string;
-  popover: string;
-  popoverText: string;
-};
-
-const kg = (value: number) => `${formatNumber(value)} kg`;
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
+export type CommunityChartColors = Omit<ChartColors, "palette" | "background">;
 
 /** Resumo textual do gráfico, usado como `aria-label`. */
 export function buildCommunityChartSummary(
@@ -128,73 +93,22 @@ export function buildCommunityChartOption(
   };
 }
 
-function toRgb(value: string): string {
-  try {
-    const ctx = document.createElement("canvas").getContext("2d", {
-      willReadFrequently: true,
-    });
-    if (!ctx) return value;
-    ctx.clearRect(0, 0, 1, 1);
-    ctx.fillStyle = value;
-    ctx.fillRect(0, 0, 1, 1);
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-    return `rgb(${r}, ${g}, ${b})`;
-  } catch {
-    return value;
-  }
-}
-
-function readColors(scope: Element): CommunityChartColors {
-  const style = getComputedStyle(scope);
-  const token = (name: string) => toRgb(style.getPropertyValue(name).trim());
-  return {
-    target: token("--chart-4"),
-    realized: token("--chart-1"),
-    pending: token("--chart-2"),
-    text: token("--muted-foreground"),
-    grid: token("--border"),
-    popover: token("--popover"),
-    popoverText: token("--popover-foreground"),
-  };
-}
-
 /** Barras agrupadas por comunidade (meta × realizado × pendente, em kg). */
 export function CommunityBarChart({
   communities,
 }: {
   communities: TechnicianCommunitySummary[];
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<ECharts | null>(null);
   const hasData = communities.length > 0;
   const ariaLabel = useMemo(
     () => buildCommunityChartSummary(communities),
     [communities],
   );
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!hasData || !container) return;
-    const chart = init(container, undefined, { renderer: "canvas" });
-    chartRef.current = chart;
-    const observer = new ResizeObserver(() => chart.resize());
-    observer.observe(container);
-    return () => {
-      observer.disconnect();
-      chart.dispose();
-      chartRef.current = null;
-    };
-  }, [hasData]);
-
-  useEffect(() => {
-    const chart = chartRef.current;
-    const container = containerRef.current;
-    if (!hasData || !chart || !container) return;
-    chart.setOption(
-      buildCommunityChartOption(communities, readColors(container), ariaLabel),
-      true,
-    );
-  }, [hasData, communities, ariaLabel]);
+  const containerRef = useEchart(
+    hasData,
+    (colors) => buildCommunityChartOption(communities, colors, ariaLabel),
+    [communities, ariaLabel],
+  );
 
   if (!hasData) return null;
 

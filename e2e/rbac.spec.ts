@@ -75,24 +75,114 @@ const DASHBOARD = {
   ],
 };
 
-for (const role of ["ADMIN", "MANAGER"]) {
-  test(`${role} vê o painel da Visão geral com a tabela por comunidade`, async ({
-    page,
-  }) => {
-    await loginAs(page, role);
-    await seedUser(page, role);
-    await page.route("**/production/dashboard", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(DASHBOARD) }),
-    );
+const MANAGEMENT_SUMMARY = {
+  scope: "ORGANIZATION",
+  organizationId: "o-1",
+  organizationName: "Cooperativa Sol",
+  currentHarvest: { id: "h-1", label: "Safra 2026", startDate: "2026-01-01", endDate: "2026-12-31" },
+  appliedCommunityId: null,
+  isEmpty: false,
+  totalOrganizationsCount: 1,
+  totalCommunitiesCount: 2,
+  totalFarmersCount: 10,
+  compliantFarmersCount: 7,
+  complianceRatePct: 70,
+  totalPlansCount: 12,
+  totalPlantedAreaHa: 33.5,
+  totalTargetKg: 50000,
+  totalRealizedKg: 20000,
+  overallConversionRatePct: 40,
+  cropRanking: [
+    { rankPosition: 1, cropId: "k1", cropName: "Milho", cropVariety: "Crioulo", unit: "kg", plansCount: 9, plantedAreaHa: 28.5, targetKg: 40000, realizedKg: 15000, conversionRatePct: 37.5, productionSharePct: 75 },
+    { rankPosition: 2, cropId: "k2", cropName: "Feijão", cropVariety: null, unit: "kg", plansCount: 3, plantedAreaHa: 5, targetKg: 10000, realizedKg: 5000, conversionRatePct: 50, productionSharePct: 25 },
+  ],
+  communities: [
+    { communityId: "c-1", communityName: "Alto da Serra", organizationId: "o-1", organizationName: "Cooperativa Sol", activeFarmersCount: 6, compliantFarmersCount: 4, complianceRatePct: 66.67, plansCount: 7, plantedAreaHa: 20, targetKg: 30000, realizedKg: 12000, conversionRatePct: 40, lastExecutionDate: "2026-05-10" },
+    { communityId: "c-2", communityName: "Vale Verde", organizationId: "o-1", organizationName: "Cooperativa Sol", activeFarmersCount: 4, compliantFarmersCount: 3, complianceRatePct: 75, plansCount: 5, plantedAreaHa: 13.5, targetKg: 20000, realizedKg: 8000, conversionRatePct: 40, lastExecutionDate: null },
+  ],
+  organizations: [],
+};
 
-    await page.goto("/admin");
+const GLOBAL_SUMMARY = {
+  ...MANAGEMENT_SUMMARY,
+  scope: "GLOBAL",
+  organizationId: null,
+  organizationName: null,
+  totalOrganizationsCount: 2,
+  organizations: [
+    { organizationId: "o-1", organizationName: "Cooperativa Sol", communitiesCount: 2, activeFarmersCount: 10, compliantFarmersCount: 7, complianceRatePct: 70, plansCount: 12, plantedAreaHa: 33.5, targetKg: 50000, realizedKg: 20000, conversionRatePct: 40 },
+    { organizationId: "o-2", organizationName: "Associação Lua", communitiesCount: 1, activeFarmersCount: 3, compliantFarmersCount: 1, complianceRatePct: 33.33, plansCount: 2, plantedAreaHa: 4, targetKg: 4000, realizedKg: 100, conversionRatePct: 2.5 },
+  ],
+};
 
-    await expect(page.getByText("40.000 kg")).toBeVisible();
-    await expect(page.getByRole("img", { name: "45% da meta alcançada" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "Alto da Serra" })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "Sem comunidade" })).toBeVisible();
-  });
+const json = (body: unknown, status = 200) => ({
+  status,
+  contentType: "application/json",
+  body: JSON.stringify(body),
+});
+
+async function mockManagementOptions(page: Page) {
+  await page.route("**/harvests", (route) => route.fulfill(json([])));
+  await page.route("**/organizations", (route) => route.fulfill(json([])));
+  await page.route("**/communities*", (route) => route.fulfill(json([])));
 }
+
+test("MANAGER vê o dashboard da organização na Visão geral, sem o painel de produção nem o global", async ({
+  page,
+}) => {
+  await loginAs(page, "MANAGER");
+  await seedUser(page, "MANAGER");
+  await mockManagementOptions(page);
+  let productionCalls = 0;
+  let globalCalls = 0;
+  const queries: string[] = [];
+  await page.route("**/production/dashboard", (route) => {
+    productionCalls += 1;
+    return route.fulfill(json(DASHBOARD));
+  });
+  await page.route("**/analytics/global/summary*", (route) => {
+    globalCalls += 1;
+    return route.fulfill(json({ message: "Acesso negado" }, 403));
+  });
+  await page.route("**/analytics/organizations/me/summary*", (route) => {
+    queries.push(new URL(route.request().url()).search);
+    return route.fulfill(json(MANAGEMENT_SUMMARY));
+  });
+
+  await page.goto("/admin");
+
+  await expect(page.getByTestId("mgmt-scope-title")).toHaveText("Cooperativa Sol");
+  await expect(page.getByText("50.000 kg")).toBeVisible();
+  await expect(page.getByTestId("crop-ranking")).toBeVisible();
+  await expect(page.getByTestId("communities-table")).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Organização" })).toHaveCount(0);
+  await expect(page.getByTestId("organizations-table")).toHaveCount(0);
+  expect(productionCalls).toBe(0);
+  expect(globalCalls).toBe(0);
+  expect(queries[0]).toBe("");
+});
+
+test("ADMIN vê o dashboard global com comparativo entre organizações", async ({ page }) => {
+  await loginAs(page, "ADMIN");
+  await seedUser(page, "ADMIN");
+  await mockManagementOptions(page);
+  let productionCalls = 0;
+  await page.route("**/production/dashboard", (route) => {
+    productionCalls += 1;
+    return route.fulfill(json(DASHBOARD));
+  });
+  await page.route("**/analytics/global/summary*", (route) =>
+    route.fulfill(json(GLOBAL_SUMMARY)),
+  );
+
+  await page.goto("/admin");
+
+  await expect(page.getByTestId("mgmt-scope-title")).toHaveText("Todas as organizações");
+  await expect(page.getByRole("combobox", { name: "Organização" })).toBeVisible();
+  await expect(page.getByTestId("organizations-table")).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Associação Lua" })).toBeVisible();
+  expect(productionCalls).toBe(0);
+});
 
 const FARMER_SUMMARY = {
   farmerId: "00000000-0000-0000-0000-000000000001",
@@ -278,22 +368,19 @@ test("erro do painel mostra a mensagem do back e 'Tentar novamente' recupera", a
 }) => {
   await loginAs(page, "ADMIN");
   await seedUser(page, "ADMIN");
-  let calls = 0;
-  await page.route("**/production/dashboard", (route) => {
-    calls += 1;
-    if (calls === 1) {
-      return route.fulfill({
-        status: 403,
-        contentType: "application/json",
-        body: JSON.stringify({ message: "Técnico não encontrado." }),
-      });
-    }
-    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(DASHBOARD) });
-  });
+  await mockManagementOptions(page);
+  // O modo dev do React executa o efeito duas vezes: a falha vale até o retry.
+  let failing = true;
+  await page.route("**/analytics/global/summary*", (route) =>
+    failing
+      ? route.fulfill(json({ message: "Falha ao consultar o resumo." }, 403))
+      : route.fulfill(json(GLOBAL_SUMMARY)),
+  );
 
   await page.goto("/admin");
 
-  await expect(page.getByText("Técnico não encontrado.")).toBeVisible();
+  await expect(page.getByText("Falha ao consultar o resumo.")).toBeVisible();
+  failing = false;
   await page.getByRole("button", { name: "Tentar novamente" }).click();
-  await expect(page.getByText("40.000 kg")).toBeVisible();
+  await expect(page.getByText("50.000 kg")).toBeVisible();
 });

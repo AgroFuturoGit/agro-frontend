@@ -421,3 +421,204 @@ export function getTechnicianSummary(params: TechnicianSummaryParams = {}) {
     { method: "GET" },
   ).then(mapTechnicianSummary);
 }
+
+export type ManagementScope = "ORGANIZATION" | "GLOBAL";
+
+export type ManagementCropRankingItem = {
+  rankPosition: number;
+  cropId: string | null;
+  cropName: string;
+  cropVariety: string | null;
+  unit: string | null;
+  plansCount: number;
+  plantedAreaHa: number;
+  targetKg: number;
+  realizedKg: number;
+  conversionRatePct: number;
+  productionSharePct: number;
+};
+
+export type ManagementCommunityPerformance = {
+  communityId: string;
+  communityName: string;
+  organizationId: string | null;
+  organizationName: string | null;
+  activeFarmersCount: number;
+  compliantFarmersCount: number;
+  complianceRatePct: number;
+  plansCount: number;
+  plantedAreaHa: number;
+  targetKg: number;
+  realizedKg: number;
+  conversionRatePct: number;
+  lastExecutionDate: string | null;
+};
+
+export type ManagementOrganizationSummary = {
+  organizationId: string;
+  organizationName: string;
+  communitiesCount: number;
+  activeFarmersCount: number;
+  compliantFarmersCount: number;
+  complianceRatePct: number;
+  plansCount: number;
+  plantedAreaHa: number;
+  targetKg: number;
+  realizedKg: number;
+  conversionRatePct: number;
+};
+
+export type ManagementSummary = {
+  scope: ManagementScope;
+  organizationId: string | null;
+  organizationName: string | null;
+  currentHarvest: FarmerSummary["currentHarvest"];
+  appliedCommunityId: string | null;
+  isEmpty: boolean;
+  totalOrganizationsCount: number;
+  totalCommunitiesCount: number;
+  totalFarmersCount: number;
+  compliantFarmersCount: number;
+  complianceRatePct: number;
+  totalPlansCount: number;
+  totalPlantedAreaHa: number;
+  totalTargetKg: number;
+  totalRealizedKg: number;
+  overallConversionRatePct: number;
+  cropRanking: ManagementCropRankingItem[];
+  communities: ManagementCommunityPerformance[];
+  organizations: ManagementOrganizationSummary[];
+};
+
+export type ManagementSummaryParams = {
+  harvestId?: string;
+  communityId?: string;
+  /** Só usado em `getGlobalSummary` (filtro do admin). */
+  organizationId?: string;
+};
+
+function mapRankingItem(raw: Raw, index: number): ManagementCropRankingItem {
+  return {
+    rankPosition: raw.rankPosition === undefined ? index + 1 : toNumber(raw.rankPosition),
+    cropId: str(raw.cropId),
+    cropName: str(raw.cropName) ?? "Cultura",
+    cropVariety: str(raw.cropVariety),
+    unit: str(raw.unit),
+    plansCount: toNumber(raw.plansCount),
+    plantedAreaHa: toNumber(raw.plantedAreaHa),
+    targetKg: toNumber(raw.targetKg),
+    realizedKg: toNumber(raw.realizedKg),
+    conversionRatePct: toNumber(raw.conversionRatePct),
+    productionSharePct: toNumber(raw.productionSharePct),
+  };
+}
+
+function mapManagementCommunity(raw: Raw): ManagementCommunityPerformance | null {
+  const communityId = str(raw.communityId);
+  if (!communityId) return null;
+  return {
+    communityId,
+    communityName: str(raw.communityName) ?? "Comunidade",
+    organizationId: str(raw.organizationId),
+    organizationName: str(raw.organizationName),
+    activeFarmersCount: toNumber(raw.activeFarmersCount),
+    compliantFarmersCount: toNumber(raw.compliantFarmersCount),
+    complianceRatePct: toNumber(raw.complianceRatePct),
+    plansCount: toNumber(raw.plansCount),
+    plantedAreaHa: toNumber(raw.plantedAreaHa),
+    targetKg: toNumber(raw.targetKg),
+    realizedKg: toNumber(raw.realizedKg),
+    conversionRatePct: toNumber(raw.conversionRatePct),
+    lastExecutionDate: str(raw.lastExecutionDate),
+  };
+}
+
+function mapManagementOrganization(raw: Raw): ManagementOrganizationSummary | null {
+  const organizationId = str(raw.organizationId);
+  if (!organizationId) return null;
+  return {
+    organizationId,
+    organizationName: str(raw.organizationName) ?? "Organização",
+    communitiesCount: toNumber(raw.communitiesCount),
+    activeFarmersCount: toNumber(raw.activeFarmersCount),
+    compliantFarmersCount: toNumber(raw.compliantFarmersCount),
+    complianceRatePct: toNumber(raw.complianceRatePct),
+    plansCount: toNumber(raw.plansCount),
+    plantedAreaHa: toNumber(raw.plantedAreaHa),
+    targetKg: toNumber(raw.targetKg),
+    realizedKg: toNumber(raw.realizedKg),
+    conversionRatePct: toNumber(raw.conversionRatePct),
+  };
+}
+
+export function mapManagementSummary(raw: Raw): ManagementSummary {
+  const harvest = raw.currentHarvest as Raw | null | undefined;
+  return {
+    scope: raw.scope === "GLOBAL" ? "GLOBAL" : "ORGANIZATION",
+    organizationId: str(raw.organizationId),
+    organizationName: str(raw.organizationName),
+    currentHarvest: harvest && str(harvest.id)
+      ? {
+          id: str(harvest.id) as string,
+          label: str(harvest.label) ?? "",
+          startDate: str(harvest.startDate),
+          endDate: str(harvest.endDate),
+        }
+      : null,
+    appliedCommunityId: str(raw.appliedCommunityId),
+    isEmpty: Boolean(raw.isEmpty),
+    totalOrganizationsCount: toNumber(raw.totalOrganizationsCount),
+    totalCommunitiesCount: toNumber(raw.totalCommunitiesCount),
+    totalFarmersCount: toNumber(raw.totalFarmersCount),
+    compliantFarmersCount: toNumber(raw.compliantFarmersCount),
+    complianceRatePct: toNumber(raw.complianceRatePct),
+    totalPlansCount: toNumber(raw.totalPlansCount),
+    totalPlantedAreaHa: toNumber(raw.totalPlantedAreaHa),
+    totalTargetKg: toNumber(raw.totalTargetKg),
+    totalRealizedKg: toNumber(raw.totalRealizedKg),
+    overallConversionRatePct: toNumber(raw.overallConversionRatePct),
+    cropRanking: list(raw.cropRanking).map(mapRankingItem),
+    communities: list(raw.communities)
+      .map(mapManagementCommunity)
+      .filter((c): c is ManagementCommunityPerformance => c !== null),
+    organizations: list(raw.organizations)
+      .map(mapManagementOrganization)
+      .filter((o): o is ManagementOrganizationSummary => o !== null),
+  };
+}
+
+function managementQuery(params: ManagementSummaryParams, withOrg: boolean): string {
+  const query = new URLSearchParams();
+  if (params.harvestId) query.set("harvestId", params.harvestId);
+  if (withOrg && params.organizationId) query.set("organizationId", params.organizationId);
+  if (params.communityId) query.set("communityId", params.communityId);
+  const qs = query.toString();
+  return qs ? `?${qs}` : "";
+}
+
+/** `GET /analytics/organizations/me/summary` (só MANAGER; a organização vem do token). */
+export function getManagerSummary(params: ManagementSummaryParams = {}) {
+  return apiRequest<Raw>(
+    `/analytics/organizations/me/summary${managementQuery(params, false)}`,
+    { method: "GET" },
+  ).then(mapManagementSummary);
+}
+
+/** `GET /analytics/organizations/:id/summary` (ADMIN qualquer; MANAGER só a sua). */
+export function getOrganizationSummary(
+  organizationId: string,
+  params: ManagementSummaryParams = {},
+) {
+  return apiRequest<Raw>(
+    `/analytics/organizations/${encodeURIComponent(organizationId)}/summary${managementQuery(params, false)}`,
+    { method: "GET" },
+  ).then(mapManagementSummary);
+}
+
+/** `GET /analytics/global/summary` (só ADMIN); filtros só vão se informados. */
+export function getGlobalSummary(params: ManagementSummaryParams = {}) {
+  return apiRequest<Raw>(
+    `/analytics/global/summary${managementQuery(params, true)}`,
+    { method: "GET" },
+  ).then(mapManagementSummary);
+}
