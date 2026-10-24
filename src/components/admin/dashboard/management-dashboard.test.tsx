@@ -532,10 +532,8 @@ describe("ManagementDashboard — paginação das tabelas (6.3)", () => {
     vi.mocked(getManagerSummary).mockResolvedValue(summary({ cropRanking: crops(25) }));
     render(<ManagementDashboard role="MANAGER" />);
     await screen.findByTestId("crop-ranking");
-    // Os ids do seletor repetem entre rodapés; usa o primeiro (ranking).
-    const trigger = screen
-      .getAllByRole("combobox")
-      .find((el) => el.id === "per-page-select") as HTMLElement;
+    // Há um seletor por rodapé; usa o primeiro (ranking).
+    const trigger = screen.getAllByLabelText("Itens por página:")[0] as HTMLElement;
     trigger.focus();
     fireEvent.keyDown(trigger, { key: "ArrowDown" });
     fireEvent.keyUp(trigger, { key: "ArrowDown" });

@@ -133,3 +133,22 @@ describe("DataTablePagination — resumo e navegação", () => {
     expect(status.textContent).toContain("25");
   });
 });
+
+describe("DataTablePagination — id do seletor", () => {
+  afterEach(cleanup);
+
+  it("dois rodapés na mesma árvore têm ids distintos e rótulos associados ao próprio seletor", () => {
+    render(
+      <>
+        <TestHost />
+        <TestHost />
+      </>,
+    );
+
+    const selects = screen.getAllByLabelText("Itens por página:");
+    expect(selects).toHaveLength(2);
+    expect(selects[0]).not.toBe(selects[1]);
+    expect(selects[0].id).not.toBe(selects[1].id);
+    expect(selects[0].id).not.toBe("");
+  });
+});
