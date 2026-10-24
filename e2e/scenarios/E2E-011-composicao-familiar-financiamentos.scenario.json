@@ -1,0 +1,590 @@
+{
+  "schema_version": 1,
+  "id": "E2E-011",
+  "title": "Composição familiar e financiamentos do agricultor",
+  "description": "O técnico com assistência ativa na comunidade cadastra, edita e exclui um membro da família e um financiamento na página do agricultor; o gestor da organização só consulta; o técnico sem assistência tenta cadastrar e a tela mostra o 403 do back sem criar nada.",
+  "feature_slug": "epic5-dados-sociais-ocorrencias",
+  "ac_refs": [
+    "AC-008",
+    "AC-009"
+  ],
+  "priority": "P0",
+  "tags": [
+    "produtores",
+    "composicao-familiar",
+    "financiamentos"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "TECHNICIAN",
+        "credentials_env": {
+          "email": "E2E_TECH_EMAIL",
+          "password": "E2E_TECH_PASSWORD"
+        }
+      },
+      {
+        "role": "MANAGER",
+        "credentials_env": {
+          "email": "E2E_MANAGER_EMAIL",
+          "password": "E2E_MANAGER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Agricultor numa comunidade com técnico de assistência ativa (E2E_TECH_*) e gestor da organização (E2E_MANAGER_*); caminho da página do agricultor em E2E_PRODUCER_PATH",
+      "Agricultor com um membro 'Membro Semente' (50 anos) e um financiamento 'Financiamento Semente' (Quitado) criados pela API, para a leitura do gestor",
+      "Técnico sem assistência nessa comunidade em E2E_TECH_NOASSIST_EMAIL / E2E_TECH_NOASSIST_PASSWORD (usado só na variante forbidden)"
+    ]
+  },
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Técnico assistente cadastra, edita e exclui um membro familiar e um financiamento",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_TECH_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_TECH_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PRODUCER_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Adicionar membro",
+            "exact": true
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome",
+            "exact": true
+          },
+          "value": "Membro E2E Tecnico"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Parentesco",
+            "exact": true
+          },
+          "value": "Sobrinho"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Idade",
+            "exact": true
+          },
+          "value": "20"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Membro E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar Membro E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Idade",
+            "exact": true
+          },
+          "value": "21"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "21",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Adicionar financiamento",
+            "exact": true
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Descrição",
+            "exact": true
+          },
+          "value": "Financiamento E2E Tecnico"
+        },
+        {
+          "action": "select",
+          "target": {
+            "by": "label",
+            "value": "Situação",
+            "exact": true
+          },
+          "value": "APPROVED"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Valor (R$)",
+            "exact": true
+          },
+          "value": "1.234,56"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Financiamento E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar Financiamento E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Valor (R$)",
+            "exact": true
+          },
+          "value": "2.000,00"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "R$ 2.000,00"
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Aprovado"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Excluir Membro E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "css",
+            "value": "[role=alertdialog] button:has-text('Excluir')"
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Excluir Financiamento E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Excluir Financiamento E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "css",
+            "value": "[role=alertdialog] button:has-text('Excluir')"
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Financiamento Semente",
+            "exact": true
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Membro E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Financiamento E2E Tecnico",
+            "exact": true
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Membro Semente",
+            "exact": true
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Financiamento Semente",
+            "exact": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "manager_readonly",
+      "title": "Gestor da organização vê os registros sem nenhuma ação de escrita",
+      "as_user": "MANAGER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_MANAGER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_MANAGER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PRODUCER_PATH}"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Membro Semente",
+            "exact": true
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Membro Semente",
+            "exact": true
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Financiamento Semente",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Adicionar membro",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Adicionar financiamento",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar Membro Semente",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Excluir Membro Semente",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar Financiamento Semente",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Excluir Financiamento Semente",
+            "exact": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "forbidden",
+      "title": "Técnico sem assistência tenta cadastrar e vê o 403 do back, sem criar nada",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_TECH_NOASSIST_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_TECH_NOASSIST_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PRODUCER_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Adicionar membro",
+            "exact": true
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome",
+            "exact": true
+          },
+          "value": "Membro Proibido"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Parentesco",
+            "exact": true
+          },
+          "value": "Primo"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Idade",
+            "exact": true
+          },
+          "value": "30"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar",
+            "exact": true
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "text",
+          "target": {
+            "by": "css",
+            "value": "[role=dialog] [role=alert]"
+          },
+          "value": "O técnico só pode visualizar agricultores das comunidades sob sua assistência."
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "cell",
+            "name": "Membro Proibido",
+            "exact": true
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "empty_state": "Estado vazio coberto em family-composition-section.test.tsx e financing-section.test.tsx."
+  }
+}

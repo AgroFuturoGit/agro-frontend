@@ -143,6 +143,55 @@ function planFor(producerId: string, cropName: string) {
   };
 }
 
+
+/**
+ * Dados sociais do agricultor (composição familiar e financiamentos): a página
+ * do produtor os carrega sempre; sem mock a chamada cairia no backend real.
+ */
+async function mockSocialData(page: Page) {
+  await page.route("**/farmers/*/family-compositions", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "ffffffff-0000-0000-0000-000000000001",
+          farmerId: "00000000-0000-0000-0000-000000000000",
+          name: "Maria da Silva",
+          kinship: "Esposa",
+          age: 42,
+          createdAt: "2026-08-01T10:00:00Z",
+          updatedAt: "2026-08-01T10:00:00Z",
+        },
+      ]),
+    }),
+  );
+  await page.route("**/farmers/*/financings", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "ffffffff-0000-0000-0000-000000000002",
+          farmerId: "00000000-0000-0000-0000-000000000000",
+          description: "PRONAF Custeio",
+          status: "APPROVED",
+          amount: 25000,
+          createdAt: "2026-08-01T10:00:00Z",
+          updatedAt: "2026-08-01T10:00:00Z",
+        },
+      ]),
+    }),
+  );
+}
+
+/** Ocorrências de campo: o Sheet do apontamento as lista sob demanda. */
+async function mockOccurrences(page: Page) {
+  await page.route("**/production-executions/*/occurrences", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+  );
+}
+
 test.describe("Planos de produção — navegação em cascata por role", () => {
   test("TECHNICIAN acessa a URL de um produtor diretamente (sem seletor) e vê os planos dele", async ({
     page,
@@ -157,6 +206,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     };
 
     await loginAs(page, "TECHNICIAN", technicianUser);
+    await mockSocialData(page);
 
     await page.route(`**/communities/${COMMUNITY_A.id}`, async (route) => {
       await route.fulfill({
@@ -210,6 +260,10 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     // TECHNICIAN escreve, então o botão aparece (não-regressão RN da
     // migração). O delete tem exatamente as mesmas 3 roles.
     await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
+    // Dados sociais do agricultor aparecem na mesma página, sem afetar os planos.
+    await expect(page.getByRole("heading", { name: /Composição familiar/ })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Maria da Silva", exact: true })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "PRONAF Custeio", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Safra 2026" })).toBeVisible();
 
     // Sem seletor de produtor — o escopo vem inteiramente da URL.
@@ -236,6 +290,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     };
 
     await loginAs(page, "FARMER", producerUser);
+    await mockSocialData(page);
 
     // Rede de segurança contra regressão: o FARMER nunca deve listar
     // produtores nem organizações/comunidades — o caminho dele é inteiro via
@@ -325,6 +380,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     };
 
     await loginAs(page, "FARMER", farmerUser);
+    await mockSocialData(page);
 
     const PLAN = planFor(PRODUCER_ANA.id, "Milho");
 
@@ -426,6 +482,7 @@ test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", (
       expectedHarvestEnd: "2026-06-29",
     };
     plan.crop = { ...plan.crop, harvestType: "CONTINUOUS", unit: "KG" };
+    await mockOccurrences(page);
 
     const execution = (id: string, harvestedAt: string, kg: number, status: string) => ({
       id,
@@ -566,6 +623,7 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
   /** Mocks do plano; o estado das execuções vive no teste e é devolvido a cada GET. */
   async function mockPlan(page: Page, executions: Exec[]) {
     const plan = { ...planFor(PRODUCER_ANA.id, "Café"), id: PLAN_ID };
+    await mockOccurrences(page);
     await page.route(`**/communities/${COMMUNITY_A.id}`, (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(COMMUNITY_A) }),
     );

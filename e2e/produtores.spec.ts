@@ -122,12 +122,55 @@ async function mockMyManager(page: Page) {
   });
 }
 
+
+/**
+ * Dados sociais do agricultor (composição familiar e financiamentos): a página
+ * do produtor os carrega sempre; sem mock a chamada cairia no backend real.
+ */
+async function mockSocialData(page: Page) {
+  await page.route("**/farmers/*/family-compositions", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "ffffffff-0000-0000-0000-000000000001",
+          farmerId: "00000000-0000-0000-0000-000000000000",
+          name: "Maria da Silva",
+          kinship: "Esposa",
+          age: 42,
+          createdAt: "2026-08-01T10:00:00Z",
+          updatedAt: "2026-08-01T10:00:00Z",
+        },
+      ]),
+    }),
+  );
+  await page.route("**/farmers/*/financings", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "ffffffff-0000-0000-0000-000000000002",
+          farmerId: "00000000-0000-0000-0000-000000000000",
+          description: "PRONAF Custeio",
+          status: "APPROVED",
+          amount: 25000,
+          createdAt: "2026-08-01T10:00:00Z",
+          updatedAt: "2026-08-01T10:00:00Z",
+        },
+      ]),
+    }),
+  );
+}
+
 test.describe("Produtores — cadastro escopado por comunidade (navegação em cascata)", () => {
   test("MANAGER navega até uma comunidade e cadastra um produtor vinculado a ela", async ({
     page,
   }) => {
     await loginAs(page, "MANAGER", MANAGER_USER);
     await mockMyManager(page);
+    await mockSocialData(page);
 
     // Estado fabricado do "backend": o POST alimenta o GET seguinte.
     let producers: Record<string, unknown>[] = [];
@@ -252,6 +295,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
   }) => {
     await loginAs(page, "MANAGER", MANAGER_USER);
     await mockMyManager(page);
+    await mockSocialData(page);
 
     await page.route("**/communities/*", async (route) => {
       if (route.request().method() !== "GET") {
