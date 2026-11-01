@@ -11,6 +11,19 @@ import { ApiError, apiRequest } from "@/lib/api";
 import { persistSession, type LoginResponse } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
+/** Só aceita rota interna do painel (`/admin...`); nunca URL externa nem `//`. */
+export function resolvePostLoginPath(from: string | null): string {
+  if (
+    from &&
+    (from === "/admin" || /^\/admin(\/|\?|#)/.test(from)) &&
+    !from.includes("\\") &&
+    !from.split(/[?#]/)[0].split("/").includes("..")
+  ) {
+    return from;
+  }
+  return "/admin";
+}
+
 export function LoginForm({ className, ...props }: React.ComponentProps<"form">) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -33,7 +46,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
         auth: false,
       });
       persistSession(data);
-      router.replace("/admin");
+      router.replace(
+        resolvePostLoginPath(new URLSearchParams(window.location.search).get("from")),
+      );
       router.refresh();
     } catch (err) {
       if (err instanceof ApiError) {

@@ -10,6 +10,17 @@ const AUTH_ROLE_COOKIE = "agro_role";
  * dependência de um backend real.
  */
 async function loginAs(page: Page, role: string) {
+  // O proxy do Next valida o token no servidor (`fetch` a `/auth/me` em `/login`),
+  // fora do alcance de `page.route`; só o browser é interceptado. Com token falso
+  // e sem back, o proxy trata a falha como "desconhecido" e não prende o usuário;
+  // o caminho de token inválido é coberto por `sessao.spec.ts`. O mock abaixo vale
+  // só para as chamadas do browser e é seguro: o refresh ignora corpo sem id/role.
+  // A sessão é conferida em `GET /auth/me` quando a API devolve 401/403/500;
+  // com token falso o back real encerraria a sessão, então o mock responde 200
+  // (corpo sem usuário: o refresh do layout o ignora e mantém a sessão semeada).
+  await page.route("**/auth/me", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "{}" }),
+  );
   await page.context().addCookies([
     {
       name: AUTH_TOKEN_COOKIE,

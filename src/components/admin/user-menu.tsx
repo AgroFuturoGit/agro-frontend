@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  clearAppCaches,
   clearSession,
   getUserSnapshot,
   subscribeUserStorage,
@@ -42,6 +43,7 @@ export function UserMenu() {
 
   function handleLogout() {
     clearSession();
+    void clearAppCaches();
     router.replace("/login");
     router.refresh();
   }
