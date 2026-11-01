@@ -154,3 +154,43 @@ describe("Sheet — padding do cabeçalho e rodapé", () => {
     expect(footer?.className).toMatch(/\bp-4\b/);
   });
 });
+
+// As sentinelas de foco do base-ui devolvem o foco ao painel no próximo quadro.
+const settleFocus = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+describe("Sheet — foco preso e devolvido (AC-004)", () => {
+  afterEach(cleanup);
+
+  it("Tab e Shift+Tab circulam dentro do painel e o foco volta ao gatilho ao fechar", async () => {
+    const user = userEvent.setup();
+    render(
+      <div>
+        <button type="button">Antes</button>
+        <TestSheet />
+        <button type="button">Depois</button>
+      </div>,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Abrir painel" });
+    await user.click(trigger);
+    const popup = await screen.findByRole("dialog");
+
+    // O foco inicial já está dentro do painel.
+    await vi.waitFor(() => expect(popup.contains(document.activeElement)).toBe(true));
+
+    for (let i = 0; i < 8; i += 1) {
+      await user.tab();
+      await settleFocus();
+      expect(popup.contains(document.activeElement), `Tab #${i + 1}`).toBe(true);
+    }
+    for (let i = 0; i < 8; i += 1) {
+      await user.tab({ shift: true });
+      await settleFocus();
+      expect(popup.contains(document.activeElement), `Shift+Tab #${i + 1}`).toBe(true);
+    }
+
+    await user.keyboard("{Escape}");
+    await vi.waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await vi.waitFor(() => expect(trigger).toHaveFocus());
+  });
+});

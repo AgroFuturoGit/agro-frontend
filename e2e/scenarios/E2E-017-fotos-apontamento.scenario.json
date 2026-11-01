@@ -1,0 +1,401 @@
+{
+  "schema_version": 1,
+  "id": "E2E-017",
+  "title": "Fotos anexadas ao apontamento de colheita",
+  "description": "O agricultor envia uma foto PNG a um apontamento seu, a vê na lista, a abre ampliada e a exclui; um PDF é recusado antes do envio; o gestor vê e baixa as fotos sem enviar nem excluir; um apontamento sem fotos mostra o estado vazio.",
+  "feature_slug": "epic5-anexos-apontamento",
+  "ac_refs": [
+    "AC-004",
+    "AC-005",
+    "AC-006"
+  ],
+  "priority": "P0",
+  "tags": [
+    "producao",
+    "anexos",
+    "apontamento"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "FARMER",
+        "credentials_env": {
+          "email": "E2E_FARMER_EMAIL",
+          "password": "E2E_FARMER_PASSWORD"
+        }
+      },
+      {
+        "role": "MANAGER",
+        "credentials_env": {
+          "email": "E2E_MANAGER_EMAIL",
+          "password": "E2E_MANAGER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop (com os anexos de apontamento) rodando com as migrations aplicadas",
+      "Agricultor com um plano e um único apontamento; caminho do detalhe do plano em E2E_PLAN_PATH; gestor da organização do agricultor em E2E_MANAGER_*",
+      "Esse apontamento tem a foto 'foto-semente.png' criada pela API, para a leitura do gestor (e a lista nunca chega a 5 fotos)",
+      "Segundo plano do agricultor com um apontamento sem fotos; caminho em E2E_EMPTY_PLAN_PATH",
+      "Arquivos de teste: E2E_PHOTO_PNG aponta para um PNG chamado foto-e2e.png (menos de 5 MB) e E2E_FILE_PDF para um PDF chamado doc-e2e.pdf"
+    ]
+  },
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Agricultor envia uma foto PNG, abre a imagem ampliada e a exclui",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_FARMER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_FARMER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Fotos do apontamento",
+            "exact": true
+          }
+        },
+        {
+          "action": "upload",
+          "target": {
+            "by": "testid",
+            "value": "attachment-input"
+          },
+          "value": "${env:E2E_PHOTO_PNG}"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "css",
+            "value": "img[alt='foto-e2e.png']"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Abrir foto-e2e.png",
+            "exact": true
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "dialog",
+            "name": "foto-e2e.png"
+          }
+        },
+        {
+          "action": "press",
+          "key": "Escape"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Excluir foto-e2e.png",
+            "exact": true
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "css",
+            "value": "[role=alertdialog] button:has-text('Excluir')"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "alertdialog",
+            "name": "Excluir foto?"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "css",
+            "value": "img[alt='foto-e2e.png']"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "css",
+            "value": "img[alt='foto-semente.png']"
+          }
+        }
+      ]
+    },
+    {
+      "name": "invalid_format",
+      "title": "Agricultor tenta enviar um PDF e vê a mensagem de formato antes do envio",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_FARMER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_FARMER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Fotos do apontamento",
+            "exact": true
+          }
+        },
+        {
+          "action": "upload",
+          "target": {
+            "by": "testid",
+            "value": "attachment-input"
+          },
+          "value": "${env:E2E_FILE_PDF}"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "doc-e2e.pdf: Formato não aceito. Envie a imagem como JPEG, PNG ou WebP."
+          }
+        }
+      ]
+    },
+    {
+      "name": "manager_readonly",
+      "title": "Gestor vê e baixa as fotos, sem enviar nem excluir",
+      "as_user": "MANAGER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_MANAGER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_MANAGER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Fotos do apontamento",
+            "exact": true
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "css",
+            "value": "img[alt='foto-semente.png']"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "css",
+            "value": "img[alt='foto-semente.png']"
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Baixar foto-semente.png",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Enviar fotos",
+            "exact": true
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Excluir foto-semente.png",
+            "exact": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "empty_state",
+      "title": "Apontamento sem fotos mostra o estado vazio e o botão de enviar ao agricultor",
+      "as_user": "FARMER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_FARMER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_FARMER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "${env:E2E_EMPTY_PLAN_PATH}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Fotos do apontamento",
+            "exact": true
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Nenhuma foto anexada."
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Enviar fotos",
+            "exact": true
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "forbidden": "O MANAGER receber 403 no DELETE é regra do back, verificada por curl; no front o botão nem aparece.",
+    "validation_error": "O arquivo acima de 5 MB e o 6º anexo são cobertos em execution-attachments-sheet.test.tsx e verificados ao vivo; o formato inválido é a variante invalid_format."
+  }
+}

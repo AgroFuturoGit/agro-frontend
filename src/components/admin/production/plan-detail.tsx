@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Check,
+  Images,
   MessageSquareWarning,
   Pencil,
   Plus,
@@ -55,6 +56,7 @@ import {
   type DecisionMode,
 } from "./execution-decision-dialog";
 import { ExecutionFormDrawer } from "./execution-form-drawer";
+import { ExecutionAttachmentsSheet } from "./execution-attachments-sheet";
 import { ExecutionOccurrencesSheet } from "./execution-occurrences-sheet";
 import { ExecutionStatusBadge } from "./execution-status-badge";
 import { ContinuousHarvestChart } from "./harvest-timeline-chart";
@@ -132,6 +134,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     null,
   );
   const [occurrencesTarget, setOccurrencesTarget] =
+    useState<ProductionExecution | null>(null);
+  const [attachmentsTarget, setAttachmentsTarget] =
     useState<ProductionExecution | null>(null);
   const [decision, setDecision] = useState<{
     mode: DecisionMode;
@@ -351,8 +355,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
     const actionsColumn = columnHelper.display({
       id: "actions",
-      // Só "Ocorrências" (leitura, 4 roles) ⇒ o cabeçalho não sugere escrita.
-      header: canWrite || canDecide ? "Ações" : "Ocorrências",
+      // Só "Ocorrências" e "Fotos" (leitura, 4 roles) ⇒ o cabeçalho não sugere escrita.
+      header: canWrite || canDecide ? "Ações" : "Ocorrências e fotos",
       cell: ({ row }) => {
         const execution = row.original;
         const edit = canEditExecution(currentRole, execution);
@@ -369,6 +373,16 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               onClick={() => setOccurrencesTarget(execution)}
             >
               <MessageSquareWarning />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Fotos do apontamento"
+              title="Fotos"
+              onClick={() => setAttachmentsTarget(execution)}
+            >
+              <Images />
             </Button>
             {decide && (
               <>
@@ -422,7 +436,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       },
     });
 
-    // "Ocorrências" é leitura liberada às 4 roles: a coluna sempre existe.
+    // "Ocorrências" e "Fotos" são leitura liberada às 4 roles: a coluna sempre existe.
     return [...baseColumns, actionsColumn] as ColumnDef<
       ProductionExecution,
       unknown
@@ -474,6 +488,15 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             >
               <MessageSquareWarning />
               Ocorrências
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAttachmentsTarget(execution)}
+            >
+              <Images />
+              Fotos
             </Button>
             {decide && (
               <>
@@ -703,6 +726,15 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         open={occurrencesTarget !== null}
         onOpenChange={(open) => {
           if (!open) setOccurrencesTarget(null);
+        }}
+        canWrite={canWrite}
+      />
+
+      <ExecutionAttachmentsSheet
+        execution={attachmentsTarget}
+        open={attachmentsTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setAttachmentsTarget(null);
         }}
         canWrite={canWrite}
       />
