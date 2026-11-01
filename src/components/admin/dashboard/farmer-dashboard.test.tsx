@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 import { FarmerDashboard } from "@/components/admin/dashboard/farmer-dashboard";
 import {
+  exportFarmerSummary,
   getFarmerSummary,
   type FarmerPlanCard,
   type FarmerSummary,
@@ -12,7 +13,8 @@ import { ApiError } from "@/lib/api";
 import { listHarvests } from "@/lib/harvests";
 import { getMyProducer } from "@/lib/producers";
 
-vi.mock("@/lib/analytics", () => ({ getFarmerSummary: vi.fn() }));
+vi.mock("@/lib/analytics", () => ({ getFarmerSummary: vi.fn(), exportFarmerSummary: vi.fn() }));
+vi.mock("@/lib/download", () => ({ saveBlob: vi.fn() }));
 vi.mock("@/lib/harvests", async () => {
   const actual = await vi.importActual<typeof import("@/lib/harvests")>("@/lib/harvests");
   return { ...actual, listHarvests: vi.fn() };
@@ -228,5 +230,36 @@ describe("FarmerDashboard (UNIT-003..006)", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("Safra não encontrada.");
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("10,5 ha")).toBeTruthy();
+  });
+});
+
+async function exportAs(name: string) {
+  const trigger = screen.getByRole("button", { name: "Exportar relatório" });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
+}
+
+describe("FarmerDashboard — exportação (AC-005)", () => {
+  it("exporta a safra vigente sem filtro e, depois, a safra escolhida", async () => {
+    vi.mocked(exportFarmerSummary).mockResolvedValue({ blob: new Blob(["x"]), filename: "r.pdf" });
+    render(<FarmerDashboard />);
+    await screen.findByText("10,5 ha");
+
+    await exportAs("PDF");
+    await waitFor(() => expect(exportFarmerSummary).toHaveBeenLastCalledWith("pdf", undefined));
+
+    await chooseHarvest("Safra 2025");
+    await waitFor(() => expect(getFarmerSummary).toHaveBeenLastCalledWith("h-0"));
+    await screen.findByText("10,5 ha");
+    await exportAs("Excel (.xlsx)");
+    await waitFor(() => expect(exportFarmerSummary).toHaveBeenLastCalledWith("xlsx", "h-0"));
+  });
+
+  it("fica desabilitado quando o painel está em erro", async () => {
+    vi.mocked(getFarmerSummary).mockRejectedValue(new ApiError(500, "falhou", null));
+    render(<FarmerDashboard />);
+    await screen.findByText("falhou");
+    const trigger = screen.getByRole("button", { name: "Exportar relatório" });
+    expect(trigger.hasAttribute("disabled") || trigger.hasAttribute("data-disabled")).toBe(true);
   });
 });

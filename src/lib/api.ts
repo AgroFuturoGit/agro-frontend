@@ -124,6 +124,80 @@ export async function apiRequest<T = unknown>(
   }
 }
 
+/** Nome do arquivo no `Content-Disposition` (`filename*=UTF-8''…` ou `filename="…"`). */
+export function parseContentDispositionFilename(
+  header: string | null,
+): string | null {
+  if (!header) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // Codificação inválida: tenta a forma simples.
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(header);
+  const name = (plain?.[1] ?? plain?.[2] ?? "").trim();
+  return name || null;
+}
+
+export type DownloadResult = { blob: Blob; filename: string };
+
+/**
+ * GET autenticado que devolve um arquivo. Usa o nome do `Content-Disposition`
+ * ou `fallbackName`; erros JSON viram `ApiError` e o 401 encerra a sessão
+ * como em `apiRequest`.
+ */
+export async function apiDownload(
+  path: string,
+  fallbackName = "relatorio",
+): Promise<DownloadResult> {
+  const headers = new Headers();
+  const token = readTokenFromCookie();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  loadingStore.start();
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      const isJson = response.headers
+        .get("content-type")
+        ?.includes("application/json");
+      let payload: unknown = null;
+      try {
+        payload = isJson ? await response.json() : await response.text();
+      } catch {
+        // Corpo vazio ou inválido: mensagem genérica "Erro NNN".
+      }
+      const message =
+        (isJson && payload && typeof payload === "object" && "message" in payload
+          ? String((payload as { message: unknown }).message)
+          : null) ?? `Erro ${response.status}`;
+      if (response.status === 401) endSession();
+      throw new ApiError(
+        response.status,
+        message,
+        payload,
+        parseRetryAfter(response.headers.get("retry-after")),
+      );
+    }
+
+    const blob = await response.blob();
+    const filename =
+      parseContentDispositionFilename(
+        response.headers.get("content-disposition"),
+      ) ?? fallbackName;
+    return { blob, filename };
+  } finally {
+    loadingStore.stop();
+  }
+}
+
 /** Backend devolve erros de validação como "campo: mensagem; campo: mensagem". */
 export function parseFieldErrors(payload: unknown): Record<string, string> {
   const errors: Record<string, string> = {};

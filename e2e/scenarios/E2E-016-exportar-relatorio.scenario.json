@@ -1,0 +1,255 @@
+{
+  "schema_version": 1,
+  "id": "E2E-016",
+  "title": "Exportar o relatório da Visão geral em PDF e Excel",
+  "description": "Em cada painel da Visão geral o usuário abre 'Exportar', escolhe PDF ou Excel e recebe o arquivo gerado pelo back (GET /analytics/.../summary/export) com os filtros da tela; o botão fica ocupado durante a geração e volta ao normal sem aviso de erro.",
+  "feature_slug": "epic6-exportacao-relatorios",
+  "ac_refs": [
+    "AC-005",
+    "AC-009"
+  ],
+  "priority": "P0",
+  "tags": [
+    "painel",
+    "exportacao",
+    "analytics"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "TECHNICIAN",
+        "credentials_env": {
+          "email": "E2E_TECHNICIAN_EMAIL",
+          "password": "E2E_TECHNICIAN_PASSWORD"
+        }
+      },
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Técnico vinculado a ao menos uma comunidade com agricultores e planos na safra vigente; nome da comunidade em E2E_TECHNICIAN_COMMUNITY",
+      "Ao menos uma organização com planos na safra vigente; nome em E2E_ADMIN_ORG"
+    ]
+  },
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Técnico exporta o PDF com a comunidade filtrada",
+      "as_user": "TECHNICIAN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_TECHNICIAN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_TECHNICIAN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "text",
+            "value": "Comunidades atendidas"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Comunidade"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_TECHNICIAN_COMMUNITY}"
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "text",
+            "value": "Comunidades atendidas"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Exportar relatório"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "menuitem",
+            "name": "PDF"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "enabled",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Exportar relatório"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "alert"
+          }
+        }
+      ]
+    },
+    {
+      "name": "admin_exporta_excel",
+      "title": "Admin exporta o Excel do global filtrado por organização",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "testid",
+            "value": "organizations-table"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "combobox",
+            "name": "Organização"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "option",
+            "name": "${env:E2E_ADMIN_ORG}"
+          }
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "css",
+            "value": "[data-testid='mgmt-scope-title']"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Exportar relatório"
+          }
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "menuitem",
+            "name": "Excel (.xlsx)"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "enabled",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Exportar relatório"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "alert"
+          }
+        }
+      ]
+    }
+  ],
+  "not_applicable": {
+    "validation_error": "A tela do painel não tem formulário; o erro do back ao exportar (400/403/500) é coberto em export-menu.test.tsx e verificado contra o back real.",
+    "forbidden": "Papel errado no endpoint é impedido pela escolha do endpoint por papel (management-dashboard.test.tsx); o 403 do back foi verificado ao vivo.",
+    "empty_state": "Painel sem dados mantém o botão habilitado; coberto em farmer-dashboard.test.tsx e verificado contra o back real."
+  }
+}

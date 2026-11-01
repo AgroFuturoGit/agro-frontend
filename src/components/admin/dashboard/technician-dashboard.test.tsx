@@ -10,6 +10,7 @@ import {
 
 import { TechnicianDashboard } from "@/components/admin/dashboard/technician-dashboard";
 import {
+  exportTechnicianSummary,
   getTechnicianSummary,
   type TechnicianFarmerSummary,
   type TechnicianSummary,
@@ -20,7 +21,8 @@ import { listCrops } from "@/lib/crops";
 import { listHarvests } from "@/lib/harvests";
 import { getMyAssignedProducers } from "@/lib/technicians";
 
-vi.mock("@/lib/analytics", () => ({ getTechnicianSummary: vi.fn() }));
+vi.mock("@/lib/analytics", () => ({ getTechnicianSummary: vi.fn(), exportTechnicianSummary: vi.fn() }));
+vi.mock("@/lib/download", () => ({ saveBlob: vi.fn() }));
 vi.mock("@/lib/harvests", async () => {
   const actual = await vi.importActual<typeof import("@/lib/harvests")>("@/lib/harvests");
   return { ...actual, listHarvests: vi.fn() };
@@ -668,5 +670,51 @@ describe("TechnicianDashboard — estados (UNIT-009)", () => {
       communityId: undefined,
       cropId: undefined,
     });
+  });
+});
+
+async function exportAs(name: string) {
+  const trigger = screen.getByRole("button", { name: "Exportar relatório" });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
+}
+
+describe("TechnicianDashboard — exportação (AC-005)", () => {
+  it("exporta com safra, comunidade e cultura da tela; sem filtro vai sem parâmetros", async () => {
+    vi.mocked(exportTechnicianSummary).mockResolvedValue({ blob: new Blob(["x"]), filename: "r.xlsx" });
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+
+    await exportAs("PDF");
+    await waitFor(() =>
+      expect(exportTechnicianSummary).toHaveBeenLastCalledWith("pdf", {
+        harvestId: undefined,
+        communityId: undefined,
+        cropId: undefined,
+      }),
+    );
+
+    await choose("Safra", "Safra 2025");
+    await screen.findByText("Comunidades atendidas");
+    await choose("Comunidade", "Vale Verde");
+    await screen.findByText("Comunidades atendidas");
+    await choose("Cultura", "Feijão");
+    await waitFor(() =>
+      expect(getTechnicianSummary).toHaveBeenLastCalledWith({
+        harvestId: "h-old",
+        communityId: "c-2",
+        cropId: "k-2",
+      }),
+    );
+    await screen.findByText("Comunidades atendidas");
+
+    await exportAs("Excel (.xlsx)");
+    await waitFor(() =>
+      expect(exportTechnicianSummary).toHaveBeenLastCalledWith("xlsx", {
+        harvestId: "h-old",
+        communityId: "c-2",
+        cropId: "k-2",
+      }),
+    );
   });
 });

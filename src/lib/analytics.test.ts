@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { apiRequest } from "@/lib/api";
+import { apiDownload, apiRequest } from "@/lib/api";
 import {
+  exportFarmerSummary,
+  exportGlobalSummary,
+  exportManagerSummary,
+  exportTechnicianSummary,
   getFarmerSummary,
   getHarvestTimeline,
   getGlobalSummary,
@@ -14,7 +18,7 @@ import {
   mapTimeline,
 } from "@/lib/analytics";
 
-vi.mock("@/lib/api", () => ({ apiRequest: vi.fn() }));
+vi.mock("@/lib/api", () => ({ apiRequest: vi.fn(), apiDownload: vi.fn() }));
 
 afterEach(() => vi.clearAllMocks());
 
@@ -290,5 +294,43 @@ describe("analytics — resumo da gestão (UNIT-001)", () => {
   it("mapManagementSummary descarta currentHarvest sem id", () => {
     const s = mapManagementSummary({ currentHarvest: { label: "2026" } });
     expect(s.currentHarvest).toBeNull();
+  });
+});
+
+describe("analytics — exportação (UNIT-002)", () => {
+  const last = () => vi.mocked(apiDownload).mock.calls[0];
+
+  it("agricultor: rota própria, formato e safra só se informada", async () => {
+    await exportFarmerSummary("pdf");
+    expect(last()[0]).toBe("/analytics/farmers/me/summary/export?format=pdf");
+    vi.clearAllMocks();
+    await exportFarmerSummary("xlsx", "h-1");
+    expect(last()[0]).toBe("/analytics/farmers/me/summary/export?format=xlsx&harvestId=h-1");
+    expect(last()[1]).toBe("relatorio.xlsx");
+  });
+
+  it("técnico: safra, comunidade e cultura só se informadas", async () => {
+    await exportTechnicianSummary("xlsx", { communityId: "c-1" });
+    expect(last()[0]).toBe("/analytics/technicians/me/summary/export?format=xlsx&communityId=c-1");
+    vi.clearAllMocks();
+    await exportTechnicianSummary("pdf", { harvestId: "h", communityId: "c", cropId: "k" });
+    expect(last()[0]).toBe(
+      "/analytics/technicians/me/summary/export?format=pdf&harvestId=h&communityId=c&cropId=k",
+    );
+  });
+
+  it("gestor: rota da organização do token, sem organizationId", async () => {
+    await exportManagerSummary("pdf", { harvestId: "h", communityId: "c" });
+    expect(last()[0]).toBe("/analytics/organizations/me/summary/export?format=pdf&harvestId=h&communityId=c");
+  });
+
+  it("admin: rota global com organização quando filtrada", async () => {
+    await exportGlobalSummary("pdf");
+    expect(last()[0]).toBe("/analytics/global/summary/export?format=pdf");
+    vi.clearAllMocks();
+    await exportGlobalSummary("xlsx", { harvestId: "h", organizationId: "o", communityId: "c" });
+    expect(last()[0]).toBe(
+      "/analytics/global/summary/export?format=xlsx&harvestId=h&organizationId=o&communityId=c",
+    );
   });
 });
