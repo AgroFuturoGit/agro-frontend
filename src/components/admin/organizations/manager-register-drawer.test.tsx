@@ -110,10 +110,48 @@ describe("ManagerRegisterDrawer — validação mínima do cadastro de Manager (
         fullName: "João Silva",
         email: "joao@agro.com",
         password: "supersecreta",
-        cpf: "123.456.789-01",
+        cpf: "12345678901",
         dateOfBirth: "1990-05-20",
       }),
     );
+  });
+
+  it("CPF digitado com máscara é enviado só com dígitos", async () => {
+    vi.mocked(registerManager).mockResolvedValue(REGISTERED_MANAGER);
+
+    renderDialog();
+
+    await screen.findByLabelText("Nome completo");
+    fillValidForm();
+    fireEvent.change(screen.getByLabelText("CPF"), {
+      target: { value: "529.982.247-25" },
+    });
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: "supersecreta" },
+    });
+
+    submitForm();
+
+    await waitFor(() => expect(registerManager).toHaveBeenCalled());
+    expect(vi.mocked(registerManager).mock.calls[0][1].cpf).toBe("52998224725");
+  });
+
+  it("e-mail sem domínio com ponto (a@b) é recusado e não chama registerManager", async () => {
+    renderDialog();
+
+    await screen.findByLabelText("Nome completo");
+    fillValidForm();
+    fireEvent.change(screen.getByLabelText("E-mail"), {
+      target: { value: "a@b" },
+    });
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: "supersecreta" },
+    });
+
+    submitForm();
+
+    expect(await screen.findByText("Informe um e-mail válido")).toBeTruthy();
+    expect(registerManager).not.toHaveBeenCalled();
   });
 });
 

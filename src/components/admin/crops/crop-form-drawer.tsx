@@ -37,6 +37,13 @@ import {
   type CropWritePayload,
   type MeasurementUnit,
 } from "@/lib/crops";
+import {
+  NAME_MIN_LENGTH_MESSAGE,
+  TEXT_MAX_LENGTH,
+  formatDecimalInput,
+  isPositiveIntegerDigits,
+  parseDecimalBr,
+} from "@/lib/validation";
 
 type Mode = "create" | "edit";
 
@@ -83,10 +90,10 @@ function toFormValues(crop: Crop): FormValues {
     isPriority: crop.isPriority,
     cycleDays: crop.cycleDays === null ? "" : String(crop.cycleDays),
     expectedProductivity:
-      crop.expectedProductivity === null ? "" : String(crop.expectedProductivity),
+      formatDecimalInput(crop.expectedProductivity),
     harvestType: crop.harvestType ?? "",
     unit: crop.unit ?? "",
-    unitWeightKg: crop.unitWeightKg === null ? "" : String(crop.unitWeightKg),
+    unitWeightKg: formatDecimalInput(crop.unitWeightKg),
   };
 }
 
@@ -108,28 +115,23 @@ function validateField(field: keyof FormValues, value: FormValues): string | nul
     case "name":
     case "variety": {
       const trimmed = value[field].trim();
-      if (trimmed.length < 2) {
-        return field === "name"
-          ? "Informe o nome da cultura"
-          : "Informe a variedade";
+      if (field === "name") {
+        if (trimmed.length === 0) return "Informe o nome da cultura";
+        if (trimmed.length < 2) return NAME_MIN_LENGTH_MESSAGE;
+        return null;
       }
-      return null;
+      return trimmed.length < 2 ? "Informe a variedade" : null;
     }
     case "cycleDays": {
       if (!value.cycleDays.trim()) return null; // opcional
-      const days = Number(value.cycleDays);
-      if (!Number.isInteger(days) || days <= 0) {
+      if (!isPositiveIntegerDigits(value.cycleDays)) {
         return "Informe um número inteiro de dias maior que zero";
       }
       return null;
     }
     case "expectedProductivity": {
-      const productivity = Number(value.expectedProductivity);
-      if (
-        !value.expectedProductivity.trim() ||
-        !Number.isFinite(productivity) ||
-        productivity <= 0
-      ) {
+      const productivity = parseDecimalBr(value.expectedProductivity);
+      if (!Number.isFinite(productivity) || productivity <= 0) {
         return "Informe uma produtividade maior que zero";
       }
       return null;
@@ -143,8 +145,8 @@ function validateField(field: keyof FormValues, value: FormValues): string | nul
     case "unitWeightKg": {
       const unit = parseMeasurementUnit(value.unit);
       if (unit !== "SACK" && unit !== "BOX") return null;
-      const weight = Number(value.unitWeightKg);
-      if (!value.unitWeightKg.trim() || !Number.isFinite(weight) || weight <= 0) {
+      const weight = parseDecimalBr(value.unitWeightKg);
+      if (!Number.isFinite(weight) || weight <= 0) {
         return "Informe o peso da unidade (maior que zero)";
       }
       return null;
@@ -180,11 +182,11 @@ function buildPayload(values: FormValues): CropWritePayload {
     name: values.name.trim(),
     variety: values.variety.trim(),
     isPriority: values.isPriority,
-    cycleDays: values.cycleDays.trim() ? Number(values.cycleDays) : null,
-    expectedProductivity: Number(values.expectedProductivity),
+    cycleDays: values.cycleDays.trim() ? Number(values.cycleDays.trim()) : null,
+    expectedProductivity: parseDecimalBr(values.expectedProductivity),
     harvestType: parseHarvestType(values.harvestType),
     unit,
-    unitWeightKg: Number(fixedWeight ?? values.unitWeightKg),
+    unitWeightKg: parseDecimalBr(fixedWeight ?? values.unitWeightKg),
   };
 }
 
@@ -359,6 +361,7 @@ export function CropFormDrawer({
                 onChange={(e) => update("name", e.target.value)}
                 onBlur={() => handleBlur("name")}
                 required
+                maxLength={TEXT_MAX_LENGTH}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.name)}
               />
@@ -375,6 +378,7 @@ export function CropFormDrawer({
                 onChange={(e) => update("variety", e.target.value)}
                 onBlur={() => handleBlur("variety")}
                 required
+                maxLength={TEXT_MAX_LENGTH}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.variety)}
               />
@@ -390,10 +394,8 @@ export function CropFormDrawer({
                 </Label>
                 <Input
                   id="crop-productivity"
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.01"
-                  min="0.01"
                   value={values.expectedProductivity}
                   onChange={(e) => update("expectedProductivity", e.target.value)}
                   onBlur={() => handleBlur("expectedProductivity")}
@@ -411,10 +413,8 @@ export function CropFormDrawer({
                 <Label htmlFor="crop-cycle">Ciclo (dias) — opcional</Label>
                 <Input
                   id="crop-cycle"
-                  type="number"
+                  type="text"
                   inputMode="numeric"
-                  step="1"
-                  min="1"
                   value={values.cycleDays}
                   onChange={(e) => update("cycleDays", e.target.value)}
                   onBlur={() => handleBlur("cycleDays")}
@@ -498,10 +498,8 @@ export function CropFormDrawer({
                 <Label htmlFor="crop-unit-weight">Peso da unidade (kg)</Label>
                 <Input
                   id="crop-unit-weight"
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.01"
-                  min="0.01"
                   value={values.unitWeightKg}
                   onChange={(e) => update("unitWeightKg", e.target.value)}
                   onBlur={() => handleBlur("unitWeightKg")}

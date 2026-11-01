@@ -199,3 +199,53 @@ describe("CropFormDrawer — payload completo (UNIT-007 / AC-002)", () => {
     );
   });
 });
+
+describe("CropFormDrawer — QA (UNIT-002 / UNIT-004)", () => {
+  it("limita nome e variedade a 255 caracteres", async () => {
+    renderForm("create");
+    expect((await screen.findByLabelText("Nome da cultura")).getAttribute("maxlength")).toBe("255");
+    expect(screen.getByLabelText("Variedade").getAttribute("maxlength")).toBe("255");
+  });
+
+  it("nome de 1 caractere mostra a mensagem de 2 caracteres; vazio pede o nome", async () => {
+    renderForm("create");
+    const name = await screen.findByLabelText("Nome da cultura");
+    fireEvent.change(name, { target: { value: "A" } });
+    submit();
+    expect(await screen.findByText("O nome deve ter pelo menos 2 caracteres.")).toBeTruthy();
+    fireEvent.change(name, { target: { value: "" } });
+    submit();
+    expect(await screen.findByText("Informe o nome da cultura")).toBeTruthy();
+  });
+
+  it("recusa notação científica na produtividade", async () => {
+    renderForm("create");
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Soja" } });
+    fireEvent.change(screen.getByLabelText("Variedade"), { target: { value: "Convencional" } });
+    fireEvent.change(screen.getByLabelText("Produtividade esperada (kg/ha)"), {
+      target: { value: "1e3" },
+    });
+    submit();
+    expect(await screen.findByText("Informe uma produtividade maior que zero")).toBeTruthy();
+    expect(createCropMock).not.toHaveBeenCalled();
+  });
+
+  it("recusa '1e3' e '0x10' no ciclo, e '12.5' na produtividade", async () => {
+    renderForm("edit", BOX_CROP);
+    const cycle = await screen.findByLabelText("Ciclo (dias) — opcional");
+    for (const bad of ["1e3", "0x10"]) {
+      fireEvent.change(cycle, { target: { value: bad } });
+      submit();
+      expect(
+        await screen.findByText("Informe um número inteiro de dias maior que zero"),
+      ).toBeTruthy();
+    }
+    fireEvent.change(cycle, { target: { value: "90" } });
+    fireEvent.change(screen.getByLabelText("Produtividade esperada (kg/ha)"), {
+      target: { value: "12.5" },
+    });
+    submit();
+    expect(await screen.findByText("Informe uma produtividade maior que zero")).toBeTruthy();
+    expect(updateCropMock).not.toHaveBeenCalled();
+  });
+});

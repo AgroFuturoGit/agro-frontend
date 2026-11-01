@@ -90,6 +90,7 @@ describe("UserFormDrawer — modo create", () => {
 });
 
 const VALID_CPF = "529.982.247-25";
+const VALID_CPF_DIGITS = "52998224725";
 
 function highlightedOption(): HTMLElement {
   const highlighted = screen
@@ -122,7 +123,11 @@ async function selectOption(triggerLabel: string, optionLabel: string) {
 }
 
 async function pickRole(label: string) {
-  await selectOption("Papel", label);
+  // Sem papel inicial não há item destacado: o clique é mais estável que o teclado.
+  const user = userEvent.setup();
+  await user.click(screen.getByLabelText("Papel"));
+  await user.click(await screen.findByRole("option", { name: label }));
+  await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
 }
 
 function fillBase() {
@@ -164,6 +169,7 @@ describe("UserFormDrawer — criação por perfil (BR-007/BR-008)", () => {
       <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={onSaved} />,
     );
 
+    await pickRole("Administrador");
     fillBase();
     submit();
 
@@ -211,7 +217,7 @@ describe("UserFormDrawer — criação por perfil (BR-007/BR-008)", () => {
         fullName: "Tânia Técnica",
         email: "tania@agro.com",
         password: "Senha@123",
-        cpf: VALID_CPF,
+        cpf: VALID_CPF_DIGITS,
         registrationType: "CREA",
         registrationNumber: "123",
         specialty: "Agronomia",
@@ -396,5 +402,84 @@ describe("UserFormDrawer — layout interno", () => {
 
     expect(containers.every(Boolean)).toBe(true);
     expect(new Set(containers).size).toBe(1);
+  });
+});
+
+describe("UserFormDrawer — QA (UNIT-001/002/003/006/009)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function renderCreate() {
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+  }
+
+  it("UNIT-001: CPF com máscara na tela vai só com dígitos para a API", async () => {
+    vi.mocked(registerUser).mockResolvedValue({ ...USER, role: "ADMIN" });
+    renderCreate();
+    await pickRole("Administrador");
+    fillBase();
+    fireEvent.change(screen.getByLabelText("CPF (opcional)"), {
+      target: { value: "52998224725" },
+    });
+    expect((screen.getByLabelText("CPF (opcional)") as HTMLInputElement).value).toBe(
+      VALID_CPF,
+    );
+    submit();
+    await waitFor(() =>
+      expect(registerUser).toHaveBeenCalledWith(
+        expect.objectContaining({ cpf: VALID_CPF_DIGITS }),
+      ),
+    );
+  });
+
+  it("UNIT-002: campos de texto têm maxLength 255", () => {
+    renderCreate();
+    for (const label of ["Nome completo", "E-mail"]) {
+      expect(screen.getByLabelText(label).getAttribute("maxlength")).toBe("255");
+    }
+  });
+
+  it("UNIT-003: e-mail sem domínio com ponto é recusado", async () => {
+    renderCreate();
+    await pickRole("Administrador");
+    fillBase();
+    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "x@x" } });
+    submit();
+    expect(await screen.findByText("Informe um e-mail válido")).toBeTruthy();
+    expect(registerUser).not.toHaveBeenCalled();
+  });
+
+  it("UNIT-002: nome de 1 caractere mostra a mensagem de 2 caracteres", async () => {
+    renderCreate();
+    await pickRole("Administrador");
+    fillBase();
+    fireEvent.change(screen.getByLabelText("Nome completo"), { target: { value: "A" } });
+    submit();
+    expect(await screen.findByText("O nome deve ter pelo menos 2 caracteres.")).toBeTruthy();
+    expect(registerUser).not.toHaveBeenCalled();
+  });
+
+  it("UNIT-006: novo usuário começa sem papel e salvar sem papel pede a seleção", async () => {
+    renderCreate();
+    expect(screen.getByLabelText("Papel").textContent).toContain("Selecione o papel");
+    fillBase();
+    submit();
+    expect(await screen.findByText("Selecione o papel.")).toBeTruthy();
+    expect(registerUser).not.toHaveBeenCalled();
+  });
+
+  it("UNIT-009: edição só habilita Salvar alterações depois de mudar algo", async () => {
+    const user = userEvent.setup();
+    render(
+      <UserFormDrawer mode="edit" user={USER} open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+    const save = screen.getByRole("button", { name: "Salvar alterações" });
+    expect((save as HTMLButtonElement).disabled).toBe(true);
+    await user.type(screen.getByLabelText("Nome completo"), "x");
+    expect((save as HTMLButtonElement).disabled).toBe(false);
   });
 });

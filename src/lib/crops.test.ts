@@ -77,6 +77,19 @@ describe("mapCrop (UNIT-001)", () => {
   });
 });
 
+describe("updatedAt (UNIT-005)", () => {
+  it("mapeia updatedAt e createdAt quando a API envia", async () => {
+    apiRequestMock.mockResolvedValue({
+      ...RAW_CROP,
+      updatedAt: "2026-10-01T12:00:00Z",
+      createdAt: "2026-09-01T12:00:00Z",
+    });
+    const crop = await getCrop("crop-1");
+    expect(crop.updatedAt).toBe("2026-10-01T12:00:00Z");
+    expect(crop.createdAt).toBe("2026-09-01T12:00:00Z");
+  });
+});
+
 describe("payload de escrita (UNIT-002)", () => {
   it("createCrop envia os 8 campos de escrita em POST /crops/register", async () => {
     apiRequestMock.mockResolvedValue(RAW_CROP);

@@ -16,6 +16,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
 import { createHarvest, updateHarvest, type Harvest } from "@/lib/harvests";
+import {
+  MAX_YEAR,
+  MIN_YEAR,
+  NAME_MIN_LENGTH_MESSAGE,
+  TEXT_MAX_LENGTH,
+  isEndBeforeStart,
+  isYearInRange,
+} from "@/lib/validation";
+
+const YEAR_RANGE_MESSAGE = `Informe uma data entre ${MIN_YEAR} e ${MAX_YEAR}`;
 
 type Mode = "create" | "edit";
 
@@ -46,20 +56,18 @@ function validateField(
   if (field === "label") {
     const trimmed = values.label.trim();
     if (!trimmed) return "Informe o rótulo da safra";
-    if (trimmed.length < 2) return "Informe o rótulo da safra";
+    if (trimmed.length < 2) return NAME_MIN_LENGTH_MESSAGE;
     return null;
   }
   if (field === "startDate") {
     if (!values.startDate) return "Informe a data de início";
+    if (!isYearInRange(values.startDate)) return YEAR_RANGE_MESSAGE;
     return null;
   }
   if (field === "endDate") {
     if (!values.endDate) return "Informe a data de término";
-    if (
-      values.startDate &&
-      values.endDate &&
-      values.startDate > values.endDate
-    ) {
+    if (!isYearInRange(values.endDate)) return YEAR_RANGE_MESSAGE;
+    if (isEndBeforeStart(values.startDate, values.endDate)) {
       return "A data de término deve ser igual ou posterior à de início";
     }
     return null;
@@ -214,6 +222,7 @@ export function HarvestFormDrawer({
                 onBlur={() => handleBlur("label")}
                 placeholder="Ex.: Safra 2025/2026"
                 required
+                maxLength={TEXT_MAX_LENGTH}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.label)}
               />
@@ -228,6 +237,8 @@ export function HarvestFormDrawer({
                 <Input
                   id="harvest-start-date"
                   type="date"
+                  min={`${MIN_YEAR}-01-01`}
+                  max={`${MAX_YEAR}-12-31`}
                   value={values.startDate}
                   onChange={(e) => update("startDate", e.target.value)}
                   onBlur={() => handleBlur("startDate")}
@@ -248,7 +259,8 @@ export function HarvestFormDrawer({
                   id="harvest-end-date"
                   type="date"
                   value={values.endDate}
-                  min={values.startDate || undefined}
+                  min={values.startDate || `${MIN_YEAR}-01-01`}
+                  max={`${MAX_YEAR}-12-31`}
                   onChange={(e) => update("endDate", e.target.value)}
                   onBlur={() => handleBlur("endDate")}
                   required

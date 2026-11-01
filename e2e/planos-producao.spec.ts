@@ -481,7 +481,7 @@ test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", (
 
     const plan = {
       ...planFor(PRODUCER_ANA.id, "Berinjela"),
-      id: "plan-continuo-1",
+      id: "0b0b0b0b-0000-4000-8000-000000000001",
       plantedArea: 1,
       expectedProductivity: 1800,
       expectedHarvestStart: "2026-05-04",
@@ -591,7 +591,7 @@ test.describe("Detalhe do plano — gráfico de colheita contínua (mockado)", (
 });
 
 test.describe("Detalhe do plano — validação de apontamentos (mockado)", () => {
-  const PLAN_ID = "plan-validacao-1";
+  const PLAN_ID = "0b0b0b0b-0000-4000-8000-000000000002";
   const PLAN_URL = `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${PRODUCER_ANA.id}/planos/${PLAN_ID}`;
 
   type Exec = {

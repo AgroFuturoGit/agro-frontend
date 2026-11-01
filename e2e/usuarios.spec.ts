@@ -293,8 +293,9 @@ test.describe("/admin/usuarios — DataTable genérico", () => {
     await page.getByLabel("Senha").fill("senha1234");
     await page.getByLabel("CPF").fill(NEW_USER.cpf);
     await expect(page.getByLabel("Data de nascimento")).toHaveCount(0);
-    // Papel já vem "Administrador" (default `ADMIN` do formulário) —
-    // corresponde ao papel do `NEW_USER`, nenhuma seleção extra necessária.
+    // O papel começa sem seleção: escolhe "Administrador" explicitamente.
+    await drawer.getByRole("combobox", { name: "Papel" }).click();
+    await page.getByRole("option", { name: "Administrador" }).click();
 
     // A lista recarregada (`GET /users` pós-criação) já inclui o novo
     // usuário — mock atualizado antes de submeter. Colocado no início do
@@ -361,7 +362,7 @@ test.describe("/admin/usuarios — DataTable genérico", () => {
     expect(technicianBody).toMatchObject({
       fullName: "Tânia Técnica",
       email: "tania.tecnica@example.com",
-      cpf: "529.982.247-25",
+      cpf: "52998224725",
       registrationType: "CREA",
       registrationNumber: "12345",
       specialty: "Agronomia",

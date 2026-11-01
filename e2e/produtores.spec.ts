@@ -277,7 +277,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     expect(registerBody).toMatchObject({
       fullName: producerName,
       email: "joao.mata@example.com",
-      cpf: "529.982.247-25",
+      cpf: "52998224725",
       dateOfBirth: "1988-03-15",
       localName: "Sítio Boa Vista",
       city: "Maceió",

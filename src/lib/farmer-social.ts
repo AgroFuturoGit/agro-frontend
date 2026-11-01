@@ -1,4 +1,5 @@
 import { apiRequest, parseFieldErrors } from "@/lib/api";
+import { parseDecimalBr } from "@/lib/validation";
 
 // ----- Composição familiar -----
 
@@ -194,11 +195,7 @@ export function formatCurrency(value: number): string {
 export function parseAmountInput(text: string): number | null {
   const raw = text.trim().replace(/^R\$\s*/, "");
   if (!raw) return null;
-  const [intPart, decPart, ...rest] = raw.split(",");
-  if (rest.length > 0) return null;
-  if (!/^(\d+|\d{1,3}(\.\d{3})+)$/.test(intPart)) return null;
-  if (decPart !== undefined && !/^\d+$/.test(decPart)) return null;
-  const value = Number(`${intPart.replace(/\./g, "")}${decPart ? `.${decPart}` : ""}`);
+  const value = parseDecimalBr(raw);
   return Number.isFinite(value) ? value : null;
 }
 

@@ -22,6 +22,13 @@ import {
   updateProductionExecution,
   type ProductionExecution,
 } from "@/lib/production";
+import {
+  MIN_POSITIVE_AMOUNT,
+  formatDecimalInput,
+  isFutureDate,
+  parseDecimalBr,
+  todayIso,
+} from "@/lib/validation";
 
 export const MISSING_UNIT_WEIGHT_MESSAGE =
   "Cadastre o peso da unidade na cultura antes de registrar apontamentos";
@@ -54,13 +61,24 @@ const EMPTY: FormValues = {
   notes: "",
 };
 
-function validate(values: FormValues): Record<string, string> {
+function validate(
+  values: FormValues,
+  original: ProductionExecution | null,
+): Record<string, string> {
   const errors: Record<string, string> = {};
-  const value = Number(values.quantity);
-  if (!values.quantity || !Number.isFinite(value) || value <= 0) {
-    errors.quantity = "Informe uma quantidade maior que zero";
+  const value = parseDecimalBr(values.quantity);
+  if (!Number.isFinite(value) || value < MIN_POSITIVE_AMOUNT) {
+    errors.quantity =
+      "Informe uma quantidade válida (use vírgula nos decimais; mínimo 0,01)";
   }
   if (!values.harvestedAt) errors.harvestedAt = "Informe a data da colheita";
+  else if (
+    isFutureDate(values.harvestedAt) &&
+    // Dado antigo inalterado não bloqueia salvar outras mudanças.
+    values.harvestedAt !== (original?.harvestedAt ?? "")
+  ) {
+    errors.harvestedAt = "A data da colheita não pode ser futura";
+  }
   return errors;
 }
 
@@ -91,7 +109,7 @@ export function ExecutionFormDrawer({
     setFieldErrors({});
     if (mode === "edit" && execution) {
       setValues({
-        quantity: String(execution.quantity ?? ""),
+        quantity: formatDecimalInput(execution.quantity),
         harvestedAt: execution.harvestedAt ?? "",
         notes: execution.notes ?? "",
       });
@@ -104,7 +122,7 @@ export function ExecutionFormDrawer({
     if (isCreate) return true;
     if (!execution) return false;
     return (
-      values.quantity !== String(execution.quantity ?? "") ||
+      values.quantity !== formatDecimalInput(execution.quantity) ||
       values.harvestedAt !== (execution.harvestedAt ?? "") ||
       values.notes !== (execution.notes ?? "")
     );
@@ -112,7 +130,7 @@ export function ExecutionFormDrawer({
 
   const factor = unitFactorKg(crop);
   const blocked = factor === null;
-  const quantityNumber = Number(values.quantity);
+  const quantityNumber = parseDecimalBr(values.quantity);
   const previewKg =
     factor !== null && values.quantity && Number.isFinite(quantityNumber) && quantityNumber > 0
       ? toKg(quantityNumber, factor)
@@ -137,7 +155,7 @@ export function ExecutionFormDrawer({
 
     if (factor === null) return;
 
-    const errors = validate(values);
+    const errors = validate(values, isCreate ? null : (execution ?? null));
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
@@ -145,7 +163,7 @@ export function ExecutionFormDrawer({
 
     setSubmitting(true);
     try {
-      const quantity = Number(values.quantity);
+      const quantity = parseDecimalBr(values.quantity);
       // Se a quantidade não mudou na edição, preserva o kg já gravado (a
       // unidade da cultura pode ter mudado depois do apontamento).
       const quantityKg =
@@ -255,10 +273,8 @@ export function ExecutionFormDrawer({
                 </Label>
                 <Input
                   id="execution-quantity"
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.01"
-                  min="0.01"
                   value={values.quantity}
                   onChange={(e) => update("quantity", e.target.value)}
                   required
@@ -286,6 +302,7 @@ export function ExecutionFormDrawer({
                 id="execution-date"
                 type="date"
                 value={values.harvestedAt}
+                max={todayIso()}
                 onChange={(e) => update("harvestedAt", e.target.value)}
                 required
                 disabled={submitting}

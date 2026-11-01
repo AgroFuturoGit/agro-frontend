@@ -103,6 +103,14 @@ function canDecideExecution(role: Role | null, execution: ProductionExecution) {
   );
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Só o GET do próprio plano respondendo 404 indica plano inexistente. */
+function isPlanNotFound(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 404;
+}
+
 export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [currentRole, setCurrentRole] = useState<Role | null>(null);
   const [names, setNames] = useState<BreadcrumbNames | null>(null);
@@ -113,6 +121,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const [executions, setExecutions] = useState<ProductionExecution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Id inexistente (404 do GET do plano) ou fora do formato UUID: tela amigável.
+  const [notFound, setNotFound] = useState(false);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ProductionExecution | null>(
@@ -230,9 +240,19 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setNotFound(false);
+    if (!UUID_PATTERN.test(planId)) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    let planFailed = false;
     try {
       const [planData, comparisonData, executionsData] = await Promise.all([
-        getProductionPlan(planId),
+        getProductionPlan(planId).catch((err: unknown) => {
+          planFailed = true;
+          throw err;
+        }),
         getProductionComparison(planId),
         listProductionExecutions(planId),
       ]);
@@ -240,6 +260,10 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       setComparison(comparisonData);
       setExecutions(executionsData);
     } catch (err) {
+      if (planFailed && isPlanNotFound(err)) {
+        setNotFound(true);
+        return;
+      }
       setError(
         err instanceof ApiError
           ? err.message
@@ -502,6 +526,35 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   }
 
   const backToPlansHref = `/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producerId}`;
+
+  if (notFound) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div
+          role="alert"
+          className="flex flex-col items-start gap-3 rounded-xl border bg-card px-6 py-8"
+        >
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Plano não encontrado
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            O plano de produção não existe ou o endereço está incorreto.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            render={
+              <Link href={backToPlansHref}>
+                <ArrowLeft />
+                Voltar para planos
+              </Link>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
