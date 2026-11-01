@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, parseFieldErrors, sessionNavigator } from "@/lib/api";
+import { ApiError, apiRequest, isConcurrencyConflict, parseFieldErrors, sessionNavigator } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -69,109 +69,69 @@ describe("conferência de sessão no apiRequest (UNIT-001)", () => {
     vi.restoreAllMocks();
   });
 
-  for (const status of [401, 403, 500]) {
-    it(`${status} com /auth/me falhando encerra a sessão e vai ao login`, async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async (url: string) => (String(url).endsWith("/auth/me") ? res(500) : res(status))),
-      );
+  it("401 encerra a sessão e vai ao login sem chamar /auth/me", async () => {
+    const fetchMock = vi.fn<(url: string) => Promise<Response>>(async () => res(401, { message: "Token inválido" }));
+    vi.stubGlobal("fetch", fetchMock);
 
-      await expect(apiRequest("/users")).rejects.toBeInstanceOf(ApiError);
+    await expect(apiRequest("/users")).rejects.toMatchObject({ status: 401 });
 
-      expect(readTokenFromCookie()).toBeNull();
-      expect(localStorage.getItem("agro_user")).toBeNull();
-      expect(goToLogin).toHaveBeenCalledWith("/admin/usuarios?page=2");
+    expect(readTokenFromCookie()).toBeNull();
+    expect(localStorage.getItem("agro_user")).toBeNull();
+    expect(goToLogin).toHaveBeenCalledWith("/admin/usuarios?page=2");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("/auth/me");
+  });
+
+  for (const status of [403, 500]) {
+    it(`${status} só vira erro: mantém a sessão e não chama /auth/me`, async () => {
+      const fetchMock = vi.fn(async () => res(status, { message: "Acesso negado" }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(apiRequest("/users")).rejects.toMatchObject({
+        status,
+        message: "Acesso negado",
+      });
+
+      expect(readTokenFromCookie()).toBe("tok");
+      expect(goToLogin).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   }
 
-  it("403 com /auth/me 200 mantém a sessão e o erro original", async () => {
+  it("401 com corpo vazio ainda encerra a sessão", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) =>
-        String(url).endsWith("/auth/me") ? res(200, {}) : res(403, { message: "Acesso negado" }),
+      vi.fn(
+        async () =>
+          new Response("", { status: 401, headers: { "content-type": "application/json" } }),
       ),
     );
 
     await expect(apiRequest("/users")).rejects.toMatchObject({
-      status: 403,
-      message: "Acesso negado",
+      status: 401,
+      message: "Erro 401",
     });
 
-    expect(readTokenFromCookie()).toBe("tok");
-    expect(goToLogin).not.toHaveBeenCalled();
+    expect(readTokenFromCookie()).toBeNull();
+    expect(goToLogin).toHaveBeenCalled();
   });
 
-  it("erro de rede no /auth/me não encerra a sessão", async () => {
+  it("erro de rede não encerra a sessão", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url: string) => {
-        if (String(url).endsWith("/auth/me")) throw new TypeError("net");
-        return res(500);
+      vi.fn(async () => {
+        throw new TypeError("net");
       }),
     );
 
-    await expect(apiRequest("/users")).rejects.toBeInstanceOf(ApiError);
+    await expect(apiRequest("/users")).rejects.toBeInstanceOf(TypeError);
 
     expect(readTokenFromCookie()).toBe("tok");
     expect(goToLogin).not.toHaveBeenCalled();
   });
 
-  for (const status of [502, 503, 504]) {
-    it(`${status} no /auth/me não encerra a sessão`, async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async (url: string) => (String(url).endsWith("/auth/me") ? res(status) : res(403))),
-      );
-
-      await expect(apiRequest("/users")).rejects.toBeInstanceOf(ApiError);
-
-      expect(readTokenFromCookie()).toBe("tok");
-      expect(goToLogin).not.toHaveBeenCalled();
-    });
-  }
-
-  for (const [label, init] of [
-    ["vazio", { status: 500, body: "" }],
-    ["JSON inválido", { status: 403, body: "{nao-json" }],
-  ] as const) {
-    it(`corpo de erro ${label} não impede a conferência`, async () => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async (url: string) =>
-          String(url).endsWith("/auth/me")
-            ? res(401)
-            : new Response(init.body, {
-                status: init.status,
-                headers: { "content-type": "application/json" },
-              }),
-        ),
-      );
-
-      await expect(apiRequest("/users")).rejects.toMatchObject({
-        status: init.status,
-        message: `Erro ${init.status}`,
-      });
-
-      expect(readTokenFromCookie()).toBeNull();
-      expect(goToLogin).toHaveBeenCalled();
-    });
-  }
-
-  it("chamadas simultâneas fazem uma só conferência", async () => {
-    const fetchMock = vi.fn(async (url: string) =>
-      String(url).endsWith("/auth/me") ? res(500) : res(403),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
-    await Promise.allSettled([apiRequest("/a"), apiRequest("/b"), apiRequest("/c")]);
-
-    const meCalls = fetchMock.mock.calls.filter(([u]) => String(u).endsWith("/auth/me"));
-    expect(meCalls).toHaveLength(1);
-    expect(goToLogin).toHaveBeenCalledTimes(1);
-  });
-
-  it("não confere sessão em /auth/login nem em chamadas sem auth", async () => {
-    const fetchMock = vi.fn(async () => res(403));
+  it("não encerra a sessão em /auth/login nem em chamadas sem auth", async () => {
+    const fetchMock = vi.fn(async () => res(401));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(apiRequest("/auth/login", { auth: false })).rejects.toBeInstanceOf(ApiError);
@@ -179,5 +139,53 @@ describe("conferência de sessão no apiRequest (UNIT-001)", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(readTokenFromCookie()).toBe("tok");
+    expect(goToLogin).not.toHaveBeenCalled();
+  });
+});
+
+describe("Retry-After no ApiError (UNIT-004)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function resWithRetry(retryAfter: string | null) {
+    const headers = new Headers({ "content-type": "application/json" });
+    if (retryAfter !== null) headers.set("Retry-After", retryAfter);
+    return new Response(JSON.stringify({ message: "Limite de tentativas" }), {
+      status: 429,
+      headers,
+    });
+  }
+
+  it("expõe retryAfterSeconds lido do header", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => resWithRetry("42")));
+    await expect(apiRequest("/auth/login", { auth: false })).rejects.toMatchObject({
+      status: 429,
+      retryAfterSeconds: 42,
+    });
+  });
+
+  it("sem header ou com valor inválido, retryAfterSeconds é nulo", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => resWithRetry(null)));
+    await expect(apiRequest("/auth/login", { auth: false })).rejects.toMatchObject({
+      retryAfterSeconds: null,
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => resWithRetry("amanhã")));
+    await expect(apiRequest("/auth/login", { auth: false })).rejects.toMatchObject({
+      retryAfterSeconds: null,
+    });
+  });
+
+  it("ApiError criado à mão segue funcionando", () => {
+    expect(new ApiError(400, "x", null).retryAfterSeconds).toBeNull();
+  });
+});
+
+describe("isConcurrencyConflict", () => {
+  it("só é verdadeiro para 409 com `current` no corpo", () => {
+    expect(isConcurrencyConflict(new ApiError(409, "x", { current: { id: "1" } }))).toBe(true);
+    expect(isConcurrencyConflict(new ApiError(409, "x", { message: "x" }))).toBe(false);
+    expect(isConcurrencyConflict(new ApiError(409, "x", null))).toBe(false);
+    expect(isConcurrencyConflict(new ApiError(400, "x", { current: {} }))).toBe(false);
   });
 });

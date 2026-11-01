@@ -39,6 +39,7 @@ import {
   type OccurrenceType,
 } from "@/lib/occurrences";
 import { formatPlanDate, type ProductionExecution } from "@/lib/production";
+import { LIMITS } from "@/lib/validation";
 
 type Props = {
   execution: ProductionExecution | null;
@@ -61,8 +62,9 @@ const EMPTY: FormValues = {
   weatherObservation: "",
   evidenceUrl: "",
 };
-const MAX_WEATHER = 255;
-const MAX_URL = 500;
+const MAX_DESCRIPTION = LIMITS.OCCURRENCE_DESCRIPTION;
+const MAX_WEATHER = LIMITS.OCCURRENCE_WEATHER;
+const MAX_URL = LIMITS.OCCURRENCE_EVIDENCE_URL;
 
 const TYPE_STYLES: Record<OccurrenceType, string> = {
   CLIMATE: "bg-sky-500/15 text-sky-800 dark:text-sky-300",
@@ -74,6 +76,8 @@ function validate(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!values.logType) errors.logType = "O tipo de ocorrência é obrigatório";
   if (!values.description.trim()) errors.description = "A descrição é obrigatória";
+  else if (values.description.trim().length > MAX_DESCRIPTION)
+    errors.description = `A descrição deve ter no máximo ${MAX_DESCRIPTION} caracteres`;
   if (values.weatherObservation.trim().length > MAX_WEATHER)
     errors.weatherObservation = `A observação deve ter no máximo ${MAX_WEATHER} caracteres`;
   const url = values.evidenceUrl.trim();
@@ -401,6 +405,7 @@ export function ExecutionOccurrencesSheet({
                 <textarea
                   id="occurrence-description"
                   rows={3}
+                  maxLength={MAX_DESCRIPTION}
                   value={values.description}
                   onChange={(e) => update("description", e.target.value)}
                   disabled={submitting}
@@ -415,6 +420,7 @@ export function ExecutionOccurrencesSheet({
                 <Label htmlFor="occurrence-weather">Observação climática (opcional)</Label>
                 <Input
                   id="occurrence-weather"
+                  maxLength={MAX_WEATHER}
                   value={values.weatherObservation}
                   onChange={(e) => update("weatherObservation", e.target.value)}
                   disabled={submitting}
@@ -430,6 +436,7 @@ export function ExecutionOccurrencesSheet({
                 <Label htmlFor="occurrence-evidence">Link da evidência (opcional)</Label>
                 <Input
                   id="occurrence-evidence"
+                  maxLength={MAX_URL}
                   inputMode="url"
                   value={values.evidenceUrl}
                   onChange={(e) => update("evidenceUrl", e.target.value)}

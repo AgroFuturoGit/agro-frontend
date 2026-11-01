@@ -30,6 +30,7 @@ import {
   type Community,
 } from "@/lib/communities";
 import { listOrganizations, type Organization } from "@/lib/organizations";
+import { LIMITS } from "@/lib/validation";
 
 type Mode = "create" | "edit";
 
@@ -304,6 +305,7 @@ export function CommunityFormDrawer({
               <Label htmlFor="community-name">Nome da comunidade</Label>
               <Input
                 id="community-name"
+                maxLength={LIMITS.COMMUNITY_NAME}
                 value={values.name}
                 onChange={(e) => update("name", e.target.value)}
                 onBlur={handleNameBlur}

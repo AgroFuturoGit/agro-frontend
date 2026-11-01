@@ -45,6 +45,7 @@ import {
   updateFamilyMember,
   type FamilyMember,
 } from "@/lib/farmer-social";
+import { LIMITS } from "@/lib/validation";
 
 type Props = {
   farmerId: string;
@@ -55,8 +56,8 @@ type Props = {
 type FormValues = { name: string; kinship: string; age: string };
 
 const EMPTY: FormValues = { name: "", kinship: "", age: "" };
-const MAX_KINSHIP = 100;
-const MAX_NAME = 255;
+const MAX_KINSHIP = LIMITS.KINSHIP;
+const MAX_NAME = LIMITS.FULL_NAME;
 
 function validate(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -69,6 +70,8 @@ function validate(values: FormValues): Record<string, string> {
   if (values.age.trim() === "") errors.age = "A idade é obrigatória";
   else if (!/^\d+$/.test(values.age.trim()))
     errors.age = "A idade deve ser um número inteiro, sem negativos";
+  else if (Number(values.age.trim()) > LIMITS.MAX_AGE)
+    errors.age = `A idade deve ser no máximo ${LIMITS.MAX_AGE}`;
   return errors;
 }
 
@@ -384,6 +387,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                   <Label htmlFor="family-name">Nome</Label>
                   <Input
                     id="family-name"
+                    maxLength={MAX_NAME}
                     value={values.name}
                     onChange={(e) => update("name", e.target.value)}
                     disabled={submitting}
@@ -397,6 +401,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                   <Label htmlFor="family-kinship">Parentesco</Label>
                   <Input
                     id="family-kinship"
+                    maxLength={MAX_KINSHIP}
                     value={values.kinship}
                     onChange={(e) => update("kinship", e.target.value)}
                     disabled={submitting}
@@ -414,6 +419,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                     type="number"
                     inputMode="numeric"
                     min="0"
+                    max={LIMITS.MAX_AGE}
                     step="1"
                     value={values.age}
                     onChange={(e) => update("age", e.target.value)}

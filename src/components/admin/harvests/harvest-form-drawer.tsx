@@ -14,18 +14,26 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError } from "@/lib/api";
-import { createHarvest, updateHarvest, type Harvest } from "@/lib/harvests";
+import { ApiError, isConcurrencyConflict } from "@/lib/api";
 import {
+  createHarvest,
+  harvestVersion,
+  updateHarvest,
+  type Harvest,
+} from "@/lib/harvests";
+import {
+  LIMITS,
   MAX_YEAR,
   MIN_YEAR,
   NAME_MIN_LENGTH_MESSAGE,
-  TEXT_MAX_LENGTH,
   isEndBeforeStart,
   isYearInRange,
 } from "@/lib/validation";
 
 const YEAR_RANGE_MESSAGE = `Informe uma data entre ${MIN_YEAR} e ${MAX_YEAR}`;
+
+export const HARVEST_CONFLICT_MESSAGE =
+  "Esta safra foi alterada por outra pessoa enquanto você editava. Os dados foram atualizados; feche e abra a edição novamente para continuar.";
 
 type Mode = "create" | "edit";
 
@@ -167,11 +175,20 @@ export function HarvestFormDrawer({
       if (mode === "create") {
         await createHarvest(payload);
       } else if (harvest) {
-        await updateHarvest(harvest.id, payload);
+        // Com a versão que estava na tela, o back recusa (409) se alguém
+        // mudou a safra depois — em vez de sobrescrever em silêncio.
+        await updateHarvest(harvest.id, payload, harvestVersion(harvest));
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError && isConcurrencyConflict(err)) {
+        // A lista por trás do drawer está desatualizada: recarrega para o
+        // usuário ver a versão atual antes de tentar de novo.
+        onSaved();
+        setFormError(HARVEST_CONFLICT_MESSAGE);
+        return;
+      }
       setFormError(
         err instanceof ApiError
           ? err.message
@@ -222,7 +239,7 @@ export function HarvestFormDrawer({
                 onBlur={() => handleBlur("label")}
                 placeholder="Ex.: Safra 2025/2026"
                 required
-                maxLength={TEXT_MAX_LENGTH}
+                maxLength={LIMITS.HARVEST_LABEL}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.label)}
               />

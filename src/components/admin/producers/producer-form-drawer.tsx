@@ -25,7 +25,11 @@ import {
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
-import { TEXT_MAX_LENGTH, isValidEmail, onlyDigits } from "@/lib/validation";
+import {
+  LIMITS,
+  isValidEmail,
+  onlyDigits,
+} from "@/lib/validation";
 import {
   parseProducerRegisterFieldErrors,
   registerProducer,
@@ -520,7 +524,7 @@ export function ProducerFormDrawer({
               >
                 <Input
                   id="producer-full-name"
-                  maxLength={TEXT_MAX_LENGTH}
+                  maxLength={LIMITS.FULL_NAME}
                   value={values.fullName}
                   onChange={(e) => update("fullName", e.target.value)}
                   onBlur={() => handleBlur("fullName")}
@@ -580,7 +584,7 @@ export function ProducerFormDrawer({
               >
                 <Input
                   id="producer-mother-name"
-                  maxLength={TEXT_MAX_LENGTH}
+                  maxLength={LIMITS.MOTHER_NAME}
                   value={values.motherName}
                   onChange={(e) => update("motherName", e.target.value)}
                   disabled={submitting}
@@ -590,7 +594,7 @@ export function ProducerFormDrawer({
               <Field id="producer-phone" label="Telefone">
                 <Input
                   id="producer-phone"
-                  maxLength={TEXT_MAX_LENGTH}
+                  maxLength={LIMITS.PHONE}
                   type="tel"
                   value={values.phone}
                   onChange={(e) => update("phone", e.target.value)}
@@ -602,7 +606,7 @@ export function ProducerFormDrawer({
               <Field id="producer-education-level" label="Escolaridade">
                 <Input
                   id="producer-education-level"
-                  maxLength={TEXT_MAX_LENGTH}
+                  maxLength={LIMITS.EDUCATION_LEVEL}
                   value={values.educationLevel}
                   onChange={(e) => update("educationLevel", e.target.value)}
                   disabled={submitting}
@@ -612,7 +616,7 @@ export function ProducerFormDrawer({
               <Field id="producer-origin" label="Origem" className={FULL_ROW}>
                 <Input
                   id="producer-origin"
-                  maxLength={TEXT_MAX_LENGTH}
+                  maxLength={LIMITS.ORIGIN}
                   value={values.origin}
                   onChange={(e) => update("origin", e.target.value)}
                   disabled={submitting}
@@ -626,7 +630,7 @@ export function ProducerFormDrawer({
                   <Field id="producer-email" label="E-mail" error={fieldErrors.email}>
                     <Input
                       id="producer-email"
-                      maxLength={TEXT_MAX_LENGTH}
+                      maxLength={LIMITS.EMAIL}
                       type="email"
                       value={values.email}
                       onChange={(e) => update("email", e.target.value)}
@@ -645,6 +649,7 @@ export function ProducerFormDrawer({
                   >
                     <Input
                       id="producer-password"
+                      maxLength={LIMITS.PASSWORD}
                       type="password"
                       value={values.password}
                       onChange={(e) => update("password", e.target.value)}
@@ -681,7 +686,7 @@ export function ProducerFormDrawer({
               >
                 <Input
                   id="producer-local-name"
-                  maxLength={TEXT_MAX_LENGTH}
+                  maxLength={LIMITS.LOCAL_NAME}
                   value={values.localName}
                   onChange={(e) => update("localName", e.target.value)}
                   disabled={submitting}
@@ -692,7 +697,7 @@ export function ProducerFormDrawer({
               <Field id="producer-street" label="Rua" className={FULL_ROW}>
                 <Input
                   id="producer-street"
-                  maxLength={TEXT_MAX_LENGTH}
+                  maxLength={LIMITS.STREET}
                   value={values.street}
                   onChange={(e) => update("street", e.target.value)}
                   disabled={submitting}
@@ -708,7 +713,7 @@ export function ProducerFormDrawer({
                 <Field id="producer-city" label="Cidade">
                   <Input
                     id="producer-city"
-                    maxLength={TEXT_MAX_LENGTH}
+                    maxLength={LIMITS.CITY}
                     value={values.city}
                     onChange={(e) => update("city", e.target.value)}
                     disabled={submitting}

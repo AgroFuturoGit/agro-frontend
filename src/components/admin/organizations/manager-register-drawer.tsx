@@ -20,7 +20,11 @@ import {
   parseManagerRegisterFieldErrors,
   registerManager,
 } from "@/lib/organizations";
-import { TEXT_MAX_LENGTH, isValidEmail, onlyDigits } from "@/lib/validation";
+import {
+  LIMITS,
+  isValidEmail,
+  onlyDigits,
+} from "@/lib/validation";
 
 type Props = {
   /** Organização de destino — sem seletor, já contextual à linha clicada. */
@@ -228,6 +232,7 @@ export function ManagerRegisterDrawer({
                   <Label htmlFor="manager-full-name">Nome completo</Label>
                   <Input
                     id="manager-full-name"
+                    maxLength={LIMITS.FULL_NAME}
                     value={values.fullName}
                     onChange={(e) => update("fullName", e.target.value)}
                     onBlur={() => handleBlur("fullName")}
@@ -248,7 +253,7 @@ export function ManagerRegisterDrawer({
                   <Input
                     id="manager-email"
                     type="email"
-                    maxLength={TEXT_MAX_LENGTH}
+                    maxLength={LIMITS.EMAIL}
                     value={values.email}
                     onChange={(e) => update("email", e.target.value)}
                     onBlur={() => handleBlur("email")}
@@ -268,6 +273,7 @@ export function ManagerRegisterDrawer({
                   <Label htmlFor="manager-password">Senha</Label>
                   <Input
                     id="manager-password"
+                    maxLength={LIMITS.PASSWORD}
                     type="password"
                     value={values.password}
                     onChange={(e) => update("password", e.target.value)}

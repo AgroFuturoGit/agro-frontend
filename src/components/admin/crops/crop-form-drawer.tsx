@@ -22,13 +22,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { ApiError, isConcurrencyConflict } from "@/lib/api";
 import {
   HARVEST_TYPES,
   HARVEST_TYPE_LABELS,
   MEASUREMENT_UNITS,
   UNIT_NAMES,
   createCrop,
+  cropVersion,
   parseCropFieldErrors,
   parseHarvestType,
   parseMeasurementUnit,
@@ -38,12 +39,18 @@ import {
   type MeasurementUnit,
 } from "@/lib/crops";
 import {
+  DIGITS,
+  LIMITS,
   NAME_MIN_LENGTH_MESSAGE,
-  TEXT_MAX_LENGTH,
+  digitsMessage,
+  exceedsDigits,
   formatDecimalInput,
   isPositiveIntegerDigits,
   parseDecimalBr,
 } from "@/lib/validation";
+
+export const CROP_CONFLICT_MESSAGE =
+  "Esta cultura foi alterada por outra pessoa enquanto você editava. Os dados foram atualizados; feche e abra a edição novamente para continuar.";
 
 type Mode = "create" | "edit";
 
@@ -127,12 +134,18 @@ function validateField(field: keyof FormValues, value: FormValues): string | nul
       if (!isPositiveIntegerDigits(value.cycleDays)) {
         return "Informe um número inteiro de dias maior que zero";
       }
+      if (Number(value.cycleDays.trim()) > LIMITS.MAX_CYCLE_DAYS) {
+        return `O ciclo deve ter no máximo ${LIMITS.MAX_CYCLE_DAYS} dias`;
+      }
       return null;
     }
     case "expectedProductivity": {
       const productivity = parseDecimalBr(value.expectedProductivity);
       if (!Number.isFinite(productivity) || productivity <= 0) {
         return "Informe uma produtividade maior que zero";
+      }
+      if (exceedsDigits(value.expectedProductivity, DIGITS.AMOUNT)) {
+        return digitsMessage(DIGITS.AMOUNT.integer, DIGITS.AMOUNT.fraction);
       }
       return null;
     }
@@ -148,6 +161,9 @@ function validateField(field: keyof FormValues, value: FormValues): string | nul
       const weight = parseDecimalBr(value.unitWeightKg);
       if (!Number.isFinite(weight) || weight <= 0) {
         return "Informe o peso da unidade (maior que zero)";
+      }
+      if (exceedsDigits(value.unitWeightKg, DIGITS.UNIT_WEIGHT)) {
+        return digitsMessage(DIGITS.UNIT_WEIGHT.integer, DIGITS.UNIT_WEIGHT.fraction);
       }
       return null;
     }
@@ -291,11 +307,20 @@ export function CropFormDrawer({
       if (mode === "create") {
         await createCrop(payload);
       } else if (crop) {
-        await updateCrop(crop.id, payload);
+        // Com a versão que estava na tela, o back recusa (409) se alguém
+        // mudou a cultura depois — em vez de sobrescrever em silêncio.
+        await updateCrop(crop.id, payload, cropVersion(crop));
       }
       onSaved();
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError && isConcurrencyConflict(err)) {
+        // A lista por trás do drawer está desatualizada: recarrega para o
+        // usuário ver a versão atual antes de tentar de novo.
+        onSaved();
+        setFormError(CROP_CONFLICT_MESSAGE);
+        return;
+      }
       if (err instanceof ApiError) {
         const apiFieldErrors = parseCropFieldErrors(err.payload);
         if (Object.keys(apiFieldErrors).length > 0) {
@@ -361,7 +386,7 @@ export function CropFormDrawer({
                 onChange={(e) => update("name", e.target.value)}
                 onBlur={() => handleBlur("name")}
                 required
-                maxLength={TEXT_MAX_LENGTH}
+                maxLength={LIMITS.CROP_NAME}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.name)}
               />
@@ -378,7 +403,7 @@ export function CropFormDrawer({
                 onChange={(e) => update("variety", e.target.value)}
                 onBlur={() => handleBlur("variety")}
                 required
-                maxLength={TEXT_MAX_LENGTH}
+                maxLength={LIMITS.CROP_VARIETY}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.variety)}
               />
