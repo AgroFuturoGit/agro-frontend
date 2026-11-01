@@ -50,6 +50,7 @@ import {
   type Financing,
   type FinancingStatus,
 } from "@/lib/farmer-social";
+import { DIGITS, LIMITS, digitsMessage, exceedsDigits } from "@/lib/validation";
 
 type Props = {
   farmerId: string;
@@ -60,7 +61,7 @@ type Props = {
 type FormValues = { description: string; status: string; amount: string };
 
 const EMPTY: FormValues = { description: "", status: "", amount: "" };
-const MAX_DESCRIPTION = 255;
+const MAX_DESCRIPTION = LIMITS.FINANCING_DESCRIPTION;
 
 const STATUS_STYLES: Record<FinancingStatus, string> = {
   PENDING: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
@@ -82,6 +83,8 @@ function validate(values: FormValues): Record<string, string> {
     const amount = parseAmountInput(values.amount);
     if (amount === null || amount < 0.01)
       errors.amount = "O valor deve ser maior que zero";
+    else if (exceedsDigits(values.amount.trim().replace(/^R\$\s*/, ""), DIGITS.MONEY))
+      errors.amount = digitsMessage(DIGITS.MONEY.integer, DIGITS.MONEY.fraction);
   }
   return errors;
 }
@@ -421,6 +424,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                   <Label htmlFor="financing-description">Descrição</Label>
                   <Input
                     id="financing-description"
+                    maxLength={MAX_DESCRIPTION}
                     value={values.description}
                     onChange={(e) => update("description", e.target.value)}
                     disabled={submitting}

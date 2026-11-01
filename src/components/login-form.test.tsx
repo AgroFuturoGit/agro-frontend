@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const replace = vi.fn();
@@ -21,6 +21,7 @@ vi.mock("@/lib/api", async (orig) => ({
   }),
 }));
 
+import { ApiError, apiRequest } from "@/lib/api";
 import { LoginForm } from "@/components/login-form";
 
 // O Node recente expõe um `localStorage` global próprio que sobrepõe o do jsdom
@@ -82,5 +83,67 @@ describe("LoginForm retorno ao from (UNIT-003)", () => {
   it("sem from vai para /admin", async () => {
     await submitWith("");
     expect(replace).toHaveBeenCalledWith("/admin");
+  });
+});
+
+describe("LoginForm com limite de tentativas 429 (UNIT-004)", () => {
+  const LIMIT_MESSAGE =
+    "Limite de tentativas de login excedido. Tente novamente mais tarde.";
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function submit429(retryAfterSeconds: number | null) {
+    vi.mocked(apiRequest).mockRejectedValueOnce(
+      new ApiError(429, LIMIT_MESSAGE, { message: LIMIT_MESSAGE }, retryAfterSeconds),
+    );
+    window.history.replaceState({}, "", "/login");
+    render(<LoginForm />);
+    await userEvent.type(screen.getByLabelText("E-mail"), "a@x.com");
+    await userEvent.type(document.querySelector("#password")!, "12345678");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+  }
+
+  it("mostra a mensagem do back com a contagem e bloqueia o botão até zerar", async () => {
+    await submit429(3);
+    expect(await screen.findByText(/Limite de tentativas de login excedido/)).toBeTruthy();
+    expect(screen.getByText(/Tente novamente em 3 s\./)).toBeTruthy();
+    const button = screen.getByRole("button", { name: "Entrar" }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getByText(/Tente novamente em 2 s\./)).toBeTruthy();
+    expect(button.disabled).toBe(true);
+
+    for (let i = 0; i < 2; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+    }
+    expect(screen.queryByText(/Tente novamente em/)).toBeNull();
+    expect((screen.getByRole("button", { name: "Entrar" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("sem Retry-After espera 60 s", async () => {
+    await submit429(null);
+    expect(await screen.findByText(/Tente novamente em 60 s\./)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Entrar" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("outros erros não bloqueiam o botão", async () => {
+    vi.mocked(apiRequest).mockRejectedValueOnce(new ApiError(401, "Credenciais inválidas", null));
+    window.history.replaceState({}, "", "/login");
+    render(<LoginForm />);
+    await userEvent.type(screen.getByLabelText("E-mail"), "a@x.com");
+    await userEvent.type(document.querySelector("#password")!, "12345678");
+    await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
+    expect(await screen.findByText("Credenciais inválidas")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Entrar" }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

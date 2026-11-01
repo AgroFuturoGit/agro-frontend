@@ -23,7 +23,11 @@ import {
   type ProductionExecution,
 } from "@/lib/production";
 import {
+  DIGITS,
+  LIMITS,
   MIN_POSITIVE_AMOUNT,
+  digitsMessage,
+  exceedsDigits,
   formatDecimalInput,
   isFutureDate,
   parseDecimalBr,
@@ -70,6 +74,8 @@ function validate(
   if (!Number.isFinite(value) || value < MIN_POSITIVE_AMOUNT) {
     errors.quantity =
       "Informe uma quantidade válida (use vírgula nos decimais; mínimo 0,01)";
+  } else if (exceedsDigits(values.quantity, DIGITS.AMOUNT)) {
+    errors.quantity = digitsMessage(DIGITS.AMOUNT.integer, DIGITS.AMOUNT.fraction);
   }
   if (!values.harvestedAt) errors.harvestedAt = "Informe a data da colheita";
   else if (
@@ -317,6 +323,7 @@ export function ExecutionFormDrawer({
               <Label htmlFor="execution-notes">Observações</Label>
               <Input
                 id="execution-notes"
+                maxLength={LIMITS.EXECUTION_NOTES}
                 value={values.notes}
                 onChange={(e) => update("notes", e.target.value)}
                 disabled={submitting}

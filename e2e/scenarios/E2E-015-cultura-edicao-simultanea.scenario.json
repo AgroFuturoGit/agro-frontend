@@ -1,0 +1,386 @@
+{
+  "schema_version": 1,
+  "id": "E2E-015",
+  "title": "Edição de cultura sem sobrescrever a de outra pessoa e com os limites do back",
+  "description": "Admin edita uma cultura normalmente; se outra pessoa salvou a mesma cultura enquanto a edição estava aberta, o drawer avisa do conflito, atualiza a lista e não reenvia sozinho. O nome para de crescer no limite do back (100 caracteres) e o gestor vê as culturas sem botões de escrita.",
+  "feature_slug": "alinhar-back-concorrencia-limites",
+  "ac_refs": [
+    "AC-002",
+    "AC-005",
+    "AC-007"
+  ],
+  "priority": "P0",
+  "tags": [
+    "culturas",
+    "concorrencia",
+    "limites"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "users": [
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      },
+      {
+        "role": "MANAGER",
+        "credentials_env": {
+          "email": "E2E_MANAGER_EMAIL",
+          "password": "E2E_MANAGER_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop (bfa3186 ou mais novo) rodando com as migrations aplicadas",
+      "Cultura 'Cultura E2E-015' cadastrada com todos os campos agronômicos",
+      "Gestor criado por POST /organizations/{id}/managers (admin)",
+      "Para a variante de conflito, o ambiente salva a mesma cultura por PATCH /crops/{id} durante a espera marcada no cenário (segunda sessão)"
+    ]
+  },
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Admin edita o nome da cultura e a lista mostra o novo nome",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin/culturas"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "placeholder",
+            "value": "Buscar por nome ou variedade…"
+          },
+          "value": "Cultura E2E-015"
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 1200,
+          "note": "debounce da busca da tabela"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar cultura"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome da cultura"
+          },
+          "value": "Cultura E2E-015 B"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar alterações"
+          }
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 1500,
+          "note": "o drawer fecha e a lista recarrega"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "placeholder",
+            "value": "Buscar por nome ou variedade…"
+          },
+          "value": "Cultura E2E-015 B"
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 1200,
+          "note": "debounce da busca da tabela"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Cultura E2E-015 B"
+          }
+        }
+      ]
+    },
+    {
+      "name": "conflito_409",
+      "title": "Outra pessoa salvou a cultura durante a edição: aviso de conflito e drawer aberto",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin/culturas"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "placeholder",
+            "value": "Buscar por nome ou variedade…"
+          },
+          "value": "Cultura E2E-015"
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 1200,
+          "note": "debounce da busca da tabela"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar cultura"
+          }
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 5000,
+          "note": "a segunda sessão salva a mesma cultura nesta janela"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Variedade"
+          },
+          "value": "Variedade da primeira aba"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Salvar alterações"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "visible",
+          "target": {
+            "by": "text",
+            "value": "Esta cultura foi alterada por outra pessoa enquanto você editava."
+          }
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "heading",
+            "name": "Editar cultura"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nome_acima_do_limite",
+      "title": "Nome com 101 caracteres fica com 100",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin/culturas"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Nova cultura"
+          }
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "Nome da cultura"
+          },
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "value",
+          "target": {
+            "by": "label",
+            "value": "Nome da cultura"
+          },
+          "value": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ]
+    },
+    {
+      "name": "gestor_sem_edicao",
+      "title": "Gestor vê as culturas sem botões de criar ou editar",
+      "as_user": "MANAGER",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_MANAGER_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_MANAGER_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin",
+          "note": "aguarda o redirecionamento pós-login"
+        },
+        {
+          "action": "goto",
+          "value": "/admin/culturas"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "placeholder",
+            "value": "Buscar por nome ou variedade…"
+          },
+          "value": "Cultura E2E-015"
+        },
+        {
+          "action": "wait",
+          "timeout_ms": 1200,
+          "note": "debounce da busca da tabela"
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Nova cultura"
+          }
+        },
+        {
+          "expect": "hidden",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Editar cultura"
+          }
+        }
+      ]
+    }
+  ]
+}

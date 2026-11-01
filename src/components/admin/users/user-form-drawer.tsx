@@ -25,8 +25,8 @@ import { ApiError } from "@/lib/api";
 import { persistSession, readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
+  LIMITS,
   NAME_MIN_LENGTH_MESSAGE,
-  TEXT_MAX_LENGTH,
   isValidEmail,
   onlyDigits,
 } from "@/lib/validation";
@@ -132,13 +132,12 @@ export function UserFormDrawer({
     if (isTechnician && !cpf) errors.cpf = "Informe o CPF";
     else if (cpf && !isValidCpf(cpf)) errors.cpf = "CPF inválido";
     if (isTechnician) {
-      const hasType = Boolean(values.registrationType);
-      const hasNumber = Boolean(values.registrationNumber.trim());
-      if (hasType && !hasNumber) {
-        errors.registrationNumber = "Informe o número do registro";
-      }
-      if (hasNumber && !hasType) {
+      // O back grava o número do registro como obrigatório (coluna NOT NULL).
+      if (!values.registrationType) {
         errors.registrationType = "Informe o tipo do registro";
+      }
+      if (!values.registrationNumber.trim()) {
+        errors.registrationNumber = "Informe o número do registro";
       }
     }
     return errors;
@@ -259,7 +258,7 @@ export function UserFormDrawer({
                 value={values.fullName}
                 onChange={(e) => update("fullName", e.target.value)}
                 required
-                maxLength={TEXT_MAX_LENGTH}
+                maxLength={LIMITS.FULL_NAME}
                 disabled={submitting}
                 autoComplete="name"
                 aria-invalid={Boolean(fieldErrors.fullName)}
@@ -279,7 +278,7 @@ export function UserFormDrawer({
                     value={values.email}
                     onChange={(e) => update("email", e.target.value)}
                     required
-                    maxLength={TEXT_MAX_LENGTH}
+                    maxLength={LIMITS.EMAIL}
                     disabled={submitting}
                     autoComplete="email"
                     aria-invalid={Boolean(fieldErrors.email)}
@@ -293,6 +292,7 @@ export function UserFormDrawer({
                   <Label htmlFor="password">Senha</Label>
                   <Input
                     id="password"
+                    maxLength={LIMITS.PASSWORD}
                     type="password"
                     value={values.password}
                     onChange={(e) => update("password", e.target.value)}
@@ -427,7 +427,7 @@ export function UserFormDrawer({
                     id="registrationNumber"
                     value={values.registrationNumber}
                     onChange={(e) => update("registrationNumber", e.target.value)}
-                    maxLength={TEXT_MAX_LENGTH}
+                    maxLength={LIMITS.REGISTRATION_NUMBER}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.registrationNumber)}
                   />
@@ -444,7 +444,7 @@ export function UserFormDrawer({
                     id="specialty"
                     value={values.specialty}
                     onChange={(e) => update("specialty", e.target.value)}
-                    maxLength={TEXT_MAX_LENGTH}
+                    maxLength={LIMITS.SPECIALTY}
                     disabled={submitting}
                   />
                 </div>

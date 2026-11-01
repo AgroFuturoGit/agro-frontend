@@ -246,6 +246,22 @@ describe("UserFormDrawer — criação por perfil (BR-007/BR-008)", () => {
     expect(registerUser).not.toHaveBeenCalled();
   });
 
+  it("UNIT-006: Técnico sem tipo e sem número do registro é bloqueado com os dois erros", async () => {
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+
+    await pickRole("Técnico");
+    await screen.findByLabelText("Tipo de registro");
+    fillBase();
+    fireEvent.change(screen.getByLabelText("CPF"), { target: { value: VALID_CPF } });
+    submit();
+
+    expect(await screen.findByText("Informe o tipo do registro")).toBeTruthy();
+    expect(screen.getByText("Informe o número do registro")).toBeTruthy();
+    expect(createTechnician).not.toHaveBeenCalled();
+  });
+
   it("UNIT-007: Técnico com tipo sem número também é bloqueado", async () => {
     render(
       <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={() => {}} />,
@@ -436,11 +452,16 @@ describe("UserFormDrawer — QA (UNIT-001/002/003/006/009)", () => {
     );
   });
 
-  it("UNIT-002: campos de texto têm maxLength 255", () => {
+  it("UNIT-005: campos de texto têm o maxLength do back", async () => {
     renderCreate();
-    for (const label of ["Nome completo", "E-mail"]) {
-      expect(screen.getByLabelText(label).getAttribute("maxlength")).toBe("255");
-    }
+    expect(screen.getByLabelText("Nome completo").getAttribute("maxlength")).toBe("150");
+    expect(screen.getByLabelText("E-mail").getAttribute("maxlength")).toBe("100");
+    expect(screen.getByLabelText("Senha").getAttribute("maxlength")).toBe("100");
+    await pickRole("Técnico");
+    expect(
+      (await screen.findByLabelText("Número do registro")).getAttribute("maxlength"),
+    ).toBe("50");
+    expect(screen.getByLabelText("Especialidade").getAttribute("maxlength")).toBe("100");
   });
 
   it("UNIT-003: e-mail sem domínio com ponto é recusado", async () => {

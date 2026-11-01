@@ -609,10 +609,21 @@ describe("ProducerFormDrawer — QA (UNIT-001 / UNIT-009)", () => {
     );
   });
 
-  it("UNIT-002: campos de texto têm maxLength 255", async () => {
+  it("UNIT-005: campos de texto têm o maxLength do back", async () => {
     renderDialog();
-    for (const label of ["Nome completo", "Nome da mãe", "E-mail"]) {
-      expect((await screen.findByLabelText(label)).getAttribute("maxlength")).toBe("255");
+    const expected: Record<string, string> = {
+      "Nome completo": "150",
+      "Nome da mãe": "150",
+      "E-mail": "100",
+      Senha: "100",
+      Telefone: "20",
+      Escolaridade: "100",
+      Origem: "100",
+      Rua: "100",
+      Cidade: "100",
+    };
+    for (const [label, max] of Object.entries(expected)) {
+      expect((await screen.findByLabelText(label)).getAttribute("maxlength")).toBe(max);
     }
   });
 

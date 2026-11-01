@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CropFormDrawer } from "@/components/admin/crops/crop-form-drawer";
 import { createCrop, updateCrop, type Crop } from "@/lib/crops";
+import { ApiError } from "@/lib/api";
 
 vi.mock("@/lib/crops", async () => {
   const actual = await vi.importActual<typeof import("@/lib/crops")>("@/lib/crops");
@@ -23,6 +24,8 @@ const BOX_CROP: Crop = {
   harvestType: "CONTINUOUS",
   unit: "BOX",
   unitWeightKg: 20,
+  createdAt: "2026-09-01T08:00:00.111111",
+  updatedAt: "2026-10-30T10:15:30.123456",
 };
 
 function renderForm(mode: "create" | "edit", crop?: Crop) {
@@ -168,16 +171,20 @@ describe("CropFormDrawer — payload completo (UNIT-007 / AC-002)", () => {
     submit();
 
     await waitFor(() =>
-      expect(updateCropMock).toHaveBeenCalledWith("c-1", {
-        name: "Tomate Cereja",
-        variety: "Italiano",
-        isPriority: true,
-        cycleDays: 90,
-        expectedProductivity: 1500,
-        harvestType: "CONTINUOUS",
-        unit: "BOX",
-        unitWeightKg: 20,
-      }),
+      expect(updateCropMock).toHaveBeenCalledWith(
+        "c-1",
+        {
+          name: "Tomate Cereja",
+          variety: "Italiano",
+          isPriority: true,
+          cycleDays: 90,
+          expectedProductivity: 1500,
+          harvestType: "CONTINUOUS",
+          unit: "BOX",
+          unitWeightKg: 20,
+        },
+        "2026-10-30T10:15:30.123456",
+      ),
     );
   });
 
@@ -201,10 +208,10 @@ describe("CropFormDrawer — payload completo (UNIT-007 / AC-002)", () => {
 });
 
 describe("CropFormDrawer — QA (UNIT-002 / UNIT-004)", () => {
-  it("limita nome e variedade a 255 caracteres", async () => {
+  it("limita nome e variedade a 100 caracteres (limite do back)", async () => {
     renderForm("create");
-    expect((await screen.findByLabelText("Nome da cultura")).getAttribute("maxlength")).toBe("255");
-    expect(screen.getByLabelText("Variedade").getAttribute("maxlength")).toBe("255");
+    expect((await screen.findByLabelText("Nome da cultura")).getAttribute("maxlength")).toBe("100");
+    expect(screen.getByLabelText("Variedade").getAttribute("maxlength")).toBe("100");
   });
 
   it("nome de 1 caractere mostra a mensagem de 2 caracteres; vazio pede o nome", async () => {
@@ -247,5 +254,113 @@ describe("CropFormDrawer — QA (UNIT-002 / UNIT-004)", () => {
     submit();
     expect(await screen.findByText("Informe uma produtividade maior que zero")).toBeTruthy();
     expect(updateCropMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("CropFormDrawer — concorrência (UNIT-001 / UNIT-002)", () => {
+  it("edição envia a versão recebida (updatedAt) como terceiro argumento", async () => {
+    updateCropMock.mockResolvedValue(BOX_CROP);
+    renderForm("edit", BOX_CROP);
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Tomate X" } });
+    submit();
+    await waitFor(() => expect(updateCropMock).toHaveBeenCalled());
+    expect(updateCropMock.mock.calls[0][2]).toBe("2026-10-30T10:15:30.123456");
+  });
+
+  it("sem updatedAt usa createdAt", async () => {
+    updateCropMock.mockResolvedValue(BOX_CROP);
+    renderForm("edit", { ...BOX_CROP, updatedAt: undefined });
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Tomate X" } });
+    submit();
+    await waitFor(() => expect(updateCropMock).toHaveBeenCalled());
+    expect(updateCropMock.mock.calls[0][2]).toBe("2026-09-01T08:00:00.111111");
+  });
+
+  it("criação não manda versão", async () => {
+    createCropMock.mockResolvedValue(BOX_CROP);
+    renderForm("create");
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Feijão" } });
+    fireEvent.change(screen.getByLabelText("Variedade"), { target: { value: "Carioca" } });
+    fireEvent.change(screen.getByLabelText("Produtividade esperada (kg/ha)"), { target: { value: "900" } });
+    await pickOption("Tipo de colheita", "Colheita única");
+    await pickOption("Unidade", "Quilograma (kg)");
+    submit();
+    await waitFor(() => expect(createCropMock).toHaveBeenCalled());
+    expect(createCropMock.mock.calls[0]).toHaveLength(1);
+  });
+
+  it("409 com current mostra o aviso, recarrega a lista, mantém o drawer aberto e não reenvia", async () => {
+    updateCropMock.mockRejectedValue(
+      new ApiError(409, "A cultura foi alterada por outro usuário depois que esta edição começou.", {
+        message: "A cultura foi alterada por outro usuário depois que esta edição começou.",
+        current: { id: "c-1" },
+      }),
+    );
+    const { onSaved, onOpenChange } = renderForm("edit", BOX_CROP);
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Tomate X" } });
+    submit();
+    expect(
+      await screen.findByText(/Esta cultura foi alterada por outra pessoa enquanto você editava\./),
+    ).toBeTruthy();
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(updateCropMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("409 sem current segue mostrando a mensagem do back", async () => {
+    updateCropMock.mockRejectedValue(new ApiError(409, "Operação conflita com dados existentes", {}));
+    const { onSaved } = renderForm("edit", BOX_CROP);
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Tomate X" } });
+    submit();
+    expect(await screen.findByText("Operação conflita com dados existentes")).toBeTruthy();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
+describe("CropFormDrawer — limites do back (UNIT-005)", () => {
+  async function fillValid() {
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Soja" } });
+    fireEvent.change(screen.getByLabelText("Variedade"), { target: { value: "Conv" } });
+    await pickOption("Tipo de colheita", "Colheita única");
+    await pickOption("Unidade", "Saca");
+  }
+
+  it("recusa produtividade com mais de 8 inteiros ou 2 decimais", async () => {
+    renderForm("create");
+    await fillValid();
+    fireEvent.change(screen.getByLabelText("Peso da unidade (kg)"), { target: { value: "60" } });
+    for (const bad of ["123456789", "1,234"]) {
+      fireEvent.change(screen.getByLabelText("Produtividade esperada (kg/ha)"), { target: { value: bad } });
+      submit();
+      expect(
+        await screen.findByText("Use no máximo 8 dígitos antes da vírgula e 2 depois."),
+      ).toBeTruthy();
+    }
+    expect(createCropMock).not.toHaveBeenCalled();
+  });
+
+  it("recusa peso da unidade com mais de 6 inteiros ou 3 decimais", async () => {
+    renderForm("create");
+    await fillValid();
+    fireEvent.change(screen.getByLabelText("Produtividade esperada (kg/ha)"), { target: { value: "900" } });
+    fireEvent.change(screen.getByLabelText("Peso da unidade (kg)"), { target: { value: "1,2345" } });
+    submit();
+    expect(
+      await screen.findByText("Use no máximo 6 dígitos antes da vírgula e 3 depois."),
+    ).toBeTruthy();
+    expect(createCropMock).not.toHaveBeenCalled();
+  });
+
+  it("recusa ciclo acima de 1000 dias e aceita 1000", async () => {
+    renderForm("edit", BOX_CROP);
+    const cycle = await screen.findByLabelText("Ciclo (dias) — opcional");
+    fireEvent.change(cycle, { target: { value: "1001" } });
+    submit();
+    expect(await screen.findByText("O ciclo deve ter no máximo 1000 dias")).toBeTruthy();
+    expect(updateCropMock).not.toHaveBeenCalled();
+    updateCropMock.mockResolvedValue(BOX_CROP);
+    fireEvent.change(cycle, { target: { value: "1000" } });
+    submit();
+    await waitFor(() => expect(updateCropMock).toHaveBeenCalled());
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Eye, EyeOff, Loader2, Mail } from "lucide-react";
 
@@ -24,11 +24,25 @@ export function resolvePostLoginPath(from: string | null): string {
   return "/admin";
 }
 
+/** Espera padrão quando o 429 vem sem o header `Retry-After`. */
+const DEFAULT_RETRY_SECONDS = 60;
+
 export function LoginForm({ className, ...props }: React.ComponentProps<"form">) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Segundos restantes do bloqueio por excesso de tentativas (429).
+  const [retryIn, setRetryIn] = useState(0);
+
+  useEffect(() => {
+    if (retryIn <= 0) return;
+    const timer = setTimeout(() => {
+      setRetryIn((current) => current - 1);
+      if (retryIn === 1) setError(null);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [retryIn]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,7 +65,10 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
       );
       router.refresh();
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status === 429) {
+        setError(err.message);
+        setRetryIn(err.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS);
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError("Não foi possível conectar ao servidor. Tente novamente.");
@@ -81,7 +98,13 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
           className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{error}</span>
+          <span>
+            {error}
+            {retryIn > 0 && (
+              // A contagem muda a cada segundo: fora do anúncio do leitor de tela.
+              <span aria-hidden="true">{` Tente novamente em ${retryIn} s.`}</span>
+            )}
+          </span>
         </div>
       )}
 
@@ -141,7 +164,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
 
       </div>
 
-      <Button type="submit" size="lg" disabled={submitting} className="h-10 w-full">
+      <Button type="submit" size="lg" disabled={submitting || retryIn > 0} className="h-10 w-full">
         {submitting ? (
           <>
             <Loader2 className="size-4 animate-spin" />

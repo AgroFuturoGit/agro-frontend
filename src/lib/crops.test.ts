@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiRequest } from "@/lib/api";
 import {
   createCrop,
+  cropVersion,
   getCrop,
   unitFactorKg,
   unitLabel,
@@ -108,6 +109,33 @@ describe("payload de escrita (UNIT-002)", () => {
       method: "PATCH",
       body: FULL_PAYLOAD,
     });
+  });
+});
+
+describe("baseUpdatedAt na edição (UNIT-001)", () => {
+  it("updateCrop envia baseUpdatedAt junto dos 8 campos", async () => {
+    apiRequestMock.mockResolvedValue(RAW_CROP);
+    await updateCrop("crop-1", FULL_PAYLOAD, "2026-10-30T10:15:30.123456");
+    expect(apiRequestMock).toHaveBeenCalledWith("/crops/crop-1", {
+      method: "PATCH",
+      body: { ...FULL_PAYLOAD, baseUpdatedAt: "2026-10-30T10:15:30.123456" },
+    });
+  });
+
+  it("createCrop nunca envia baseUpdatedAt", async () => {
+    apiRequestMock.mockResolvedValue(RAW_CROP);
+    await createCrop(FULL_PAYLOAD);
+    const body = apiRequestMock.mock.calls[0][1]?.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty("baseUpdatedAt");
+  });
+
+  it("cropVersion usa updatedAt, depois createdAt, e deixa a string intacta", () => {
+    expect(cropVersion({ updatedAt: "2026-10-30T10:15:30.123456", createdAt: "2026-01-01T00:00:00" })).toBe(
+      "2026-10-30T10:15:30.123456",
+    );
+    expect(cropVersion({ createdAt: "2026-01-01T00:00:00" })).toBe("2026-01-01T00:00:00");
+    expect(cropVersion({})).toBeUndefined();
+    expect(cropVersion(null)).toBeUndefined();
   });
 });
 

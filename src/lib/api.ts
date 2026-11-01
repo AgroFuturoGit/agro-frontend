@@ -6,11 +6,19 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 export class ApiError extends Error {
   status: number;
   payload: unknown;
+  /** Segundos pedidos pelo back no header `Retry-After` (429); nulo sem o header. */
+  retryAfterSeconds: number | null;
 
-  constructor(status: number, message: string, payload: unknown) {
+  constructor(
+    status: number,
+    message: string,
+    payload: unknown,
+    retryAfterSeconds: number | null = null,
+  ) {
     super(message);
     this.status = status;
     this.payload = payload;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -22,41 +30,25 @@ export const sessionNavigator = {
   },
 };
 
-const SESSION_ERROR_STATUSES = [401, 403, 500];
-
-let sessionCheck: Promise<void> | null = null;
-
 /**
- * O back responde 401, 403 ou 500 para token inválido, e 403 também para
- * permissão negada com token válido — o status sozinho não diz qual é.
- * Confere com `GET /auth/me` (uma conferência por vez, compartilhada) e só
- * encerra a sessão quando o back rejeita o token; erro de rede não encerra.
+ * O back responde 401 para token ausente, inválido ou vencido e 403 só para
+ * falta de permissão. No 401 a sessão acaba na hora: limpa o que ficou salvo
+ * e leva ao login, guardando a rota para voltar depois.
  */
-function checkSession(): Promise<void> {
-  if (sessionCheck) return sessionCheck;
-  sessionCheck = (async () => {
-    const token = readTokenFromCookie();
-    let valid = true;
-    try {
-      const response = await fetch(`${API_URL}/auth/me`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      // Só 401/403/500 indicam token rejeitado; 502/503/504 etc. são transitórios.
-      valid = response.ok || !SESSION_ERROR_STATUSES.includes(response.status);
-    } catch {
-      return;
-    }
-    if (valid) return;
-    clearSession();
-    void clearAppCaches();
-    const { pathname, search } = window.location;
-    if (pathname.startsWith("/login")) return;
-    const current = `${pathname}${search}`;
-    sessionNavigator.goToLogin(pathname.startsWith("/admin") ? current : null);
-  })().finally(() => {
-    sessionCheck = null;
-  });
-  return sessionCheck;
+function endSession() {
+  clearSession();
+  void clearAppCaches();
+  const { pathname, search } = window.location;
+  if (pathname.startsWith("/login")) return;
+  const current = `${pathname}${search}`;
+  sessionNavigator.goToLogin(pathname.startsWith("/admin") ? current : null);
+}
+
+/** `Retry-After` em segundos inteiros positivos; qualquer outra coisa vira nulo. */
+function parseRetryAfter(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value.trim())) return null;
+  const seconds = Number(value.trim());
+  return seconds > 0 ? seconds : null;
 }
 
 type RequestOptions = Omit<RequestInit, "body"> & {
@@ -104,15 +96,15 @@ export async function apiRequest<T = unknown>(
         "message" in payload
           ? String((payload as { message: unknown }).message)
           : null) ?? `Erro ${response.status}`;
-      if (
-        auth &&
-        SESSION_ERROR_STATUSES.includes(response.status) &&
-        path !== "/auth/me" &&
-        path !== "/auth/login"
-      ) {
-        await checkSession();
+      if (auth && response.status === 401 && path !== "/auth/login") {
+        endSession();
       }
-      throw new ApiError(response.status, message, payload);
+      throw new ApiError(
+        response.status,
+        message,
+        payload,
+        parseRetryAfter(response.headers.get("retry-after")),
+      );
     }
 
     return payload as T;

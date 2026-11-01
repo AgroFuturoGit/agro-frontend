@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  DIGITS,
+  LIMITS,
+  digitsMessage,
+  exceedsDigits,
   isEndBeforeStart,
   isFutureDate,
   isDecimalBr,
@@ -58,5 +62,33 @@ describe("validation", () => {
     expect(isEndBeforeStart("2026-05-01", "2026-04-30")).toBe(true);
     expect(isEndBeforeStart("2026-05-01", "2026-05-01")).toBe(false);
     expect(isEndBeforeStart("", "2026-05-01")).toBe(false);
+  });
+});
+
+describe("limites do back", () => {
+  it("exceedsDigits conta inteiros e decimais do @Digits", () => {
+    expect(exceedsDigits("12345678", DIGITS.AMOUNT)).toBe(false);
+    expect(exceedsDigits("123456789", DIGITS.AMOUNT)).toBe(true);
+    expect(exceedsDigits("1,25", DIGITS.AMOUNT)).toBe(false);
+    expect(exceedsDigits("1,255", DIGITS.AMOUNT)).toBe(true);
+    expect(exceedsDigits("1,500", DIGITS.AMOUNT)).toBe(false);
+    expect(exceedsDigits("0000001,5", DIGITS.AMOUNT)).toBe(false);
+    expect(exceedsDigits("1.234.567,89", DIGITS.AMOUNT)).toBe(false);
+    expect(exceedsDigits("123456,123", DIGITS.UNIT_WEIGHT)).toBe(false);
+    expect(exceedsDigits("1234567", DIGITS.UNIT_WEIGHT)).toBe(true);
+    expect(exceedsDigits("1,1234", DIGITS.UNIT_WEIGHT)).toBe(true);
+    expect(exceedsDigits("12345678901", DIGITS.MONEY)).toBe(true);
+    expect(exceedsDigits("abc", DIGITS.AMOUNT)).toBe(false);
+  });
+
+  it("digitsMessage descreve o limite", () => {
+    expect(digitsMessage(8, 2)).toBe("Use no máximo 8 dígitos antes da vírgula e 2 depois.");
+  });
+
+  it("limites nomeados batem com o back", () => {
+    expect(LIMITS.CROP_NAME).toBe(100);
+    expect(LIMITS.HARVEST_LABEL).toBe(100);
+    expect(LIMITS.MAX_CYCLE_DAYS).toBe(1000);
+    expect(LIMITS.EXECUTION_NOTES).toBe(500);
   });
 });

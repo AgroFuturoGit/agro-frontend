@@ -3,8 +3,8 @@ import type { Page } from "@playwright/test";
 
 /**
  * Sessão inválida (E2E mockado): a API é interceptada com `page.route()`.
- * O back real responde 500 para token inválido e 403 para permissão negada,
- * então o front confere a sessão com `GET /auth/me` antes de encerrá-la.
+ * O back responde 401 para token ausente, inválido ou vencido; o front
+ * encerra a sessão no primeiro 401, sem conferir `GET /auth/me`.
  */
 
 const ADMIN = {
@@ -32,7 +32,7 @@ test("token inválido em /admin/usuarios leva ao login com from e volta depois d
     if (loggedIn) {
       await route.fulfill({ status: 200, json: ADMIN });
     } else {
-      await route.fulfill({ status: 500, json: { message: "Token inválido" } });
+      await route.fulfill({ status: 401, json: { message: "Token inválido" } });
     }
   });
   await page.route("**/users*", async (route) => {
@@ -42,7 +42,7 @@ test("token inválido em /admin/usuarios leva ao login com from e volta depois d
         json: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 10 },
       });
     } else {
-      await route.fulfill({ status: 500, json: { message: "Token inválido" } });
+      await route.fulfill({ status: 401, json: { message: "Token inválido" } });
     }
   });
   await page.route("**/auth/login", async (route) => {

@@ -139,10 +139,28 @@ export function createCrop(payload: CropWritePayload) {
   }).then(mapCrop);
 }
 
-export function updateCrop(id: string, payload: CropWritePayload) {
+/**
+ * Versão do registro que a tela tem: `updatedAt`, ou `createdAt` quando a
+ * cultura nunca foi editada. A string segue exatamente como o back mandou.
+ */
+export function cropVersion(
+  crop: Pick<Crop, "updatedAt" | "createdAt"> | null | undefined,
+): string | undefined {
+  return crop?.updatedAt ?? crop?.createdAt ?? undefined;
+}
+
+/**
+ * `baseUpdatedAt` é a versão que o usuário viu ao abrir a edição: o back
+ * recusa com 409 se a cultura mudou depois disso.
+ */
+export function updateCrop(
+  id: string,
+  payload: CropWritePayload,
+  baseUpdatedAt?: string,
+) {
   return apiRequest<CropApiResponse>(`/crops/${id}`, {
     method: "PATCH",
-    body: payload,
+    body: baseUpdatedAt ? { ...payload, baseUpdatedAt } : payload,
   }).then(mapCrop);
 }
 

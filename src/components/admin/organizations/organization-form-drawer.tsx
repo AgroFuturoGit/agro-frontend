@@ -31,6 +31,7 @@ import {
   type Organization,
   type OrganizationType,
 } from "@/lib/organizations";
+import { LIMITS } from "@/lib/validation";
 
 type Mode = "create" | "edit";
 
@@ -236,6 +237,7 @@ export function OrganizationFormDrawer({
               <Label htmlFor="organization-name">Nome</Label>
               <Input
                 id="organization-name"
+                maxLength={LIMITS.ORGANIZATION_NAME}
                 value={values.name}
                 onChange={(e) => update("name", e.target.value)}
                 onBlur={() => handleBlur("name")}

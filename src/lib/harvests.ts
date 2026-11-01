@@ -5,6 +5,8 @@ export type Harvest = {
   label: string;
   startDate: string;
   endDate: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type HarvestWritePayload = {
@@ -18,15 +20,29 @@ type HarvestApiResponse = {
   label: string;
   startDate: string;
   endDate: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 };
 
-function mapHarvest(raw: HarvestApiResponse): Harvest {
+export function mapHarvest(raw: HarvestApiResponse): Harvest {
   return {
     id: raw.id,
     label: raw.label,
     startDate: raw.startDate,
     endDate: raw.endDate,
+    ...(raw.createdAt ? { createdAt: raw.createdAt } : {}),
+    ...(raw.updatedAt ? { updatedAt: raw.updatedAt } : {}),
   };
+}
+
+/**
+ * Versão do registro que a tela tem: `updatedAt`, ou `createdAt` quando a
+ * safra nunca foi editada. A string segue exatamente como o back mandou.
+ */
+export function harvestVersion(
+  harvest: Pick<Harvest, "updatedAt" | "createdAt"> | null | undefined,
+): string | undefined {
+  return harvest?.updatedAt ?? harvest?.createdAt ?? undefined;
 }
 
 export function listHarvests() {
@@ -48,10 +64,18 @@ export function createHarvest(payload: HarvestWritePayload) {
   }).then(mapHarvest);
 }
 
-export function updateHarvest(id: string, payload: HarvestWritePayload) {
+/**
+ * `baseUpdatedAt` é a versão que o usuário viu ao abrir a edição: o back
+ * recusa com 409 se a safra mudou depois disso.
+ */
+export function updateHarvest(
+  id: string,
+  payload: HarvestWritePayload,
+  baseUpdatedAt?: string,
+) {
   return apiRequest<HarvestApiResponse>(`/harvests/${id}`, {
     method: "PATCH",
-    body: payload,
+    body: baseUpdatedAt ? { ...payload, baseUpdatedAt } : payload,
   }).then(mapHarvest);
 }
 

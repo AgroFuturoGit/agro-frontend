@@ -35,7 +35,10 @@ import {
   type ProductionPlan,
 } from "@/lib/production";
 import {
+  DIGITS,
   MIN_POSITIVE_AMOUNT,
+  digitsMessage,
+  exceedsDigits,
   formatDecimalInput,
   parseDecimalBr,
 } from "@/lib/validation";
@@ -112,6 +115,8 @@ function validate(
   if (!Number.isFinite(area) || area < MIN_POSITIVE_AMOUNT) {
     errors.plantedArea =
       "Informe uma área válida (use vírgula nos decimais; mínimo 0,01)";
+  } else if (exceedsDigits(values.plantedArea, DIGITS.AMOUNT)) {
+    errors.plantedArea = digitsMessage(DIGITS.AMOUNT.integer, DIGITS.AMOUNT.fraction);
   }
   // Plantio dentro do intervalo da safra (só valida o que a safra informa).
   // Na edição, só se a data mudou: dado antigo inalterado não bloqueia.
