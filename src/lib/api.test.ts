@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiDownload, apiRequest, isConcurrencyConflict, parseFieldErrors, sessionNavigator } from "@/lib/api";
+import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -297,6 +297,87 @@ describe("apiDownload (UNIT-001)", () => {
   it("401 encerra a sessão", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => res(401, { message: "Token inválido" })));
     await expect(apiDownload("/x")).rejects.toMatchObject({ status: 401 });
+    expect(readTokenFromCookie()).toBeNull();
+    expect(goToLogin).toHaveBeenCalledWith("/admin");
+  });
+});
+
+describe("apiUpload (UNIT-001)", () => {
+  let goToLogin: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    installMemoryStorage();
+    persistSession({
+      token: "tok",
+      userResponseDTO: {
+        id: "1",
+        fullName: "A",
+        email: "a@x.com",
+        cpf: "1",
+        role: "FARMER",
+        dateOfBirth: null,
+      },
+    });
+    window.history.replaceState({}, "", "/admin");
+    goToLogin = vi.spyOn(sessionNavigator, "goToLogin").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function form() {
+    const data = new FormData();
+    data.append("file", new File(["x"], "a.png", { type: "image/png" }));
+    return data;
+  }
+
+  it("envia o FormData por POST com o token e sem Content-Type manual", async () => {
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () =>
+      res(201, { id: "att-1" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const data = form();
+
+    const result = await apiUpload<{ id: string }>("/production-executions/e1/attachments", data);
+
+    expect(result).toEqual({ id: "att-1" });
+    const init = fetchMock.mock.calls[0][1];
+    expect(init?.method).toBe("POST");
+    expect(init?.body).toBe(data);
+    const headers = new Headers(init?.headers);
+    expect(headers.get("Authorization")).toBe("Bearer tok");
+    expect(headers.has("Content-Type")).toBe(false);
+  });
+
+  it("400 vira ApiError com a mensagem do back", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        res(400, { message: "Formato não aceito. Envie a imagem como JPEG, PNG ou WebP." }),
+      ),
+    );
+    await expect(apiUpload("/x", form())).rejects.toMatchObject({
+      status: 400,
+      message: "Formato não aceito. Envie a imagem como JPEG, PNG ou WebP.",
+    });
+    expect(goToLogin).not.toHaveBeenCalled();
+  });
+
+  it("413 vira a mensagem do limite de 5 MB", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 413 })),
+    );
+    const err = await apiUpload("/x", form()).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ status: 413, message: "A imagem excede o limite de 5 MB." });
+  });
+
+  it("401 encerra a sessão", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => res(401, { message: "Token inválido" })));
+    await expect(apiUpload("/x", form())).rejects.toMatchObject({ status: 401 });
     expect(readTokenFromCookie()).toBeNull();
     expect(goToLogin).toHaveBeenCalledWith("/admin");
   });

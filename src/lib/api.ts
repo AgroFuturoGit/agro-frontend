@@ -211,6 +211,53 @@ export async function apiDownload(
   }
 }
 
+/**
+ * POST multipart autenticado. Não define `Content-Type`: o navegador monta o
+ * boundary. Erros seguem `apiRequest` (`toApiError`, 401 encerra a sessão); o
+ * 413 do limite multipart vira a mensagem de 5 MB. Devolve o JSON da resposta.
+ */
+export async function apiUpload<T = unknown>(
+  path: string,
+  formData: FormData,
+): Promise<T> {
+  const headers = new Headers();
+  const token = readTokenFromCookie();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  loadingStore.start();
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await toApiError(response, path, true);
+      if (response.status === 413) {
+        throw new ApiError(
+          413,
+          "A imagem excede o limite de 5 MB.",
+          error.payload,
+          error.retryAfterSeconds,
+        );
+      }
+      throw error;
+    }
+
+    const isJson = response.headers
+      .get("content-type")
+      ?.includes("application/json");
+    try {
+      return (isJson ? await response.json() : null) as T;
+    } catch {
+      throw new SyntaxError("Resposta da API inválida");
+    }
+  } finally {
+    loadingStore.stop();
+  }
+}
+
 /** Backend devolve erros de validação como "campo: mensagem; campo: mensagem". */
 export function parseFieldErrors(payload: unknown): Record<string, string> {
   const errors: Record<string, string> = {};

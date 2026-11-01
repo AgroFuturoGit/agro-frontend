@@ -14,6 +14,7 @@ import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getHarvestTimeline } from "@/lib/analytics";
 import { getMyProducer, listProducers } from "@/lib/producers";
+import { listAttachments } from "@/lib/attachments";
 import { listOccurrences } from "@/lib/occurrences";
 import {
   deleteProductionExecution,
@@ -52,6 +53,11 @@ vi.mock("@/lib/occurrences", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/occurrences")>("@/lib/occurrences");
   return { ...actual, listOccurrences: vi.fn() };
+});
+vi.mock("@/lib/attachments", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/attachments")>("@/lib/attachments");
+  return { ...actual, listAttachments: vi.fn() };
 });
 vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: vi.fn(() => false) }));
 
@@ -965,5 +971,58 @@ describe("PlanDetail — ocorrências do apontamento (UNIT-006)", () => {
     expect(
       await screen.findByRole("button", { name: "Adicionar ocorrência" }),
     ).toBeTruthy();
+  });
+});
+
+describe("PlanDetail — fotos do apontamento (UNIT-005)", () => {
+  const TWO = [
+    { ...EXECUTIONS[0], id: "execution-a", harvestedAt: "2026-04-02" },
+    { ...EXECUTIONS[0], id: "execution-b", harvestedAt: "2026-06-20" },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(listAttachments).mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
+
+  it.each(["ADMIN", "TECHNICIAN", "MANAGER", "FARMER"] as const)(
+    "%s: cada apontamento tem a ação Fotos, que abre o do apontamento certo",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(listProductionExecutions).mockResolvedValue(TWO);
+
+      renderPlanDetail();
+
+      await screen.findByText("20/06/2026");
+      const buttons = screen.getAllByRole("button", { name: "Fotos do apontamento" });
+      expect(buttons).toHaveLength(2);
+      fireEvent.click(buttons[0]);
+      await waitFor(() => expect(listAttachments).toHaveBeenCalledWith("execution-b"));
+      const sheet = await screen.findByRole("dialog");
+      expect(sheet).toHaveAttribute("data-slot", "sheet-content");
+      expect(sheet.textContent).toContain("Fotos do apontamento");
+      expect(await screen.findByText("Nenhuma foto anexada.")).toBeTruthy();
+      // Só quem escreve envia.
+      const canSend = role !== "MANAGER";
+      expect(!!screen.queryByRole("button", { name: "Enviar fotos" })).toBe(canSend);
+    },
+  );
+
+  it("mobile: o card também tem Fotos e abre o Sheet", async () => {
+    loginAs("MANAGER");
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    vi.mocked(listProductionExecutions).mockResolvedValue(TWO);
+
+    renderPlanDetail();
+
+    await screen.findByText("20/06/2026");
+    const buttons = screen.getAllByRole("button", { name: "Fotos" });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[1]);
+    await waitFor(() => expect(listAttachments).toHaveBeenCalledWith("execution-a"));
+    expect(screen.queryByRole("button", { name: "Enviar fotos" })).toBeNull();
   });
 });
