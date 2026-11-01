@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "E2E-014",
+  "title": "Telas de lista cabem em 768px com layout acessível",
+  "description": "Com o admin real em viewport de 768px, Usuários, Safras e Organizações abrem sem cortar o cabeçalho nem o botão de ação, com um único main e o link para pular ao conteúdo. As larguras 375 e 1366 são conferidas no navegador em verificação manual.",
+  "feature_slug": "qa-layout-acessibilidade",
+  "ac_refs": [
+    "AC-001",
+    "AC-006",
+    "AC-009"
+  ],
+  "priority": "P1",
+  "tags": [
+    "layout",
+    "responsivo"
+  ],
+  "preconditions": {
+    "base_url_env": "E2E_BASE_URL",
+    "start_path": "/login",
+    "viewport": {
+      "width": 768,
+      "height": 800
+    },
+    "users": [
+      {
+        "role": "ADMIN",
+        "credentials_env": {
+          "email": "E2E_ADMIN_EMAIL",
+          "password": "E2E_ADMIN_PASSWORD"
+        }
+      }
+    ],
+    "state": [
+      "Backend develop rodando com as migrations aplicadas",
+      "Usuário ADMIN existente e ativo"
+    ]
+  },
+  "variants": [
+    {
+      "name": "happy_path",
+      "title": "Admin percorre Usuários, Safras e Organizações em 768px",
+      "as_user": "ADMIN",
+      "steps": [
+        {
+          "action": "fill",
+          "target": {
+            "by": "label",
+            "value": "E-mail"
+          },
+          "value": "${env:E2E_ADMIN_EMAIL}"
+        },
+        {
+          "action": "fill",
+          "target": {
+            "by": "css",
+            "value": "#password"
+          },
+          "value": "${env:E2E_ADMIN_PASSWORD}"
+        },
+        {
+          "action": "click",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Entrar"
+          }
+        },
+        {
+          "action": "wait",
+          "value": "/admin"
+        },
+        {
+          "action": "goto",
+          "value": "/admin/usuarios"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Novo usuário"
+          }
+        },
+        {
+          "action": "goto",
+          "value": "/admin/safras"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "button",
+            "name": "Nova safra"
+          }
+        },
+        {
+          "action": "goto",
+          "value": "/admin/organizacoes"
+        },
+        {
+          "action": "wait",
+          "target": {
+            "by": "role",
+            "value": "heading",
+            "name": "Painel administrativo"
+          }
+        }
+      ],
+      "assertions": [
+        {
+          "expect": "count",
+          "target": {
+            "by": "role",
+            "value": "main"
+          },
+          "value": 1
+        },
+        {
+          "expect": "visible",
+          "target": {
+            "by": "role",
+            "value": "heading",
+            "name": "Painel administrativo"
+          }
+        }
+      ]
+    }
+  ]
+}

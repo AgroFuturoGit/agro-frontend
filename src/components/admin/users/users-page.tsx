@@ -17,6 +17,7 @@ import {
 } from "@tanstack/react-table";
 
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
@@ -185,6 +186,49 @@ export function UsersPage() {
     getPaginationRowModel: getPaginationRowModel(),
   });
 
+  function renderMobileCard(row: Row<User>) {
+    const user = row.original;
+    return (
+      <Card className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground">{user.fullName}</p>
+            <p className="mt-1 break-all text-sm text-muted-foreground">
+              {user.email}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {ROLE_LABELS[user.role as Role] ?? user.role}
+              {user.cpf ? ` · ${formatCpf(user.cpf)}` : ""}
+            </p>
+          </div>
+          {canManage && (
+            <div className="flex shrink-0 gap-1">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Editar usuário"
+                onClick={() => setEditTarget(user)}
+              >
+                <Pencil />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                aria-label="Excluir usuário"
+                onClick={() => setDeleteTarget(user)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 />
+              </Button>
+            </div>
+          )}
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
@@ -229,6 +273,7 @@ export function UsersPage() {
           table.resetColumnFilters();
         }}
         emptyTitle="Nenhum usuário cadastrado ainda."
+        renderMobileCard={renderMobileCard}
       />
 
       <DataTablePagination table={table} />

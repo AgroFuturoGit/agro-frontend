@@ -18,6 +18,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 
@@ -66,6 +67,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
   const [role, setRole] = useState<Role | null>(null);
 
   useEffect(() => {
@@ -89,7 +91,7 @@ export function SidebarNav() {
               tooltip={label}
               className="h-9"
               render={
-                <Link href={href}>
+                <Link href={href} onClick={() => setOpenMobile(false)}>
                   <Icon />
                   <span>{label}</span>
                 </Link>
