@@ -53,6 +53,16 @@ type Props = {
   canWrite: boolean;
 };
 
+/** Envio que não deu certo; `file` só existe quando vale tentar de novo (rede ou 5xx). */
+type UploadFailure = { key: string; name: string; message: string; file: File | null };
+
+const NO_ITEMS: ExecutionAttachment[] = [];
+
+/** Recusa de validação (4xx) não melhora reenviando o mesmo arquivo. */
+function isRetryable(err: unknown): boolean {
+  return !(err instanceof ApiError) || err.status >= 500;
+}
+
 function ErrorBox({ message }: { message: string }) {
   return (
     <div
@@ -78,14 +88,21 @@ export function ExecutionAttachmentsSheet({
 }: Props) {
   const executionId = execution?.id ?? null;
 
-  const [items, setItems] = useState<ExecutionAttachment[]>([]);
+  // A lista guarda de qual apontamento veio: ao trocar de `executionId` ela some
+  // no mesmo render, sem esperar o efeito, e nunca alimenta GETs com o id novo.
+  const [loaded, setLoaded] = useState<{
+    executionId: string;
+    items: ExecutionAttachment[];
+  } | null>(null);
+  const items =
+    loaded && loaded.executionId === executionId ? loaded.items : NO_ITEMS;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // id do anexo → Object URL da imagem; "error" quando a prévia falhou.
   const [previews, setPreviews] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState(false);
-  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [failures, setFailures] = useState<UploadFailure[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const [viewTarget, setViewTarget] = useState<ExecutionAttachment | null>(null);
@@ -96,6 +113,9 @@ export function ExecutionAttachmentsSheet({
   const inputRef = useRef<HTMLInputElement>(null);
   // Sequência da última carga: respostas de outro apontamento ou antigas são descartadas.
   const loadSeq = useRef(0);
+  // Sessão do sheet (abertura + apontamento): sobe ao fechar/trocar e descarta
+  // o que um envio iniciado antes ainda tentar gravar no estado.
+  const session = useRef(0);
   // Geração das miniaturas: sobe ao fechar/trocar e invalida downloads em andamento.
   const previewGen = useRef(0);
   const urls = useRef(new Map<string, string>());
@@ -115,7 +135,7 @@ export function ExecutionAttachmentsSheet({
     setError(null);
     try {
       const data = await listAttachments(executionId);
-      if (seq === loadSeq.current) setItems(data);
+      if (seq === loadSeq.current) setLoaded({ executionId, items: data });
     } catch (err) {
       if (seq !== loadSeq.current) return;
       setError(
@@ -129,17 +149,20 @@ export function ExecutionAttachmentsSheet({
   useEffect(() => {
     if (!open || !executionId) return;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setItems([]);
     setPreviews({});
-    setUploadErrors([]);
+    setFailures([]);
+    setUploading(false);
     setActionError(null);
     setViewTarget(null);
     setDeleteTarget(null);
     /* eslint-enable react-hooks/set-state-in-effect */
     refresh();
     return () => {
+      session.current += 1;
       loadSeq.current += 1;
       releasePreviews();
+      setLoaded(null);
+      setPreviews({});
     };
   }, [open, executionId, refresh, releasePreviews]);
 
@@ -167,21 +190,23 @@ export function ExecutionAttachmentsSheet({
     }
   }, [items, open, executionId]);
 
-  async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files ?? []);
-    event.target.value = "";
+  async function sendFiles(files: File[]) {
     if (!executionId || files.length === 0) return;
-
-    setUploadErrors([]);
+    const mine = session.current;
     setActionError(null);
     setUploading(true);
-    const errors: string[] = [];
+    const failed: UploadFailure[] = [];
     let count = items.length;
     let sent = false;
     for (const file of files) {
       const invalid = validateImageFile(file, count);
       if (invalid) {
-        errors.push(`${file.name}: ${invalid}`);
+        failed.push({
+          key: `${file.name}-${failed.length}`,
+          name: file.name,
+          message: `${file.name}: ${invalid}`,
+          file: null,
+        });
         continue;
       }
       try {
@@ -189,29 +214,63 @@ export function ExecutionAttachmentsSheet({
         count += 1;
         sent = true;
       } catch (err) {
-        errors.push(
-          `${file.name}: ${
+        failed.push({
+          key: `${file.name}-${failed.length}`,
+          name: file.name,
+          message: `${file.name}: ${
             err instanceof ApiError ? err.message : "Não foi possível enviar a foto."
           }`,
-        );
+          file: isRetryable(err) ? file : null,
+        });
       }
     }
-    setUploadErrors(errors);
+    // Fechou ou trocou de apontamento durante o envio: nada disto é do sheet atual.
+    if (mine !== session.current) return;
+    setFailures((prev) => [...prev, ...failed]);
     setUploading(false);
     if (sent) await refresh();
+  }
+
+  async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    setFailures([]);
+    await sendFiles(files);
+  }
+
+  async function handleRetry(failure: UploadFailure) {
+    if (!failure.file) return;
+    const file = failure.file;
+    setFailures((prev) => prev.filter((f) => f !== failure));
+    await sendFiles([file]);
   }
 
   async function handleDownload(item: ExecutionAttachment) {
     if (!executionId) return;
     setActionError(null);
     try {
-      const { blob } = await downloadAttachment(executionId, item.id, item.filename);
-      saveBlob(blob, item.filename);
+      const { blob, filename } = await downloadAttachment(
+        executionId,
+        item.id,
+        item.filename,
+      );
+      saveBlob(blob, filename);
     } catch (err) {
       setActionError(
         err instanceof ApiError ? err.message : "Não foi possível baixar a foto.",
       );
     }
+  }
+
+  function dropPreview(id: string) {
+    const url = urls.current.get(id);
+    if (url) URL.revokeObjectURL(url);
+    urls.current.delete(id);
+    setPreviews((prev) => {
+      const rest = { ...prev };
+      delete rest[id];
+      return rest;
+    });
   }
 
   async function handleDelete() {
@@ -220,11 +279,13 @@ export function ExecutionAttachmentsSheet({
     setDeleting(true);
     try {
       await deleteAttachment(executionId, deleteTarget.id);
+      dropPreview(deleteTarget.id);
       setDeleteTarget(null);
       await refresh();
     } catch (err) {
       if (err instanceof ApiError && (err.status === 404 || err.status === 400)) {
         // Foto já removida por outra pessoa: some da lista.
+        dropPreview(deleteTarget.id);
         setDeleteTarget(null);
         await refresh();
       } else {
@@ -396,8 +457,25 @@ export function ExecutionAttachmentsSheet({
           )}
 
           <div aria-live="polite" className="flex flex-col gap-2">
-            {uploadErrors.map((message) => (
-              <ErrorBox key={message} message={message} />
+            {failures.map((failure) => (
+              <div key={failure.key} className="flex flex-col gap-1">
+                <ErrorBox message={failure.message} />
+                {failure.file && (
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <strong>Falhou</strong>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Tentar novamente ${failure.name}`}
+                      onClick={() => handleRetry(failure)}
+                      disabled={uploading}
+                    >
+                      Tentar novamente
+                    </Button>
+                  </div>
+                )}
+              </div>
             ))}
             {actionError && <ErrorBox message={actionError} />}
           </div>

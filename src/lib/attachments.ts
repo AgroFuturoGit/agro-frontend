@@ -80,7 +80,7 @@ export function forgetClientId(file: File): void {
   clientIds.delete(file);
 }
 
-/** Envia uma imagem (parte `file`) com o `clientId` do arquivo; reenvio reusa o id. */
+/** Envia uma imagem (parte `file`) com o `clientId` do arquivo; reenvio reusa o id. Devolve null se o back respondeu 2xx sem corpo. */
 export function uploadAttachment(executionId: string, file: File) {
   const body = new FormData();
   body.append("file", file);
@@ -90,7 +90,8 @@ export function uploadAttachment(executionId: string, file: File) {
     body,
   ).then((raw) => {
     forgetClientId(file);
-    return mapAttachment(raw, executionId);
+    // 2xx sem corpo JSON: o anexo foi gravado; quem chama recarrega a lista.
+    return raw ? mapAttachment(raw, executionId) : null;
   });
 }
 

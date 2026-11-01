@@ -72,7 +72,7 @@ describe("attachments — rotas (UNIT-002)", () => {
       /^\/production-executions\/e-1\/attachments\?clientId=[0-9a-f-]{36}$/,
     );
     expect((body as FormData).get("file")).toBe(file);
-    expect(created.id).toBe("a-1");
+    expect(created?.id).toBe("a-1");
   });
 
   it("nova tentativa do mesmo arquivo reusa o clientId; após o sucesso gera outro", async () => {
@@ -84,6 +84,23 @@ describe("attachments — rotas (UNIT-002)", () => {
     const second = vi.mocked(api.apiUpload).mock.calls[1][0];
     expect(second).toBe(first);
     expect(clientIdFor(file)).not.toBe(first.split("clientId=")[1]);
+  });
+
+  it("reenvio após falha 5xx também reusa o clientId", async () => {
+    const file = img();
+    vi.mocked(api.apiUpload).mockRejectedValueOnce(new api.ApiError(503, "fora", null));
+    await expect(uploadAttachment("e-1", file)).rejects.toThrow("fora");
+    await uploadAttachment("e-1", file);
+    const [first, second] = vi.mocked(api.apiUpload).mock.calls.map((c) => c[0]);
+    expect(second).toBe(first);
+  });
+
+  it("2xx sem corpo não é erro: devolve null e libera o clientId", async () => {
+    const file = img();
+    vi.mocked(api.apiUpload).mockResolvedValueOnce(null);
+    const id = clientIdFor(file);
+    await expect(uploadAttachment("e-1", file)).resolves.toBeNull();
+    expect(clientIdFor(file)).not.toBe(id);
   });
 
   it("baixa pelo binário autenticado e exclui com DELETE", async () => {

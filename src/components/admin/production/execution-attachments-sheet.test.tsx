@@ -248,6 +248,40 @@ describe("ExecutionAttachmentsSheet — abrir, baixar e excluir (UNIT-003)", () 
     expect(vi.mocked(saveBlob).mock.calls[0][1]).toBe("foto-1.png");
   });
 
+  it("Baixar usa o nome saneado devolvido por apiDownload, não o nome cru da lista", async () => {
+    vi.mocked(listAttachments).mockResolvedValue([{ ...att(1), filename: "../../etc/foto.png" }]);
+    vi.mocked(downloadAttachment).mockResolvedValue({
+      blob: new Blob(["x"], { type: "image/png" }),
+      filename: "foto.png",
+    });
+    renderSheet(false);
+    await screen.findByAltText("../../etc/foto.png");
+    fireEvent.click(screen.getByRole("button", { name: "Baixar ../../etc/foto.png" }));
+    await waitFor(() => expect(saveBlob).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(saveBlob).mock.calls[0][1]).toBe("foto.png");
+  });
+
+  it("Excluir revoga a Object URL do anexo na hora", async () => {
+    let resolveList: (v: ExecutionAttachment[]) => void = () => {};
+    vi.mocked(listAttachments)
+      .mockResolvedValueOnce([att(1)])
+      .mockReturnValueOnce(
+        new Promise((r) => {
+          resolveList = r;
+        }),
+      );
+    vi.mocked(deleteAttachment).mockResolvedValue(undefined);
+    renderSheet(true);
+    await screen.findByAltText("foto-1.png");
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "Excluir foto-1.png" }));
+    const alert = await screen.findByRole("alertdialog");
+    fireEvent.click(within(alert).getByRole("button", { name: "Excluir" }));
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith("blob:preview-1"));
+    resolveList([]);
+    expect(await screen.findByText("Nenhuma foto anexada.")).toBeInTheDocument();
+  });
+
   it("Excluir pede confirmação e só então apaga e recarrega", async () => {
     vi.mocked(listAttachments).mockResolvedValueOnce([att(1)]).mockResolvedValueOnce([]);
     vi.mocked(deleteAttachment).mockResolvedValue(undefined);
@@ -319,5 +353,91 @@ describe("ExecutionAttachmentsSheet — Object URLs (UNIT-006)", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(createObjectURL).not.toHaveBeenCalled();
+  });
+});
+
+describe("ExecutionAttachmentsSheet — troca de apontamento (UNIT-001)", () => {
+  const other: ProductionExecution = { ...EXECUTION, id: "exec-2" };
+
+  it("envio que termina depois de fechar e reabrir em outro apontamento não mistura fotos", async () => {
+    let finishUpload: (v: ExecutionAttachment) => void = () => {};
+    vi.mocked(uploadAttachment).mockReturnValue(
+      new Promise((r) => {
+        finishUpload = r;
+      }),
+    );
+    vi.mocked(listAttachments).mockImplementation(async (id: string) =>
+      id === "exec-1" ? [att(1)] : [att(9, "exec-2")],
+    );
+    const { rerender, ui } = renderSheet(true);
+    await screen.findByAltText("foto-1.png");
+    fireEvent.change(input(), { target: { files: [file("nova.png", "image/png")] } });
+    await waitFor(() => expect(uploadAttachment).toHaveBeenCalledTimes(1));
+
+    rerender(ui(null, false));
+    rerender(ui(other, true));
+    expect(await screen.findByAltText("foto-9.png")).toBeInTheDocument();
+    const listCalls = vi.mocked(listAttachments).mock.calls.length;
+
+    finishUpload(att(2));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(screen.getByAltText("foto-9.png")).toBeInTheDocument();
+    expect(screen.queryByAltText("foto-1.png")).toBeNull();
+    expect(vi.mocked(listAttachments).mock.calls.length).toBe(listCalls);
+    // O envio do apontamento antigo não deixa o botão do novo preso em "Enviando…".
+    expect(screen.getByRole("button", { name: "Enviar fotos" })).toBeEnabled();
+  });
+
+  it("reabrir em outro apontamento não pede miniatura com o id do anterior", async () => {
+    vi.mocked(listAttachments).mockImplementation(async (id: string) =>
+      id === "exec-1" ? [att(1)] : [att(9, "exec-2")],
+    );
+    const { rerender, ui } = renderSheet(false);
+    await screen.findByAltText("foto-1.png");
+    rerender(ui(null, false));
+    rerender(ui(other, true));
+    await screen.findByAltText("foto-9.png");
+    expect(downloadAttachment).not.toHaveBeenCalledWith("exec-2", "a-1", expect.anything());
+  });
+});
+
+describe("ExecutionAttachmentsSheet — nova tentativa do envio (UNIT-003)", () => {
+  it("falha de rede lista a foto como Falhou e Tentar novamente reenvia o mesmo File", async () => {
+    vi.mocked(listAttachments).mockResolvedValueOnce([]).mockResolvedValueOnce([att(1)]);
+    vi.mocked(uploadAttachment)
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce(att(1));
+    renderSheet(true);
+    await screen.findByText("Nenhuma foto anexada.");
+    const png = file("nova.png", "image/png");
+    fireEvent.change(input(), { target: { files: [png] } });
+    expect(await screen.findByText("Falhou")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente nova.png" }));
+    expect(await screen.findByAltText("foto-1.png")).toBeInTheDocument();
+    expect(uploadAttachment).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(uploadAttachment).mock.calls[1][1]).toBe(png);
+    expect(screen.queryByText("Falhou")).toBeNull();
+  });
+
+  it("5xx também oferece nova tentativa", async () => {
+    vi.mocked(listAttachments).mockResolvedValue([]);
+    vi.mocked(uploadAttachment).mockRejectedValue(new ApiError(503, "Indisponível", null));
+    renderSheet(true);
+    await screen.findByText("Nenhuma foto anexada.");
+    fireEvent.change(input(), { target: { files: [file("x.png", "image/png")] } });
+    expect(
+      await screen.findByRole("button", { name: "Tentar novamente x.png" }),
+    ).toBeInTheDocument();
+  });
+
+  it.each([400, 413])("recusa %i não oferece nova tentativa", async (status) => {
+    vi.mocked(listAttachments).mockResolvedValue([]);
+    vi.mocked(uploadAttachment).mockRejectedValue(new ApiError(status, "Recusada", null));
+    renderSheet(true);
+    await screen.findByText("Nenhuma foto anexada.");
+    fireEvent.change(input(), { target: { files: [file("x.png", "image/png")] } });
+    expect(await screen.findByText("x.png: Recusada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Tentar novamente x\.png/ })).toBeNull();
   });
 });

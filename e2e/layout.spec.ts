@@ -75,13 +75,16 @@ test.describe("Layout responsivo", () => {
     await loginAsAdmin(page);
     await page.setViewportSize({ width: 375, height: 800 });
     await page.goto("/admin");
+    // Dev frio: clicar antes da hidratação não abre o menu.
+    await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "Alternar menu lateral" }).click();
     const menu = page.getByRole("dialog");
-    await expect(menu).toBeVisible();
+    await expect(menu).toBeVisible({ timeout: 15_000 });
 
     await menu.getByRole("link", { name: "Safras" }).click();
-    await expect(page).toHaveURL(/\/admin\/safras/);
+    // A primeira visita compila a rota (dev frio) e passa dos 5 s padrão.
+    await expect(page).toHaveURL(/\/admin\/safras/, { timeout: 30_000 });
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
