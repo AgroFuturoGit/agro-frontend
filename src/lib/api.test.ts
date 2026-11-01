@@ -249,6 +249,36 @@ describe("apiDownload (UNIT-001)", () => {
     expect((await apiDownload("/x")).filename).toBe("relatório-josé.pdf");
   });
 
+  it.each([
+    ["../../x.pdf", "x.pdf"],
+    ["a/b\\c.xlsx", "abc.xlsx"],
+    ["..", "relatorio"],
+    ["/.pdf", ".pdf"],
+  ])("sanitiza o nome %s", async (raw, expected) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => file({ "content-disposition": `attachment; filename="${raw}"` })),
+    );
+    expect((await apiDownload("/x")).filename).toBe(expected);
+  });
+
+  it("nome com 300 caracteres é limitado a 150", async () => {
+    const long = `${"a".repeat(296)}.pdf`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => file({ "content-disposition": `attachment; filename="${long}"` })),
+    );
+    expect((await apiDownload("/x")).filename).toHaveLength(150);
+  });
+
+  it("nome vazio após sanitizar cai em relatorio", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => file({ "content-disposition": "attachment; filename*=UTF-8''%2F..%2F" })),
+    );
+    expect((await apiDownload("/x")).filename).toBe("relatorio");
+  });
+
   it("sem header usa o nome padrão informado", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => file()));
     expect((await apiDownload("/x", "relatorio.xlsx")).filename).toBe("relatorio.xlsx");

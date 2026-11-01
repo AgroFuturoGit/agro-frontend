@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ChevronDown, Download, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -30,11 +30,22 @@ export function ExportMenu({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const running = useRef(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const wasBusy = useRef(false);
+
+  // Ao terminar a geração o foco volta ao botão (ele não fica `disabled`
+  // durante `busy`, só `aria-disabled`, para não perdê-lo).
+  useEffect(() => {
+    if (wasBusy.current && !busy) triggerRef.current?.focus();
+    wasBusy.current = busy;
+  }, [busy]);
 
   async function run(format: ExportFormat) {
     if (running.current) return;
     running.current = true;
+    setOpen(false);
     setBusy(true);
     setError(null);
     try {
@@ -50,9 +61,16 @@ export function ExportMenu({
 
   return (
     <div className="flex min-w-0 flex-col items-end gap-1">
-      <DropdownMenu>
+      <DropdownMenu
+        open={open && !busy}
+        onOpenChange={(next) => {
+          if (!busy) setOpen(next);
+        }}
+      >
         <DropdownMenuTrigger
-          disabled={disabled || busy}
+          ref={triggerRef}
+          disabled={disabled}
+          aria-disabled={busy || undefined}
           aria-busy={busy}
           aria-label="Exportar relatório"
           render={<Button type="button" variant="outline" />}

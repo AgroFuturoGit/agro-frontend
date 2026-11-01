@@ -65,6 +65,25 @@ describe("ExportMenu (UNIT-003)", () => {
     await act(async () => finish(file));
     await waitFor(() => expect(trigger.getAttribute("aria-busy")).toBe("false"));
     expect(screen.getByText("Exportar")).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("durante a geração usa aria-disabled (sem disabled) e o clique não abre o menu", async () => {
+    let finish: (v: typeof file) => void = () => {};
+    const onExport = vi.fn(
+      () => new Promise<typeof file>((resolve) => (finish = resolve)),
+    );
+    render(<ExportMenu onExport={onExport} />);
+    await openMenu();
+    await choose("PDF");
+    const trigger = await screen.findByRole("button", { name: "Exportar relatório" });
+    await waitFor(() => expect(trigger.getAttribute("aria-disabled")).toBe("true"));
+    expect((trigger as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("menuitem", { name: "PDF" })).toBeNull();
+    expect(onExport).toHaveBeenCalledTimes(1);
+    await act(async () => finish(file));
+    await waitFor(() => expect(trigger.hasAttribute("aria-disabled")).toBe(false));
   });
 
   it("mostra a mensagem do back e some no próximo clique", async () => {
