@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, parseFieldErrors, sessionNavigator } from "@/lib/api";
+import { ApiError, apiRequest, isConcurrencyConflict, parseFieldErrors, sessionNavigator } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -178,5 +178,14 @@ describe("Retry-After no ApiError (UNIT-004)", () => {
 
   it("ApiError criado à mão segue funcionando", () => {
     expect(new ApiError(400, "x", null).retryAfterSeconds).toBeNull();
+  });
+});
+
+describe("isConcurrencyConflict", () => {
+  it("só é verdadeiro para 409 com `current` no corpo", () => {
+    expect(isConcurrencyConflict(new ApiError(409, "x", { current: { id: "1" } }))).toBe(true);
+    expect(isConcurrencyConflict(new ApiError(409, "x", { message: "x" }))).toBe(false);
+    expect(isConcurrencyConflict(new ApiError(409, "x", null))).toBe(false);
+    expect(isConcurrencyConflict(new ApiError(400, "x", { current: {} }))).toBe(false);
   });
 });

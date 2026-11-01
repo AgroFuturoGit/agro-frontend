@@ -107,8 +107,10 @@ export function resolveAccess(params: {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 /**
- * Confere o token no back. `invalid` só quando o back responde com erro
- * HTTP; falha de rede é `unknown` e nunca prende o usuário fora do login.
+ * Confere o token no back. `invalid` só quando o back responde 401 (token
+ * ruim ou ausente; o `/auth/me` nunca devolve 403 por papel). Qualquer outro
+ * status (403, 500, 502...) ou falha de rede é `unknown` e nunca apaga a
+ * sessão nem prende o usuário fora do login.
  */
 async function validateToken(
   token: string,
@@ -119,8 +121,7 @@ async function validateToken(
       signal: AbortSignal.timeout(3000),
     });
     if (response.ok) return "valid";
-    // Só 401/403/500 indicam token rejeitado; 502/503/504 etc. são transitórios.
-    return [401, 403, 500].includes(response.status) ? "invalid" : "unknown";
+    return response.status === 401 ? "invalid" : "unknown";
   } catch {
     return "unknown";
   }

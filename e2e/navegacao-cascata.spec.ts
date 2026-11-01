@@ -288,6 +288,17 @@ async function mockPlansForProducer(page: Page, plans: unknown[] = [PLAN]) {
   });
 }
 
+async function mockFarmerExtras(page: Page) {
+  // A página do produtor também lista composição familiar e financiamentos;
+  // sem mock a chamada iria ao back real (e o teste mudaria com ele ligado).
+  await page.route("**/farmers/*/family-compositions*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.route("**/farmers/*/financings*", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+}
+
 async function mockPlanDetail(page: Page) {
   // Registrado ANTES das rotas mais específicas — no Playwright, o último
   // `page.route()` registrado tem prioridade, então os handlers de
@@ -304,6 +315,21 @@ async function mockPlanDetail(page: Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify(COMPARISON),
+    });
+  });
+  // Série semanal do gráfico (`/analytics/plans/{id}/timeline`): sem mock ia ao
+  // back real e, com token falso, a sessão era encerrada por um 401.
+  await page.route(`**/analytics/plans/${PLAN.id}/timeline*`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        planId: PLAN.id,
+        harvestType: "SINGLE",
+        granularity: "WEEK",
+        unit: "kg",
+        points: [],
+      }),
     });
   });
   await page.route(`**/production-plans/${PLAN.id}/executions`, async (route) => {
@@ -343,6 +369,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await mockCommunityById(page);
     await mockProducersList(page);
     await mockPlansForProducer(page);
+    await mockFarmerExtras(page);
     await mockPlanDetail(page);
 
     await page.goto("/admin/organizacoes");
@@ -468,6 +495,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await loginAs(page, "TECHNICIAN", TECHNICIAN_USER);
     await mockMyAssignedProducers(page);
     await mockPlansForProducer(page, [PLAN]);
+    await mockFarmerExtras(page);
     // `GET /communities/{id}` e `GET /farmers` continuam
     // `hasRole('MANAGER') or hasRole('ADMIN')` no backend real — o
     // breadcrumb da página de planos precisa tolerar o 403 e cair em
@@ -496,6 +524,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await loginAs(page, "FARMER", PRODUCER_USER);
     await mockMyProducer(page);
     await mockPlansForProducer(page, [PLAN]);
+    await mockFarmerExtras(page);
 
     await page.goto("/admin/organizacoes");
 
@@ -522,6 +551,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await mockCommunitiesList(page, []);
     await mockProducersList(page, []);
     await mockPlansForProducer(page, []);
+    await mockFarmerExtras(page);
 
     await page.goto(`/admin/organizacoes/${ORGANIZATION.id}`);
     await expect(
@@ -575,6 +605,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
         await mockMyAssignedProducers(page, []);
         await mockCommunitiesList(page, []);
         await mockPlansForProducer(page, []);
+    await mockFarmerExtras(page);
 
         await page.goto("/admin/organizacoes");
 

@@ -22,6 +22,17 @@ export class ApiError extends Error {
   }
 }
 
+/** 409 de edição simultânea: o back devolve o registro atual em `current`. */
+export function isConcurrencyConflict(err: ApiError): boolean {
+  const payload = err.payload;
+  return (
+    err.status === 409 &&
+    typeof payload === "object" &&
+    payload !== null &&
+    "current" in payload
+  );
+}
+
 /** Navegação isolada para poder ser trocada nos testes. */
 export const sessionNavigator = {
   goToLogin(from: string | null) {

@@ -130,8 +130,20 @@ describe("LoginForm com limite de tentativas 429 (UNIT-004)", () => {
     expect((screen.getByRole("button", { name: "Entrar" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("sem Retry-After espera 60 s", async () => {
+  it("anuncia o tempo uma vez em região polite e esconde a contagem visual", async () => {
+    await submit429(30);
+    const notice = await screen.findByText("Tente novamente em cerca de 30 segundos.");
+    expect(notice.closest('[aria-live="polite"]')).not.toBeNull();
+    expect(screen.getByText(/Tente novamente em 30 s\./).getAttribute("aria-hidden")).toBe("true");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(screen.getAllByText("Tente novamente em cerca de 30 segundos.")).toHaveLength(1);
+  });
+
+  it("sem Retry-After anuncia 'cerca de 1 minuto' e espera 60 s", async () => {
     await submit429(null);
+    expect(await screen.findByText("Aguarde cerca de 1 minuto e tente novamente.")).toBeTruthy();
     expect(await screen.findByText(/Tente novamente em 60 s\./)).toBeTruthy();
     expect((screen.getByRole("button", { name: "Entrar" }) as HTMLButtonElement).disabled).toBe(true);
   });

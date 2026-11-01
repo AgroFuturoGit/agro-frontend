@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { ApiError, isConcurrencyConflict } from "@/lib/api";
 import {
   HARVEST_TYPES,
   HARVEST_TYPE_LABELS,
@@ -51,17 +51,6 @@ import {
 
 export const CROP_CONFLICT_MESSAGE =
   "Esta cultura foi alterada por outra pessoa enquanto você editava. Os dados foram atualizados; feche e abra a edição novamente para continuar.";
-
-/** 409 de edição simultânea: o back devolve o registro atual em `current`. */
-function isConcurrencyConflict(err: ApiError): boolean {
-  const payload = err.payload;
-  return (
-    err.status === 409 &&
-    typeof payload === "object" &&
-    payload !== null &&
-    "current" in payload
-  );
-}
 
 type Mode = "create" | "edit";
 

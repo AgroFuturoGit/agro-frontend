@@ -34,6 +34,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
   const [error, setError] = useState<string | null>(null);
   // Segundos restantes do bloqueio por excesso de tentativas (429).
   const [retryIn, setRetryIn] = useState(0);
+  // Texto fixo do bloqueio, lido uma só vez pelo leitor de tela (a contagem
+  // visual muda a cada segundo e fica fora do anúncio).
+  const [retryNotice, setRetryNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (retryIn <= 0) return;
@@ -68,6 +71,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
       if (err instanceof ApiError && err.status === 429) {
         setError(err.message);
         setRetryIn(err.retryAfterSeconds ?? DEFAULT_RETRY_SECONDS);
+        setRetryNotice(
+          err.retryAfterSeconds != null
+            ? `Tente novamente em cerca de ${err.retryAfterSeconds} segundos.`
+            : "Aguarde cerca de 1 minuto e tente novamente.",
+        );
       } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
@@ -95,14 +103,18 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"form">)
       {error && (
         <div
           role="alert"
+          aria-live={retryIn > 0 ? "polite" : undefined}
           className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           <span>
             {error}
             {retryIn > 0 && (
-              // A contagem muda a cada segundo: fora do anúncio do leitor de tela.
-              <span aria-hidden="true">{` Tente novamente em ${retryIn} s.`}</span>
+              <>
+                <span className="sr-only">{` ${retryNotice}`}</span>
+                {/* A contagem muda a cada segundo: fora do anúncio do leitor de tela. */}
+                <span aria-hidden="true">{` Tente novamente em ${retryIn} s.`}</span>
+              </>
             )}
           </span>
         </div>

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError } from "@/lib/api";
+import { ApiError, isConcurrencyConflict } from "@/lib/api";
 import {
   createHarvest,
   harvestVersion,
@@ -34,17 +34,6 @@ const YEAR_RANGE_MESSAGE = `Informe uma data entre ${MIN_YEAR} e ${MAX_YEAR}`;
 
 export const HARVEST_CONFLICT_MESSAGE =
   "Esta safra foi alterada por outra pessoa enquanto você editava. Os dados foram atualizados; feche e abra a edição novamente para continuar.";
-
-/** 409 de edição simultânea: o back devolve o registro atual em `current`. */
-function isConcurrencyConflict(err: ApiError): boolean {
-  const payload = err.payload;
-  return (
-    err.status === 409 &&
-    typeof payload === "object" &&
-    payload !== null &&
-    "current" in payload
-  );
-}
 
 type Mode = "create" | "edit";
 
