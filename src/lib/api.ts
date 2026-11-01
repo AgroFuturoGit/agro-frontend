@@ -62,6 +62,40 @@ function parseRetryAfter(value: string | null): number | null {
   return seconds > 0 ? seconds : null;
 }
 
+/**
+ * Monta o `ApiError` de uma resposta com falha: lê o corpo (JSON ou texto),
+ * escolhe a mensagem, encerra a sessão no 401 (exceto no login) e guarda o
+ * `Retry-After`. Usado por `apiRequest` e `apiDownload`.
+ */
+async function toApiError(
+  response: Response,
+  path: string,
+  auth: boolean,
+): Promise<ApiError> {
+  const isJson = response.headers
+    .get("content-type")
+    ?.includes("application/json");
+  let payload: unknown = null;
+  try {
+    payload = isJson ? await response.json() : await response.text();
+  } catch {
+    // Corpo vazio ou inválido: segue com payload nulo (mensagem "Erro NNN").
+  }
+  const message =
+    (isJson && payload && typeof payload === "object" && "message" in payload
+      ? String((payload as { message: unknown }).message)
+      : null) ?? `Erro ${response.status}`;
+  if (auth && response.status === 401 && path !== "/auth/login") {
+    endSession();
+  }
+  return new ApiError(
+    response.status,
+    message,
+    payload,
+    parseRetryAfter(response.headers.get("retry-after")),
+  );
+}
+
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
   auth?: boolean;
@@ -88,6 +122,8 @@ export async function apiRequest<T = unknown>(
       body: body === undefined ? undefined : JSON.stringify(body),
     });
 
+    if (!response.ok) throw await toApiError(response, path, auth);
+
     const isJson = response.headers
       .get("content-type")
       ?.includes("application/json");
@@ -95,30 +131,81 @@ export async function apiRequest<T = unknown>(
     try {
       payload = isJson ? await response.json() : await response.text();
     } catch {
-      // Corpo vazio ou inválido: segue com payload nulo (mensagem "Erro NNN").
-      if (response.ok) throw new SyntaxError("Resposta da API inválida");
-    }
-
-    if (!response.ok) {
-      const message =
-        (isJson &&
-        payload &&
-        typeof payload === "object" &&
-        "message" in payload
-          ? String((payload as { message: unknown }).message)
-          : null) ?? `Erro ${response.status}`;
-      if (auth && response.status === 401 && path !== "/auth/login") {
-        endSession();
-      }
-      throw new ApiError(
-        response.status,
-        message,
-        payload,
-        parseRetryAfter(response.headers.get("retry-after")),
-      );
+      throw new SyntaxError("Resposta da API inválida");
     }
 
     return payload as T;
+  } finally {
+    loadingStore.stop();
+  }
+}
+
+/** Nome do arquivo no `Content-Disposition` (`filename*=UTF-8''…` ou `filename="…"`). */
+export function parseContentDispositionFilename(
+  header: string | null,
+): string | null {
+  if (!header) return null;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/i.exec(header);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].trim());
+    } catch {
+      // Codificação inválida: tenta a forma simples.
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/i.exec(header);
+  const name = (plain?.[1] ?? plain?.[2] ?? "").trim();
+  return name || null;
+}
+
+/**
+ * Defesa em profundidade: o back já sanitiza, mas o nome do header não é
+ * confiável. Remove separadores de caminho, controles e `..`, limita o
+ * tamanho e cai em `relatorio.<ext>` se nada sobrar.
+ */
+export function sanitizeFilename(name: string): string {
+  const ext = /\.([A-Za-z0-9]{1,8})$/.exec(name.trim())?.[1];
+  const clean = name
+    .replace(/[\\/\x00-\x1f\x7f]/g, "")
+    .replace(/\.{2,}/g, "")
+    .trim()
+    .slice(0, 150);
+  if (!clean || /^\.+$/.test(clean)) {
+    return ext ? `relatorio.${ext}` : "relatorio";
+  }
+  return clean;
+}
+
+export type DownloadResult = { blob: Blob; filename: string };
+
+/**
+ * GET autenticado que devolve um arquivo. Usa o nome do `Content-Disposition`
+ * ou `fallbackName`; erros JSON viram `ApiError` e o 401 encerra a sessão
+ * como em `apiRequest`.
+ */
+export async function apiDownload(
+  path: string,
+  fallbackName = "relatorio",
+): Promise<DownloadResult> {
+  const headers = new Headers();
+  const token = readTokenFromCookie();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  loadingStore.start();
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) throw await toApiError(response, path, true);
+
+    const blob = await response.blob();
+    const rawName = parseContentDispositionFilename(
+      response.headers.get("content-disposition"),
+    );
+    const filename = rawName ? sanitizeFilename(rawName) : fallbackName;
+    return { blob, filename };
   } finally {
     loadingStore.stop();
   }

@@ -1,4 +1,4 @@
-import { apiRequest } from "@/lib/api";
+import { apiDownload, apiRequest } from "@/lib/api";
 import type { PlanStatus } from "@/lib/production";
 import type { TimelineGranularity, TimelinePoint } from "@/lib/harvest-timeline";
 
@@ -621,4 +621,69 @@ export function getGlobalSummary(params: ManagementSummaryParams = {}) {
     `/analytics/global/summary${managementQuery(params, true)}`,
     { method: "GET" },
   ).then(mapManagementSummary);
+}
+
+export type ExportFormat = "pdf" | "xlsx";
+
+function exportQuery(
+  format: ExportFormat,
+  filters: Record<string, string | undefined>,
+): string {
+  const query = new URLSearchParams({ format });
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) query.set(key, value);
+  }
+  return `?${query.toString()}`;
+}
+
+/** `GET /analytics/farmers/me/summary/export` (só FARMER). */
+export function exportFarmerSummary(format: ExportFormat, harvestId?: string) {
+  return apiDownload(
+    `/analytics/farmers/me/summary/export${exportQuery(format, { harvestId })}`,
+    `relatorio.${format}`,
+  );
+}
+
+/** `GET /analytics/technicians/me/summary/export` (só TECHNICIAN). */
+export function exportTechnicianSummary(
+  format: ExportFormat,
+  params: TechnicianSummaryParams = {},
+) {
+  return apiDownload(
+    `/analytics/technicians/me/summary/export${exportQuery(format, {
+      harvestId: params.harvestId,
+      communityId: params.communityId,
+      cropId: params.cropId,
+    })}`,
+    `relatorio.${format}`,
+  );
+}
+
+/** `GET /analytics/organizations/me/summary/export` (só MANAGER). */
+export function exportManagerSummary(
+  format: ExportFormat,
+  params: ManagementSummaryParams = {},
+) {
+  return apiDownload(
+    `/analytics/organizations/me/summary/export${exportQuery(format, {
+      harvestId: params.harvestId,
+      communityId: params.communityId,
+    })}`,
+    `relatorio.${format}`,
+  );
+}
+
+/** `GET /analytics/global/summary/export` (só ADMIN). */
+export function exportGlobalSummary(
+  format: ExportFormat,
+  params: ManagementSummaryParams = {},
+) {
+  return apiDownload(
+    `/analytics/global/summary/export${exportQuery(format, {
+      harvestId: params.harvestId,
+      organizationId: params.organizationId,
+      communityId: params.communityId,
+    })}`,
+    `relatorio.${format}`,
+  );
 }

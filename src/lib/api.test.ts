@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiRequest, isConcurrencyConflict, parseFieldErrors, sessionNavigator } from "@/lib/api";
+import { ApiError, apiDownload, apiRequest, isConcurrencyConflict, parseFieldErrors, sessionNavigator } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -187,5 +187,117 @@ describe("isConcurrencyConflict", () => {
     expect(isConcurrencyConflict(new ApiError(409, "x", { message: "x" }))).toBe(false);
     expect(isConcurrencyConflict(new ApiError(409, "x", null))).toBe(false);
     expect(isConcurrencyConflict(new ApiError(400, "x", { current: {} }))).toBe(false);
+  });
+});
+
+describe("apiDownload (UNIT-001)", () => {
+  let goToLogin: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    installMemoryStorage();
+    persistSession({
+      token: "tok",
+      userResponseDTO: {
+        id: "1",
+        fullName: "A",
+        email: "a@x.com",
+        cpf: "1",
+        role: "ADMIN",
+        dateOfBirth: null,
+      },
+    });
+    window.history.replaceState({}, "", "/admin");
+    goToLogin = vi.spyOn(sessionNavigator, "goToLogin").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function file(headers: Record<string, string> = {}) {
+    return new Response("PDFDATA", {
+      status: 200,
+      headers: { "content-type": "application/pdf", ...headers },
+    });
+  }
+
+  it("devolve o Blob e o nome do Content-Disposition, enviando o token", async () => {
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async () =>
+      file({ "content-disposition": 'attachment; filename="relatorio-x.pdf"' }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { blob, filename } = await apiDownload("/analytics/x/export?format=pdf");
+
+    expect(filename).toBe("relatorio-x.pdf");
+    expect(await blob.text()).toBe("PDFDATA");
+    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(headers.get("Authorization")).toBe("Bearer tok");
+  });
+
+  it("entende filename* com acento", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        file({
+          "content-disposition":
+            "attachment; filename=\"relatorio-jose.pdf\"; filename*=UTF-8''relat%C3%B3rio-jos%C3%A9.pdf",
+        }),
+      ),
+    );
+    expect((await apiDownload("/x")).filename).toBe("relatório-josé.pdf");
+  });
+
+  it.each([
+    ["../../x.pdf", "x.pdf"],
+    ["a/b\\c.xlsx", "abc.xlsx"],
+    ["..", "relatorio"],
+    ["/.pdf", ".pdf"],
+  ])("sanitiza o nome %s", async (raw, expected) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => file({ "content-disposition": `attachment; filename="${raw}"` })),
+    );
+    expect((await apiDownload("/x")).filename).toBe(expected);
+  });
+
+  it("nome com 300 caracteres é limitado a 150", async () => {
+    const long = `${"a".repeat(296)}.pdf`;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => file({ "content-disposition": `attachment; filename="${long}"` })),
+    );
+    expect((await apiDownload("/x")).filename).toHaveLength(150);
+  });
+
+  it("nome vazio após sanitizar cai em relatorio", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => file({ "content-disposition": "attachment; filename*=UTF-8''%2F..%2F" })),
+    );
+    expect((await apiDownload("/x")).filename).toBe("relatorio");
+  });
+
+  it("sem header usa o nome padrão informado", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => file()));
+    expect((await apiDownload("/x", "relatorio.xlsx")).filename).toBe("relatorio.xlsx");
+    expect((await apiDownload("/x")).filename).toBe("relatorio");
+  });
+
+  it("erro JSON vira ApiError com a mensagem do back", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => res(400, { message: "Formato de exportação inválido" })));
+    await expect(apiDownload("/x")).rejects.toMatchObject({
+      status: 400,
+      message: "Formato de exportação inválido",
+    });
+    expect(goToLogin).not.toHaveBeenCalled();
+  });
+
+  it("401 encerra a sessão", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => res(401, { message: "Token inválido" })));
+    await expect(apiDownload("/x")).rejects.toMatchObject({ status: 401 });
+    expect(readTokenFromCookie()).toBeNull();
+    expect(goToLogin).toHaveBeenCalledWith("/admin");
   });
 });

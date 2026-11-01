@@ -21,7 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ExportMenu } from "@/components/admin/dashboard/export-menu";
 import {
+  exportFarmerSummary,
   getFarmerSummary,
   type FarmerPlanCard,
   type FarmerSummary,
@@ -353,7 +355,18 @@ export function FarmerDashboard() {
         <p className="text-sm text-muted-foreground">
           {summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : ""}
         </p>
-        {selector}
+        <div className="flex flex-wrap items-start gap-3">
+          {selector}
+          <ExportMenu
+            disabled={loading || error !== null}
+            onExport={(format) =>
+              exportFarmerSummary(
+                format,
+                harvestId === CURRENT ? undefined : harvestId,
+              )
+            }
+          />
+        </div>
       </div>
       {body}
     </div>

@@ -15,6 +15,7 @@ import { CommunityBarChart } from "@/components/admin/dashboard/community-bar-ch
 import { WarningCard } from "@/components/admin/dashboard/warning-card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { ExportMenu } from "@/components/admin/dashboard/export-menu";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  exportTechnicianSummary,
   getTechnicianSummary,
   type TechnicianFarmerSummary,
   type TechnicianSummary,
@@ -396,6 +398,16 @@ export function TechnicianDashboard() {
           { value: ALL, label: "Todas" },
           ...crops.map((c) => ({ value: c.id, label: c.name })),
         ]}
+      />
+      <ExportMenu
+        disabled={loading || error !== null}
+        onExport={(format) =>
+          exportTechnicianSummary(format, {
+            harvestId: harvestId === CURRENT ? undefined : harvestId,
+            communityId: communityId === ALL ? undefined : communityId,
+            cropId: cropId === ALL ? undefined : cropId,
+          })
+        }
       />
     </div>
   );

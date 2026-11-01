@@ -16,6 +16,7 @@ import { CommunityTargetChart } from "@/components/admin/dashboard/community-tar
 import { CropShareChart } from "@/components/admin/dashboard/crop-share-chart";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { ExportMenu } from "@/components/admin/dashboard/export-menu";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,6 +34,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  exportGlobalSummary,
+  exportManagerSummary,
   getGlobalSummary,
   getManagerSummary,
   type ManagementCropRankingItem,
@@ -482,6 +485,21 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
         onChange={setCommunityId}
         disabled={!communitiesOrgId}
         options={[{ value: ALL, label: "Todas" }, ...communityOptions]}
+      />
+      <ExportMenu
+        disabled={loading || error !== null}
+        onExport={(format) => {
+          const params = {
+            harvestId: harvestId === CURRENT ? undefined : harvestId,
+            communityId: communityId === ALL ? undefined : communityId,
+          };
+          return isAdmin
+            ? exportGlobalSummary(format, {
+                ...params,
+                organizationId: organizationId === ALL ? undefined : organizationId,
+              })
+            : exportManagerSummary(format, params);
+        }}
       />
     </div>
   );

@@ -10,6 +10,8 @@ import {
 
 import { ManagementDashboard } from "@/components/admin/dashboard/management-dashboard";
 import {
+  exportGlobalSummary,
+  exportManagerSummary,
   getGlobalSummary,
   getManagerSummary,
   type ManagementSummary,
@@ -19,7 +21,10 @@ import { listCommunities } from "@/lib/communities";
 import { listHarvests } from "@/lib/harvests";
 import { listOrganizations } from "@/lib/organizations";
 
+vi.mock("@/lib/download", () => ({ saveBlob: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({
+  exportGlobalSummary: vi.fn(),
+  exportManagerSummary: vi.fn(),
   getGlobalSummary: vi.fn(),
   getManagerSummary: vi.fn(),
 }));
@@ -548,5 +553,89 @@ describe("ManagementDashboard — paginação das tabelas (6.3)", () => {
     fireEvent.keyDown(target, { key: "Enter" });
     fireEvent.keyUp(target, { key: "Enter" });
     await waitFor(() => expect(bodyRows("crop-ranking")).toHaveLength(20));
+  });
+});
+
+async function exportAs(name: string) {
+  const trigger = screen.getByRole("button", { name: "Exportar relatório" });
+  fireEvent.click(trigger);
+  fireEvent.click(await screen.findByRole("menuitem", { name }));
+}
+
+describe("ManagementDashboard — exportação (UNIT-005)", () => {
+  const file = { blob: new Blob(["x"]), filename: "r.pdf" };
+
+  it("gestor exporta pela organização do token e nunca chama o global", async () => {
+    vi.mocked(exportManagerSummary).mockResolvedValue(file);
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("mgmt-scope-title");
+
+    await exportAs("PDF");
+    await waitFor(() =>
+      expect(exportManagerSummary).toHaveBeenLastCalledWith("pdf", {
+        harvestId: undefined,
+        communityId: undefined,
+      }),
+    );
+    await waitFor(() => expect(listCommunities).toHaveBeenCalledWith("o-1"));
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Comunidade" }).hasAttribute("disabled")).toBe(false),
+    );
+    await choose("Comunidade", "Alto da Serra");
+    await screen.findByTestId("mgmt-scope-title");
+    await waitFor(() =>
+      expect(getManagerSummary).toHaveBeenLastCalledWith({ harvestId: undefined, communityId: "c-1" }),
+    );
+    await exportAs("Excel (.xlsx)");
+    await waitFor(() =>
+      expect(exportManagerSummary).toHaveBeenLastCalledWith("xlsx", {
+        harvestId: undefined,
+        communityId: "c-1",
+      }),
+    );
+    expect(exportGlobalSummary).not.toHaveBeenCalled();
+  });
+
+  it("admin exporta pelo global com a organização filtrada e nunca chama a do gestor", async () => {
+    vi.mocked(exportGlobalSummary).mockResolvedValue(file);
+    render(<ManagementDashboard role="ADMIN" />);
+    await screen.findByTestId("mgmt-scope-title");
+
+    await exportAs("PDF");
+    await waitFor(() =>
+      expect(exportGlobalSummary).toHaveBeenLastCalledWith("pdf", {
+        harvestId: undefined,
+        communityId: undefined,
+        organizationId: undefined,
+      }),
+    );
+
+    await waitFor(() => expect(listOrganizations).toHaveBeenCalled());
+    await choose("Organização", "Cooperativa Sol");
+    await waitFor(() =>
+      expect(getGlobalSummary).toHaveBeenLastCalledWith({
+        harvestId: undefined,
+        organizationId: "o-1",
+        communityId: undefined,
+      }),
+    );
+    await screen.findByTestId("mgmt-scope-title");
+    await exportAs("Excel (.xlsx)");
+    await waitFor(() =>
+      expect(exportGlobalSummary).toHaveBeenLastCalledWith("xlsx", {
+        harvestId: undefined,
+        communityId: undefined,
+        organizationId: "o-1",
+      }),
+    );
+    expect(exportManagerSummary).not.toHaveBeenCalled();
+  });
+
+  it("fica desabilitado com o painel em erro", async () => {
+    vi.mocked(getManagerSummary).mockRejectedValue(new ApiError(500, "falhou", null));
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByText("falhou");
+    const trigger = screen.getByRole("button", { name: "Exportar relatório" });
+    expect(trigger.hasAttribute("disabled") || trigger.hasAttribute("data-disabled")).toBe(true);
   });
 });
