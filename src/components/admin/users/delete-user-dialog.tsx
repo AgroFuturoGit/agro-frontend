@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
+import { deleteTechnician, listTechnicians } from "@/lib/technicians";
 import { deleteUser, type User } from "@/lib/users";
 
 type Props = {
@@ -23,9 +24,30 @@ type Props = {
   onDeleted: () => void;
 };
 
+/**
+ * O back recusa (409) `DELETE /users/{id}` de quem tem perfil. O FARMER sai pela
+ * comunidade e o MANAGER ainda não tem rota de exclusão.
+ */
+const BLOCKED_REASON: Partial<Record<User["role"], string>> = {
+  FARMER:
+    "Agricultores são excluídos na tela da comunidade, junto com o perfil de produtor.",
+  MANAGER: "O sistema ainda não permite excluir gestores.",
+};
+
+/** O técnico sai pelo próprio perfil; usuário antigo sem perfil, pela rota de usuário. */
+async function removeUser(user: User) {
+  if (user.role === "TECHNICIAN") {
+    const technicians = await listTechnicians();
+    const profile = technicians.find((item) => item.user?.id === user.id);
+    if (profile) return deleteTechnician(profile.id);
+  }
+  return deleteUser(user.id);
+}
+
 export function DeleteUserDialog({ user, open, onOpenChange, onDeleted }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const blockedReason = user ? BLOCKED_REASON[user.role] : undefined;
 
   // Sempre que o diálogo abre, descarta o erro e o envio da abertura anterior.
   useEffect(() => {
@@ -40,7 +62,7 @@ export function DeleteUserDialog({ user, open, onOpenChange, onDeleted }: Props)
     setError(null);
     setSubmitting(true);
     try {
-      await deleteUser(user.id);
+      await removeUser(user);
       onDeleted();
       onOpenChange(false);
     } catch (err) {
@@ -62,11 +84,15 @@ export function DeleteUserDialog({ user, open, onOpenChange, onDeleted }: Props)
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir usuário</AlertDialogTitle>
           <AlertDialogDescription>
-            Esta ação removerá{" "}
-            <span className="font-medium text-foreground">
-              {user?.fullName ?? "o usuário"}
-            </span>{" "}
-            do sistema. Não é possível desfazer.
+            {blockedReason ?? (
+              <>
+                Esta ação removerá{" "}
+                <span className="font-medium text-foreground">
+                  {user?.fullName ?? "o usuário"}
+                </span>{" "}
+                do sistema. Não é possível desfazer.
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -81,21 +107,25 @@ export function DeleteUserDialog({ user, open, onOpenChange, onDeleted }: Props)
         )}
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Excluindo…
-              </>
-            ) : (
-              "Excluir"
-            )}
-          </AlertDialogAction>
+          <AlertDialogCancel disabled={submitting}>
+            {blockedReason ? "Fechar" : "Cancelar"}
+          </AlertDialogCancel>
+          {!blockedReason && (
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleConfirm}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="animate-spin" />
+                  Excluindo…
+                </>
+              ) : (
+                "Excluir"
+              )}
+            </AlertDialogAction>
+          )}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
