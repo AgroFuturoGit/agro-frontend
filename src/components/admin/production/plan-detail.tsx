@@ -105,6 +105,13 @@ function canDecideExecution(role: Role | null, execution: ProductionExecution) {
   );
 }
 
+// Fotos e ocorrências: o back recusa (403) a escrita do FARMER em apontamento
+// VALIDATED; ADMIN e TECHNICIAN seguem podendo complementar a evidência.
+function canWriteEvidence(role: Role | null, execution: ProductionExecution | null) {
+  if (role === "FARMER") return execution?.status !== "VALIDATED";
+  return role === "ADMIN" || role === "TECHNICIAN";
+}
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -727,7 +734,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         onOpenChange={(open) => {
           if (!open) setOccurrencesTarget(null);
         }}
-        canWrite={canWrite}
+        canWrite={canWriteEvidence(currentRole, occurrencesTarget)}
       />
 
       <ExecutionAttachmentsSheet
@@ -736,7 +743,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         onOpenChange={(open) => {
           if (!open) setAttachmentsTarget(null);
         }}
-        canWrite={canWrite}
+        canWrite={canWriteEvidence(currentRole, attachmentsTarget)}
       />
 
       {canWrite && (

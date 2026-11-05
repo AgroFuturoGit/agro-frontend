@@ -1026,3 +1026,64 @@ describe("PlanDetail — fotos do apontamento (UNIT-005)", () => {
     expect(screen.queryByRole("button", { name: "Enviar fotos" })).toBeNull();
   });
 });
+
+describe("PlanDetail — evidências de apontamento validado", () => {
+  const VALIDATED_ONLY = [ALL_STATUSES[1]];
+
+  async function addOccurrenceAfterOpen() {
+    await screen.findByText("Validado");
+    fireEvent.click(screen.getByRole("button", { name: "Ocorrências do apontamento" }));
+    await waitFor(() => expect(listOccurrences).toHaveBeenCalled());
+    const addOccurrence = screen.queryByRole("button", { name: "Adicionar ocorrência" });
+    cleanup();
+    return addOccurrence;
+  }
+
+  async function attachmentInputAfterOpen() {
+    await screen.findByText("Validado");
+    fireEvent.click(screen.getByRole("button", { name: "Fotos do apontamento" }));
+    await waitFor(() => expect(listAttachments).toHaveBeenCalled());
+    return screen.queryByTestId("attachment-input");
+  }
+
+  beforeEach(() => {
+    vi.mocked(listOccurrences).mockResolvedValue([]);
+    vi.mocked(listAttachments).mockResolvedValue([]);
+  });
+
+  it("FARMER: não adiciona ocorrência nem envia foto em apontamento validado", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue(VALIDATED_ONLY);
+
+    renderPlanDetail();
+    expect(await addOccurrenceAfterOpen()).toBeNull();
+
+    renderPlanDetail();
+    expect(await attachmentInputAfterOpen()).toBeNull();
+  });
+
+  it.each(["ADMIN", "TECHNICIAN"] as const)(
+    "%s: continua escrevendo evidências em apontamento validado",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(listProductionExecutions).mockResolvedValue(VALIDATED_ONLY);
+
+      renderPlanDetail();
+      expect(await addOccurrenceAfterOpen()).not.toBeNull();
+
+      renderPlanDetail();
+      expect(await attachmentInputAfterOpen()).not.toBeNull();
+    },
+  );
+
+  it("FARMER: continua escrevendo evidências em apontamento rejeitado", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue([ALL_STATUSES[2]]);
+
+    renderPlanDetail();
+    await screen.findByText("Rejeitado");
+    fireEvent.click(screen.getByRole("button", { name: "Fotos do apontamento" }));
+    await waitFor(() => expect(listAttachments).toHaveBeenCalled());
+    expect(screen.queryByTestId("attachment-input")).not.toBeNull();
+  });
+});

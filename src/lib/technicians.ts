@@ -50,4 +50,13 @@ export function createTechnician(payload: TechnicianRegisterPayload) {
   });
 }
 
+export function listTechnicians() {
+  return apiRequest<Technician[]>("/technicians", { method: "GET" });
+}
+
+/** Exclui o perfil e o usuário do técnico e encerra as assistências ativas (ADMIN). */
+export function deleteTechnician(id: string) {
+  return apiRequest<void>(`/technicians/${id}`, { method: "DELETE" });
+}
+
 export type { Producer };
