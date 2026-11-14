@@ -40,7 +40,9 @@ function Arc({ value }: { value: number | null }) {
           d={ARC_PATH}
           fill="none"
           strokeWidth={16}
-          strokeLinecap="round"
+          // Sem ponta arredondada: com traço de 16px, a ponta somaria ~8px em
+          // cada extremo e um 0,5% pareceria ~11% do arco.
+          strokeLinecap="butt"
           pathLength={100}
           strokeDasharray={`${value} 100`}
           className="stroke-primary transition-[stroke-dasharray] duration-500 motion-reduce:transition-none"

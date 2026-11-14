@@ -102,4 +102,21 @@ describe("ComparisonSummary — GoalGauge + 3 StatCards", () => {
     expect(screen.getByText("Meta de colheita atingida")).toBeInTheDocument();
     expect(screen.getByText("+10 kg")).toBeInTheDocument();
   });
+
+  it("plano sem previsto mostra 'Sem meta definida', e não '0% / meta atingida'", () => {
+    render(
+      <ComparisonSummary
+        comparison={{
+          productionPlanId: "p1",
+          expectedYield: 0,
+          totalActualYield: 0,
+          difference: 0,
+          percentageRealized: 0,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Sem meta definida")).toBeInTheDocument();
+    expect(screen.queryByText("Meta de colheita atingida")).toBeNull();
+  });
 });

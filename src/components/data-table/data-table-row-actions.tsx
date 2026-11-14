@@ -57,16 +57,17 @@ export function DataTableRowActions({
         className,
       )}
     >
-      {actions.map(({ label, icon: Icon, onClick, href, tone = "default", disabled }) => {
+      {actions.map(({ label, icon: Icon, onClick, href, tone = "default", disabled }, index) => {
         const toneClass = TONE_CLASS[tone];
         const icon = <Icon aria-hidden="true" className="size-4" />;
 
         if (href && !disabled) {
           return (
             <Link
-              key={label}
+              key={`${index}-${label}`}
               href={href}
               aria-label={label}
+              onClick={onClick}
               className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), toneClass)}
             >
               {icon}
@@ -76,7 +77,7 @@ export function DataTableRowActions({
 
         return (
           <Button
-            key={label}
+            key={`${index}-${label}`}
             type="button"
             variant="ghost"
             size="icon-sm"

@@ -27,7 +27,8 @@ export const FINANCING_STATUS_VARIANT: Record<FinancingStatus, BadgeVariant> = {
 };
 
 /** Cor da barra de progresso do plano (cards do agricultor). */
-export const PROGRESS_STATUS_VARIANT: Record<ProgressStatus, ProgressVariant> = {
+// Valores válidos tanto na barra (Progress) quanto no badge: um único mapa.
+export const PROGRESS_STATUS_VARIANT: Record<ProgressStatus, ProgressVariant & BadgeVariant> = {
   GOAL_REACHED: "success",
   ON_TRACK: "success",
   BELOW_EXPECTED: "warning",
@@ -35,14 +36,9 @@ export const PROGRESS_STATUS_VARIANT: Record<ProgressStatus, ProgressVariant> = 
   NOT_STARTED: "muted",
 };
 
-/** Badge do status de progresso do plano (mesma semântica da barra). */
-export const PROGRESS_STATUS_BADGE_VARIANT: Record<ProgressStatus, BadgeVariant> = {
-  GOAL_REACHED: "success",
-  ON_TRACK: "success",
-  BELOW_EXPECTED: "warning",
-  DELAYED: "destructive",
-  NOT_STARTED: "muted",
-};
+/** Badge do status de progresso do plano (o mesmo mapa da barra). */
+export const PROGRESS_STATUS_BADGE_VARIANT: Record<ProgressStatus, BadgeVariant> =
+  PROGRESS_STATUS_VARIANT;
 
 export const SEVERITY_VARIANT: Record<WarningSeverity, BadgeVariant> = {
   HIGH: "destructive",

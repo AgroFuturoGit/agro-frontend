@@ -20,14 +20,17 @@ export function ComparisonSummary({ comparison, unit = "kg" }: Props) {
   const { expectedYield, totalActualYield, difference, percentageRealized } =
     comparison;
   const remaining = difference < 0 ? Math.abs(difference) : 0;
+  // Sem previsto não há meta: o gauge mostra "Sem meta definida" em vez de
+  // "0% / meta atingida".
+  const hasGoal = expectedYield > 0;
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <GoalGauge
-        percentage={percentageRealized}
-        reached={remaining === 0}
+        percentage={hasGoal ? percentageRealized : null}
+        reached={hasGoal && remaining === 0}
         remainingLabel={
-          remaining > 0
+          hasGoal && remaining > 0
             ? `Faltam ${formatNumber(remaining)} ${unit} para bater a meta`
             : undefined
         }

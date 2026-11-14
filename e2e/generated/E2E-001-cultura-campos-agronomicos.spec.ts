@@ -35,7 +35,7 @@ test.describe('E2E-001 Cadastrar e editar cultura sem perder os campos agronômi
     await page.goto('/admin/culturas');
     await page.getByRole('button', { name: 'Nova cultura' }).click();
     await page.getByLabel('Nome da cultura').fill('Tomate E2E');
-    await page.getByLabel('Variedade').fill('Italiano');
+    await page.getByLabel('Variedade', { exact: true }).fill('Italiano');
     await page.getByLabel('Produtividade esperada (kg/ha)').fill('1500');
     await page.getByRole('combobox', { name: 'Tipo de colheita' }).click();
     await page.getByRole('option', { name: 'Colheita contínua' }).click();
@@ -72,7 +72,7 @@ test.describe('E2E-001 Cadastrar e editar cultura sem perder os campos agronômi
     await page.goto('/admin/culturas');
     await page.getByRole('button', { name: 'Nova cultura' }).click();
     await page.getByLabel('Nome da cultura').fill('Soja E2E');
-    await page.getByLabel('Variedade').fill('Convencional');
+    await page.getByLabel('Variedade', { exact: true }).fill('Convencional');
     await page.getByRole('button', { name: 'Salvar', exact: true }).click();
     await expect(page.getByText('Informe uma produtividade maior que zero')).toBeVisible();
     // produtividade, tipo de colheita e unidade
