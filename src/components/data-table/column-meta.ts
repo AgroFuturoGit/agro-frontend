@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  * - `numeric`: valores numéricos com `tabular-nums`, alinhados à direita.
  * - `headerClassName` / `cellClassName`: escape para casos pontuais.
  *
- * Coluna de ações: `meta: { align: "right" }` + `DataTableRowActions`.
+ * Coluna de ações: sem `align` (à esquerda, como no Figma) + `DataTableRowActions`.
  */
 export type DataTableColumnAlign = "left" | "center" | "right";
 export type DataTableCellVariant = "default" | "primary" | "secondary";

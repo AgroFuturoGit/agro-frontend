@@ -90,6 +90,6 @@ describe("AdminLayout — landmarks e skip link", () => {
   it("conteúdo usa o espaçamento entre seções do token", () => {
     renderShell();
 
-    expect(screen.getByRole("main")).toHaveClass("flex", "flex-col", "gap-section");
+    expect(screen.getByRole("main")).toHaveClass("flex", "flex-col", "gap-section-sm");
   });
 });

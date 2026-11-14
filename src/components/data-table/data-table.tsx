@@ -7,7 +7,7 @@ import {
   type Row,
   type Table as ReactTableInstance,
 } from "@tanstack/react-table";
-import { FileX } from "lucide-react";
+import { Inbox, SearchX } from "lucide-react";
 
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -115,7 +115,7 @@ export function DataTable<TData, TValue>({
     }
     return (
       <DataTableStatus
-        icon={FileX}
+        icon={hasActiveFilters ? SearchX : Inbox}
         title={
           hasActiveFilters
             ? "Nenhum resultado para os filtros aplicados."

@@ -16,13 +16,13 @@ type GoalGaugeProps = {
   className?: string;
 };
 
-// Semicírculo real de raio 66 e traço 16 (Figma 156:29): 148 × 80.
-const ARC_PATH = "M 8 72 A 66 66 0 0 1 140 72";
+// Semicírculo real de raio 66 e traço 16 (Figma 160:10): 148 × 82, sem cortar o ápice.
+const ARC_PATH = "M 8 74 A 66 66 0 0 1 140 74";
 
 function Arc({ value }: { value: number | null }) {
   return (
     <svg
-      viewBox="0 0 148 80"
+      viewBox="0 0 148 82"
       className="h-20 w-37"
       aria-hidden="true"
       focusable="false"

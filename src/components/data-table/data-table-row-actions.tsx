@@ -22,7 +22,8 @@ type DataTableRowActionsProps = {
   actions: DataTableRowAction[];
   /**
    * Alinhamento do grupo; deve acompanhar o `meta.align` da coluna "Ações".
-   * Padrão `end` (coluna com `meta: { align: "right" }`). A margem negativa
+   * Padrão `start`: no Figma (97:91, 124:232) a coluna "Ações" é alinhada à
+   * esquerda, sem `meta.align`. Use `end` só com `meta: { align: "right" }`. A margem negativa
    * compensa o respiro interno do botão de 32px, para o ícone alinhar com o
    * texto do cabeçalho.
    */
@@ -42,7 +43,7 @@ const TONE_CLASS: Record<NonNullable<DataTableRowAction["tone"]>, string> = {
  */
 export function DataTableRowActions({
   actions,
-  align = "end",
+  align = "start",
   className,
 }: DataTableRowActionsProps) {
   if (actions.length === 0) return null;

@@ -445,7 +445,6 @@ describe("DataTable — columnDef.meta e RowActions (UX-4/UX-5)", () => {
       {
         id: "actions",
         header: "Ações",
-        meta: { align: "right" },
         cell: ({ row }) => (
           <DataTableRowActions
             actions={[
@@ -480,15 +479,15 @@ describe("DataTable — columnDef.meta e RowActions (UX-4/UX-5)", () => {
     expect(screen.getByRole("columnheader", { name: "Quantidade" })).toHaveClass("text-right");
   });
 
-  it("coluna 'Ações' alinhada à direita no cabeçalho e no grupo de botões", () => {
+  it("coluna 'Ações' alinhada à esquerda no cabeçalho e no grupo de botões (Figma 97:91)", () => {
     render(<MetaHost />);
 
-    expect(screen.getByRole("columnheader", { name: "Ações" })).toHaveClass("text-right");
+    expect(screen.getByRole("columnheader", { name: "Ações" })).not.toHaveClass("text-right");
     const group = screen
       .getByRole("button", { name: "Editar Ana" })
       .closest('[data-slot="data-table-row-actions"]');
-    expect(group).toHaveClass("justify-end");
-    expect(group?.closest("td")).toHaveClass("text-right");
+    expect(group).toHaveClass("justify-start", "-ml-2");
+    expect(group?.closest("td")).not.toHaveClass("text-right");
   });
 
   it("colunas sem meta continuam alinhadas à esquerda (compatível)", () => {

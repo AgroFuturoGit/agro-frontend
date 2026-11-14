@@ -39,6 +39,7 @@ export function ComparisonSummary({ comparison, unit = "kg" }: Props) {
       />
       <StatCard
         label="Diferença"
+        tone={difference < 0 ? "negative" : difference > 0 ? "positive" : "default"}
         value={`${difference > 0 ? "+" : ""}${formatNumber(difference)} ${unit}`}
       />
     </div>

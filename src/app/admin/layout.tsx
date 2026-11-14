@@ -78,7 +78,7 @@ export default function AdminLayout({
             <main
               id="conteudo-principal"
               tabIndex={-1}
-              className="flex flex-1 flex-col gap-section overflow-y-auto p-4 outline-none md:px-6 md:pt-(--page-padding-y) md:pb-8 lg:px-(--page-padding-x)"
+              className="flex flex-1 flex-col gap-section-sm overflow-y-auto p-4 outline-none md:px-6 md:pt-(--page-padding-y) md:pb-8 lg:px-(--page-padding-x)"
             >
               {children}
             </main>
