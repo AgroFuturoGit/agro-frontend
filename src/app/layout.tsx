@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Roboto } from "next/font/google";
 import "./globals.css";
 
 import { LoadingOverlay } from "@/components/loading-overlay";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Fonte da interface (Figma ProduPlan). Vira --font-sans/--font-heading no
+// globals.css; Geist Mono continua só para --font-mono (CPF/CNPJ).
+const roboto = Roboto({
+  variable: "--font-roboto",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -34,7 +37,7 @@ export default function RootLayout({
   return (
     <html
       lang="pt-BR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${roboto.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>

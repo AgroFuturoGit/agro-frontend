@@ -2,17 +2,34 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+type CardVariant = "default" | "highlight" | "dashed"
+
+// Superfície única do painel: fundo branco, borda 1px e raio de card, sem
+// sombra nem ring. `highlight` destaca um card (ex.: KPI principal);
+// `dashed` é o contorno de estados vazios.
+const cardVariantClasses: Record<CardVariant, string> = {
+  default: "border-border bg-card",
+  highlight: "border-primary/40 bg-secondary",
+  dashed: "border-dashed border-border bg-transparent",
+}
+
 function Card({
   className,
   size = "default",
+  variant = "default",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }) {
+}: React.ComponentProps<"div"> & {
+  size?: "default" | "sm"
+  variant?: CardVariant
+}) {
   return (
     <div
       data-slot="card"
       data-size={size}
+      data-variant={variant}
       className={cn(
-        "group/card flex flex-col gap-4 overflow-hidden rounded-xl bg-card py-4 text-sm text-card-foreground ring-1 ring-foreground/10 has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-4 overflow-hidden rounded-xl border py-4 text-sm text-card-foreground has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 data-[size=sm]:gap-3 data-[size=sm]:py-3 data-[size=sm]:has-data-[slot=card-footer]:pb-0 *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        cardVariantClasses[variant],
         className
       )}
       {...props}
@@ -91,6 +108,8 @@ function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
     />
   )
 }
+
+export type { CardVariant }
 
 export {
   Card,
