@@ -66,7 +66,7 @@ test.describe('E2E-015 Edição de cultura sem sobrescrever a de outra pessoa e 
     await page.getByRole('button', { name: 'Editar cultura' }).click();
     // a segunda sessão salva a mesma cultura nesta janela
     await page.waitForTimeout(5000);
-    await page.getByLabel('Variedade').fill('Variedade da primeira aba');
+    await page.getByLabel('Variedade', { exact: true }).fill('Variedade da primeira aba');
     await page.getByRole('button', { name: 'Salvar alterações' }).click();
     await expect(page.getByText('Esta cultura foi alterada por outra pessoa enquanto você editava.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Editar cultura' })).toBeVisible();

@@ -37,10 +37,10 @@ test.describe('E2E-004 Perfis de técnico e agricultor alinhados ao contrato da 
     await page.getByRole('button', { name: 'Novo usuário' }).click();
     await page.getByRole('combobox', { name: 'Papel' }).click();
     await page.getByRole('option', { name: 'Técnico' }).click();
-    await page.getByLabel('Nome completo').fill(env('E2E_TECH_NAME'));
-    await page.getByLabel('E-mail').fill(env('E2E_TECH_EMAIL'));
+    await page.getByLabel('Nome completo', { exact: true }).fill(env('E2E_TECH_NAME'));
+    await page.getByLabel('E-mail', { exact: true }).fill(env('E2E_TECH_EMAIL'));
     await page.locator('#password').fill(env('E2E_TECH_PASSWORD'));
-    await page.getByLabel('CPF').fill(env('E2E_TECH_CPF'));
+    await page.getByLabel('CPF', { exact: true }).fill(env('E2E_TECH_CPF'));
     await page.getByRole('combobox', { name: 'Tipo de registro' }).click();
     await page.getByRole('option', { name: 'CREA' }).click();
     await page.getByLabel('Número do registro').fill('12345');
@@ -63,10 +63,10 @@ test.describe('E2E-004 Perfis de técnico e agricultor alinhados ao contrato da 
     await page.getByRole('button', { name: 'Novo Agricultor' }).click();
     await page.getByRole('combobox', { name: 'Comunidade' }).click();
     await page.getByRole('option', { name: env('E2E_COMMUNITY_NAME') }).click();
-    await page.getByLabel('Nome completo').fill(env('E2E_FARMER_NAME'));
-    await page.getByLabel('E-mail').fill(env('E2E_FARMER_EMAIL'));
+    await page.getByLabel('Nome completo', { exact: true }).fill(env('E2E_FARMER_NAME'));
+    await page.getByLabel('E-mail', { exact: true }).fill(env('E2E_FARMER_EMAIL'));
     await page.locator('#producer-password').fill(env('E2E_FARMER_PASSWORD'));
-    await page.getByLabel('CPF').fill(env('E2E_FARMER_CPF'));
+    await page.getByLabel('CPF', { exact: true }).fill(env('E2E_FARMER_CPF'));
     await page.getByLabel('Data de nascimento').fill('1980-05-20');
     await page.getByLabel('Telefone').fill('82999990000');
     await page.getByLabel('Endereço/Nome local').fill('Sítio Boa Vista E2E');

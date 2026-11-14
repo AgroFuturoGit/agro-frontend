@@ -195,7 +195,9 @@ test.describe("/admin/culturas — DataTable genérico", () => {
     await expect(page.getByRole("heading", { name: "Nova cultura" })).toBeVisible();
 
     await page.getByLabel("Nome da cultura").fill(NEW_CROP.name);
-    await page.getByLabel("Variedade").fill(NEW_CROP.variety);
+    // exact: a busca da toolbar ("Buscar por nome ou variedade") também casa
+    // com getByLabel parcial.
+    await page.getByLabel("Variedade", { exact: true }).fill(NEW_CROP.variety);
     // Campos agronômicos obrigatórios desde o alinhamento ao agricultural-core.
     await page.getByLabel("Produtividade esperada (kg/ha)").fill("3000");
     await page.getByRole("combobox", { name: "Tipo de colheita" }).click();

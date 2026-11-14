@@ -288,11 +288,13 @@ test.describe("/admin/usuarios — DataTable genérico", () => {
     await expect(drawer).toHaveAttribute("data-side", "right");
     await expect(page.getByRole("heading", { name: "Novo usuário" })).toBeVisible();
 
-    await page.getByLabel("Nome completo").fill(NEW_USER.fullName);
-    await page.getByLabel("E-mail").fill(NEW_USER.email);
-    await page.getByLabel("Senha").fill("senha1234");
-    await page.getByLabel("CPF").fill(NEW_USER.cpf);
-    await expect(page.getByLabel("Data de nascimento")).toHaveCount(0);
+    // Escopo no drawer: a busca da toolbar ("Buscar por nome, e-mail ou CPF")
+    // também casa com getByLabel parcial.
+    await drawer.getByLabel("Nome completo").fill(NEW_USER.fullName);
+    await drawer.getByLabel("E-mail").fill(NEW_USER.email);
+    await drawer.getByLabel("Senha").fill("senha1234");
+    await drawer.getByLabel("CPF").fill(NEW_USER.cpf);
+    await expect(drawer.getByLabel("Data de nascimento")).toHaveCount(0);
     // O papel começa sem seleção: escolhe "Administrador" explicitamente.
     await drawer.getByRole("combobox", { name: "Papel" }).click();
     await page.getByRole("option", { name: "Administrador" }).click();
