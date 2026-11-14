@@ -14,7 +14,6 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function AdminLayout({
@@ -32,13 +31,13 @@ export default function AdminLayout({
       <TooltipProvider>
         <SidebarProvider>
           <Sidebar collapsible="icon">
-            <SidebarHeader>
+            <SidebarHeader className="px-5 pt-7 pb-0 group-data-[collapsible=icon]:px-2">
               <Link
                 href="/admin"
-                className="flex h-10 items-center gap-2 px-2 font-semibold tracking-tight"
+                className="flex h-9 items-center gap-2 rounded-nav px-3 text-lg font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:px-0"
               >
-                <span className="grid size-8 place-items-center rounded-md bg-primary text-primary-foreground">
-                  <Sprout className="size-4" />
+                <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground group-data-[collapsible=icon]:size-8">
+                  <Sprout className="size-[18px]" aria-hidden="true" />
                 </span>
                 <span className="group-data-[collapsible=icon]:hidden">
                   ProduPlan
@@ -46,29 +45,32 @@ export default function AdminLayout({
               </Link>
             </SidebarHeader>
             <SidebarContent>
-              <SidebarGroup>
+              <SidebarGroup className="px-5 pt-8 group-data-[collapsible=icon]:px-2">
                 <SidebarNav />
               </SidebarGroup>
             </SidebarContent>
-            <SidebarFooter>
-              <p className="px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            <SidebarFooter className="px-5 pb-7 group-data-[collapsible=icon]:px-2">
+              <p className="px-3 text-sm text-muted-foreground group-data-[collapsible=icon]:hidden">
                 © {new Date().getFullYear()} ProduPlan
               </p>
             </SidebarFooter>
           </Sidebar>
 
-          <SidebarInset id="conteudo-principal" tabIndex={-1} className="outline-none">
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:px-8">
-              <SidebarTrigger />
-              <Separator orientation="vertical" className="mr-2 h-6" />
-              <h1 className="text-lg font-semibold tracking-tight">
+          <SidebarInset
+            id="conteudo-principal"
+            tabIndex={-1}
+            className="bg-background outline-none"
+          >
+            <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground md:h-(--header-height) md:px-6 lg:px-(--page-padding-x)">
+              <SidebarTrigger className="-ml-1.5 size-control [&_svg:not([class*='size-'])]:size-6" />
+              <h1 className="min-w-0 truncate text-lg font-semibold md:text-2xl">
                 Painel administrativo
               </h1>
-              <div className="ml-auto">
+              <div className="ml-auto shrink-0">
                 <UserMenu />
               </div>
             </header>
-            <div className="flex-1 overflow-y-auto p-4 md:p-8">
+            <div className="flex-1 overflow-y-auto p-4 md:px-6 md:pt-(--page-padding-y) md:pb-8 lg:px-(--page-padding-x)">
               {children}
             </div>
           </SidebarInset>

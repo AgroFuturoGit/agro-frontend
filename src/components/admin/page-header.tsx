@@ -1,0 +1,76 @@
+import { BackLink } from "@/components/admin/back-link";
+import {
+  Breadcrumb,
+  type BreadcrumbItem,
+} from "@/components/ui/breadcrumb";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
+
+type PageHeaderProps = {
+  /** Renderizado em `<h2>`: o `<h1>` ("Painel administrativo") é do shell. */
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  /** CTA(s) à direita, alinhados à base do bloco de texto; empilham abaixo de `md`. */
+  actions?: React.ReactNode;
+  breadcrumb?: BreadcrumbItem[];
+  back?: { href: string; label: string };
+  /** Mostra skeletons no lugar do título e da descrição. */
+  loading?: boolean;
+  className?: string;
+};
+
+/**
+ * Cabeçalho de página do painel: breadcrumb opcional, link de retorno,
+ * título 30/36 bold, descrição 16/24 medium e ações à direita.
+ */
+export function PageHeader({
+  title,
+  description,
+  actions,
+  breadcrumb,
+  back,
+  loading = false,
+  className,
+}: PageHeaderProps) {
+  const hasBreadcrumb = Boolean(breadcrumb && breadcrumb.length > 0);
+
+  return (
+    <div
+      data-slot="page-header"
+      className={cn("flex flex-col gap-4", className)}
+    >
+      {hasBreadcrumb && breadcrumb ? <Breadcrumb items={breadcrumb} /> : null}
+      <div className="flex flex-col gap-2">
+        {back ? <BackLink href={back.href}>{back.label}</BackLink> : null}
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="flex min-w-0 flex-col gap-1">
+            {loading ? (
+              <div aria-busy="true" className="flex flex-col gap-1">
+                <Skeleton className="h-9 w-64 max-w-full" />
+                {description !== undefined ? (
+                  <Skeleton className="h-6 w-96 max-w-full" />
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <h2 className="text-page-title font-bold text-foreground">
+                  {title}
+                </h2>
+                {description ? (
+                  <p className="text-base font-medium text-muted-foreground">
+                    {description}
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+          {actions ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {actions}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}

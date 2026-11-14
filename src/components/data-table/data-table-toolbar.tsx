@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Table as ReactTableInstance } from "@tanstack/react-table";
-import { ChevronDown, Filter, Search, X } from "lucide-react";
+import { ChevronDown, Funnel, Search, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import { cn } from "@/lib/utils";
 
 type ToolbarFilter = {
   columnId: string;
@@ -26,12 +27,21 @@ type DataTableToolbarProps<TData> = {
   table: ReactTableInstance<TData>;
   searchPlaceholder?: string;
   filters?: ToolbarFilter[];
+  /**
+   * Controles extras na mesma linha da busca e do "Filtros" (ex.: o
+   * checkbox "Somente prioritárias" de Culturas). Quebra linha no mobile.
+   */
+  extra?: React.ReactNode;
 };
+
+const CHIP_CLASS =
+  "inline-flex h-control-sm items-center gap-1 rounded-full bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none motion-reduce:transition-none";
 
 export function DataTableToolbar<TData>({
   table,
   searchPlaceholder = "Buscar…",
   filters = [],
+  extra,
 }: DataTableToolbarProps<TData>) {
   const [rawSearch, setRawSearch] = useState("");
   const debouncedSearch = useDebouncedValue(rawSearch, 500);
@@ -73,10 +83,13 @@ export function DataTableToolbar<TData>({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-80">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+    <div className="flex flex-col gap-3 rounded-xl border border-border bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:w-64">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+          />
           <Input
             type="search"
             value={rawSearch}
@@ -89,17 +102,22 @@ export function DataTableToolbar<TData>({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            className="gap-2 border-input px-3 text-foreground"
             aria-expanded={filtersOpen}
             onClick={() => setFiltersOpen((v) => !v)}
           >
-            <Filter className="size-4" />
+            <Funnel className="size-3.5" aria-hidden="true" />
             Filtros
             <ChevronDown
-              className={`size-4 transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+              aria-hidden="true"
+              className={cn(
+                "size-3.5 transition-transform motion-reduce:transition-none",
+                filtersOpen && "rotate-180",
+              )}
             />
           </Button>
         )}
+        {extra}
       </div>
 
       {hasAnyActiveFilter && (
@@ -108,9 +126,9 @@ export function DataTableToolbar<TData>({
             <button
               type="button"
               onClick={clearSearch}
-              className="inline-flex h-7 items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium hover:bg-accent"
+              className={CHIP_CLASS}
             >
-              Busca: {appliedSearch} <X className="size-3" />
+              Busca: {appliedSearch} <X className="size-3" aria-hidden="true" />
             </button>
           )}
           {activeColumnFilters.map(({ filter, value }) => (
@@ -118,10 +136,10 @@ export function DataTableToolbar<TData>({
               key={filter.columnId}
               type="button"
               onClick={() => table.getColumn(filter.columnId)?.setFilterValue(undefined)}
-              className="inline-flex h-7 items-center gap-1 rounded-full bg-muted px-2.5 text-xs font-medium hover:bg-accent"
+              className={CHIP_CLASS}
             >
               {filter.label}: {filter.options.find((o) => o.value === value)?.label ?? value}{" "}
-              <X className="size-3" />
+              <X className="size-3" aria-hidden="true" />
             </button>
           ))}
           <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
@@ -142,7 +160,7 @@ export function DataTableToolbar<TData>({
               <div key={filter.columnId} className="flex flex-col gap-1">
                 <label
                   htmlFor={`data-table-filter-${filter.columnId}`}
-                  className="text-xs font-semibold text-muted-foreground"
+                  className="text-xs font-medium text-muted-foreground"
                 >
                   {filter.label}
                 </label>
@@ -152,7 +170,7 @@ export function DataTableToolbar<TData>({
                     table.getColumn(filter.columnId)?.setFilterValue(v === "all" ? undefined : v)
                   }
                 >
-                  <SelectTrigger id={`data-table-filter-${filter.columnId}`} className="h-9 w-44">
+                  <SelectTrigger id={`data-table-filter-${filter.columnId}`} className="w-44">
                     <SelectValue placeholder="Todos">
                       {() => currentLabel ?? "Todos"}
                     </SelectValue>

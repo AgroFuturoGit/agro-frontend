@@ -42,7 +42,7 @@ const FILTERS = [
   },
 ];
 
-function TestHost() {
+function TestHost({ extra }: { extra?: React.ReactNode } = {}) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
 
@@ -60,7 +60,7 @@ function TestHost() {
 
   return (
     <>
-      <DataTableToolbar table={table} filters={FILTERS} />
+      <DataTableToolbar table={table} filters={FILTERS} extra={extra} />
       <span data-testid="global-filter-debug">{globalFilter}</span>
       <span data-testid="category-filter-debug">
         {String(table.getColumn("category")?.getFilterValue() ?? "")}
@@ -275,5 +275,25 @@ describe("DataTableToolbar — chips removiveis e botao Limpar", () => {
     expect(globalFilterDebug()).toBe("");
     expect(categoryFilterDebug()).toBe("");
     expect(screen.queryByRole("button", { name: "Limpar" })).toBeNull();
+  });
+});
+
+describe("DataTableToolbar — slot extra (Lote 1B)", () => {
+  afterEach(cleanup);
+
+  it("renderiza o conteúdo de `extra` na mesma linha da busca e do 'Filtros'", () => {
+    render(
+      <TestHost
+        extra={
+          <label>
+            <input type="checkbox" /> Somente prioritárias
+          </label>
+        }
+      />,
+    );
+
+    const checkbox = screen.getByLabelText("Somente prioritárias");
+    const filtros = screen.getByRole("button", { name: /Filtros/ });
+    expect(checkbox.closest("label")?.parentElement).toBe(filtros.parentElement);
   });
 });

@@ -54,11 +54,10 @@ export function UserMenu() {
         render={
           <Button
             variant="ghost"
-            size="lg"
-            className="h-10 gap-2 rounded-full px-1.5"
+            className="h-10 gap-3 rounded-full pr-2 pl-1 text-header-foreground"
           >
-            <Avatar size="sm">
-              <AvatarFallback className="bg-primary text-primary-foreground">
+            <Avatar>
+              <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
                 {user ? initials(user.fullName) : "··"}
               </AvatarFallback>
             </Avatar>

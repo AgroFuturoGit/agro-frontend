@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
   Building2,
-  LayoutDashboard,
+  ChartLine,
+  LayoutGrid,
   ShieldCheck,
   Sprout,
-  UserCog,
-  Wheat,
+  Tractor,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,11 +30,11 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/admin", label: "Visão geral", icon: LayoutDashboard },
+  { href: "/admin", label: "Visão geral", icon: LayoutGrid },
   {
     href: "/admin/usuarios",
     label: "Usuários",
-    icon: UserCog,
+    icon: Users,
     roles: ["ADMIN", "MANAGER"],
   },
   {
@@ -43,7 +43,7 @@ const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     roles: ["ADMIN"],
   },
-  { href: "/admin/culturas", label: "Culturas", icon: Wheat },
+  { href: "/admin/culturas", label: "Culturas", icon: Sprout },
   {
     href: "/admin/organizacoes",
     label: "Organizações",
@@ -53,11 +53,11 @@ const NAV_ITEMS: NavItem[] = [
     // no nível certo dentro de `organizations-page.tsx` — MANAGER e
     // FARMER são redirecionados automaticamente, nunca escolhem pela UI.
   },
-  { href: "/admin/safras", label: "Safras", icon: Sprout },
+  { href: "/admin/safras", label: "Safras", icon: Tractor },
   {
     href: "/admin/relatorios",
     label: "Relatórios",
-    icon: BarChart3,
+    icon: ChartLine,
     // A tela é montada a partir de `GET /farmers/me`, que o backend só
     // libera para FARMER (`hasRole('FARMER')` em `FarmerController`). As
     // demais roles não têm caminho de dados para ela e recebiam 403.
@@ -89,10 +89,10 @@ export function SidebarNav() {
             <SidebarMenuButton
               isActive={active}
               tooltip={label}
-              className="h-9"
+              className="gap-5 px-3 text-base"
               render={
                 <Link href={href} onClick={() => setOpenMobile(false)}>
-                  <Icon />
+                  <Icon aria-hidden="true" />
                   <span>{label}</span>
                 </Link>
               }
