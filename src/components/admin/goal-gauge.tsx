@@ -51,6 +51,9 @@ function Arc({ value }: { value: number | null }) {
 }
 
 /**
+ * Escala: % 24 → "meta alcançada" 16 → frase final 12 (no máximo 2 degraus
+ * entre vizinhos).
+ *
  * Gauge em semicírculo da meta de colheita. O nome acessível
  * ("X% da meta alcançada") fica no `role="img"`; o número e a legenda
  * visíveis repetem a informação e por isso saem da árvore acessível.
@@ -71,8 +74,8 @@ export function GoalGauge({
     return (
       <Card aria-busy="true" className={cardClass}>
         <Skeleton className="h-20 w-37 rounded-t-full rounded-b-none" />
-        <Skeleton className="mt-2 h-7 w-24" />
-        <Skeleton className="mt-2 h-4 w-28" />
+        <Skeleton className="mt-2 h-8 w-24" />
+        <Skeleton className="mt-2 h-6 w-28" />
         <span className="sr-only">Carregando meta alcançada</span>
       </Card>
     );
@@ -102,13 +105,13 @@ export function GoalGauge({
         <Arc value={clamped} />
         <span
           aria-hidden="true"
-          className="-mt-7 text-gauge font-bold text-primary tabular-nums"
+          className="-mt-8 text-gauge font-bold text-primary tabular-nums"
         >
           {formatted}
         </span>
         <span
           aria-hidden="true"
-          className="mt-2 text-caption font-medium text-muted-foreground"
+          className="mt-2 text-base font-medium text-muted-foreground"
         >
           meta alcançada
         </span>

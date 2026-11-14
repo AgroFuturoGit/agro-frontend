@@ -9,12 +9,14 @@ import {
 } from "@tanstack/react-table";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Pencil, Trash2 } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 
 import { DataTable } from "./data-table";
 import { DataTableColumnHeader } from "./data-table-column-header";
+import { DataTableRowActions } from "./data-table-row-actions";
 
 // `useIsMobile` mockado no boundary do hook — cada teste controla o
 // viewport explicitamente, sem depender de `window.matchMedia` (que o
@@ -54,6 +56,7 @@ type TestHostProps = {
   errorHint?: string;
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
+  emptyActionHref?: string;
   onRetry?: () => void;
   hasActiveFilters?: boolean;
   onClearFilters?: () => void;
@@ -376,3 +379,163 @@ describe("DataTable — modo card (mobile)", () => {
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("DataTable — erro como InlineAlert (UX-3)", () => {
+  afterEach(cleanup);
+
+  it("erro usa o InlineAlert destrutivo, sem o visual de estado vazio", () => {
+    const { container } = render(<TestHost data={[]} hasError onRetry={() => {}} />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveAttribute("data-slot", "inline-alert");
+    expect(alert).toHaveAttribute("data-variant", "destructive");
+    expect(alert.textContent).toContain("Tente novamente em alguns instantes.");
+    expect(container.querySelector('[data-slot="empty-state"]')).toBeNull();
+  });
+
+  it("sem onRetry, não oferece 'Tentar novamente'", () => {
+    render(<TestHost data={[]} hasError />);
+
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tentar novamente" })).toBeNull();
+  });
+});
+
+describe("DataTable — CTA do vazio como link (UX-7)", () => {
+  afterEach(cleanup);
+
+  it("emptyActionHref vira link real com o peso do botão principal", () => {
+    render(
+      <TestHost data={[]} emptyActionLabel="Novo item" emptyActionHref="/admin/itens/novo" />,
+    );
+
+    const link = screen.getByRole("link", { name: "Novo item" });
+    expect(link).toHaveAttribute("href", "/admin/itens/novo");
+    expect(link).toHaveClass("bg-primary");
+    expect(screen.queryByRole("button", { name: "Novo item" })).toBeNull();
+  });
+
+  it("com filtro ativo o link dá lugar a 'Limpar filtros'", () => {
+    render(
+      <TestHost
+        data={[]}
+        hasActiveFilters
+        onClearFilters={() => {}}
+        emptyActionLabel="Novo item"
+        emptyActionHref="/admin/itens/novo"
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: "Novo item" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Limpar filtros" })).toBeInTheDocument();
+  });
+});
+
+describe("DataTable — columnDef.meta e RowActions (UX-4/UX-5)", () => {
+  afterEach(cleanup);
+
+  type Row2 = { id: string; name: string; email: string; qty: number };
+  const DATA: Row2[] = [{ id: "1", name: "Ana", email: "ana@x.com", qty: 1200 }];
+
+  function MetaHost({ onEdit, onDelete }: { onEdit?: () => void; onDelete?: () => void }) {
+    const cols: ColumnDef<Row2>[] = [
+      { accessorKey: "name", header: "Nome", meta: { cellVariant: "primary" } },
+      { accessorKey: "email", header: "E-mail", meta: { cellVariant: "secondary" } },
+      { accessorKey: "qty", header: "Quantidade", meta: { numeric: true } },
+      {
+        id: "actions",
+        header: "Ações",
+        meta: { align: "right" },
+        cell: ({ row }) => (
+          <DataTableRowActions
+            actions={[
+              { label: `Editar ${row.original.name}`, icon: Pencil, onClick: onEdit },
+              {
+                label: `Excluir ${row.original.name}`,
+                icon: Trash2,
+                onClick: onDelete,
+                tone: "destructive",
+              },
+            ]}
+          />
+        ),
+      },
+    ];
+    // eslint-disable-next-line react-hooks/incompatible-library
+    const table = useReactTable({
+      data: DATA,
+      columns: cols,
+      getCoreRowModel: getCoreRowModel(),
+    });
+    return <DataTable table={table} columns={cols} />;
+  }
+
+  it("célula principal/secundária e numérica à direita com tabular-nums", () => {
+    render(<MetaHost />);
+
+    expect(screen.getByRole("cell", { name: "Ana" })).toHaveClass("font-medium", "text-foreground");
+    expect(screen.getByRole("cell", { name: "ana@x.com" })).toHaveClass("text-muted-foreground");
+    const qtyCell = screen.getByRole("cell", { name: "1200" });
+    expect(qtyCell).toHaveClass("text-right", "tabular-nums");
+    expect(screen.getByRole("columnheader", { name: "Quantidade" })).toHaveClass("text-right");
+  });
+
+  it("coluna 'Ações' alinhada à direita no cabeçalho e no grupo de botões", () => {
+    render(<MetaHost />);
+
+    expect(screen.getByRole("columnheader", { name: "Ações" })).toHaveClass("text-right");
+    const group = screen
+      .getByRole("button", { name: "Editar Ana" })
+      .closest('[data-slot="data-table-row-actions"]');
+    expect(group).toHaveClass("justify-end");
+    expect(group?.closest("td")).toHaveClass("text-right");
+  });
+
+  it("colunas sem meta continuam alinhadas à esquerda (compatível)", () => {
+    render(<TestHost />);
+
+    const header = screen.getByRole("columnheader", { name: "Categoria" });
+    expect(header.className).not.toMatch(/text-right|text-center/);
+  });
+
+  it("RowActions: botões só com ícone têm nome, ícone decorativo e tom destrutivo na exclusão", async () => {
+    const user = userEvent.setup();
+    const onEdit = vi.fn();
+    const onDelete = vi.fn();
+    render(<MetaHost onEdit={onEdit} onDelete={onDelete} />);
+
+    const edit = screen.getByRole("button", { name: "Editar Ana" });
+    const del = screen.getByRole("button", { name: "Excluir Ana" });
+    expect(edit.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    expect(edit).toHaveClass("text-muted-foreground");
+    expect(del).toHaveClass("text-destructive");
+    expect(edit).toHaveClass("size-control-sm");
+
+    await user.click(edit);
+    await user.click(del);
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledTimes(1);
+  });
+
+  it("RowActions com href renderiza link", () => {
+    render(
+      <DataTableRowActions
+        actions={[{ label: "Ver plano", icon: Pencil, href: "/admin/planos/1" }]}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Ver plano" })).toHaveAttribute(
+      "href",
+      "/admin/planos/1",
+    );
+  });
+
+  it("cabeçalho ordenável tem anel de foco opaco (A11Y-2)", () => {
+    render(<TestHost />);
+
+    const button = screen.getByRole("button", { name: "Rótulo" });
+    expect(button).toHaveClass("focus-visible:ring-2", "focus-visible:ring-ring");
+    expect(button.className).not.toMatch(/ring-ring\/50/);
+  });
+});
+

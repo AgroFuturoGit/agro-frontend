@@ -297,3 +297,49 @@ describe("DataTableToolbar — slot extra (Lote 1B)", () => {
     expect(checkbox.closest("label")?.parentElement).toBe(filtros.parentElement);
   });
 });
+
+describe("DataTableToolbar — acessibilidade (A11Y-2/9/12)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("busca tem nome acessível próprio (não depende do placeholder)", () => {
+    render(<TestHost />);
+
+    const search = screen.getByRole("searchbox", { name: "Buscar" });
+    expect(search).toHaveAttribute("aria-label", "Buscar");
+    expect(search).toHaveAttribute("placeholder", "Buscar…");
+  });
+
+  it("chip anuncia a ação 'Remover filtro' e tem anel de foco opaco", () => {
+    vi.useFakeTimers();
+    render(<TestHost />);
+
+    fireEvent.change(screen.getByPlaceholderText("Buscar…"), {
+      target: { value: "abc" },
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    const chip = screen.getByRole("button", { name: "Remover filtro Busca: abc" });
+    expect(chip).toHaveClass("focus-visible:ring-2", "focus-visible:ring-ring");
+    expect(chip.className).not.toMatch(/ring-ring\/50/);
+  });
+});
+
+describe("DataTableToolbar — chip de filtro de coluna (A11Y-12)", () => {
+  afterEach(cleanup);
+
+  it("nome do chip de coluna começa por 'Remover filtro' e mantém o texto visível", async () => {
+    render(<TestHost />);
+
+    await selectCategoryOption("Beta");
+
+    const chip = await screen.findByRole("button", {
+      name: "Remover filtro Categoria: Beta",
+    });
+    expect(chip).toHaveTextContent("Categoria: Beta");
+  });
+});

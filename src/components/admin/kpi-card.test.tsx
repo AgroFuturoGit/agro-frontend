@@ -108,3 +108,56 @@ describe("StatCard", () => {
     expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(2);
   });
 });
+
+describe("KpiCard/StatCard — contraste, escala e vazio (A11Y-1/5, UX-8)", () => {
+  afterEach(cleanup);
+
+  it("highlight: label e dica em subtle-foreground (contraste ≥ 4,5 sobre o verde-claro)", () => {
+    render(<KpiCard label="Conclusão" value="80%" hint="meta 90%" highlight />);
+
+    expect(screen.getByText("Conclusão")).toHaveClass("text-subtle-foreground");
+    expect(screen.getByText("meta 90%")).toHaveClass("text-subtle-foreground");
+    expect(screen.getByText("Conclusão").className).not.toMatch(/text-muted-foreground/);
+  });
+
+  it("sem highlight: label e dica continuam em muted-foreground", () => {
+    render(<KpiCard label="Safras" value="3" hint="2 ativas" />);
+
+    expect(screen.getByText("Safras")).toHaveClass("text-muted-foreground");
+    expect(screen.getByText("2 ativas")).toHaveClass("text-muted-foreground");
+  });
+
+  it("escala: rótulo/dica 16px (text-base) ao lado do número text-kpi", () => {
+    render(<KpiCard label="Safras" value="3" hint="2 ativas" />);
+
+    expect(screen.getByText("Safras")).toHaveClass("text-base");
+    expect(screen.getByText("2 ativas")).toHaveClass("text-base");
+  });
+
+  it("StatCard: rótulo 16px (text-base)", () => {
+    render(<StatCard label="Previsto" value="1 t" />);
+
+    expect(screen.getByText("Previsto")).toHaveClass("text-base");
+  });
+
+  it.each([null, undefined, ""])("StatCard vazio (%s) mostra '—' neutro e anuncia 'sem dados'", (empty) => {
+    const { container } = render(
+      <StatCard label="Diferença" value={empty} tone="negative" />,
+    );
+
+    const dd = screen.getByText("sem dados").closest("dd");
+    expect(dd?.textContent).toContain("—");
+    expect(screen.getByText("—")).toHaveAttribute("aria-hidden", "true");
+    expect(dd).toHaveClass("text-foreground");
+    expect(dd).not.toHaveClass("text-destructive");
+    expect(container.querySelector("[data-slot=card]")).toHaveAttribute("data-tone", "default");
+  });
+
+  it("StatCard: 0 não é vazio", () => {
+    render(<StatCard label="Diferença" value={0} />);
+
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.queryByText("sem dados")).toBeNull();
+  });
+});
+

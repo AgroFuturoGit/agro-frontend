@@ -30,7 +30,7 @@ export function DataTableColumnHeader<TData, TValue>({
       type="button"
       disabled={disabled}
       onClick={() => column.toggleSorting(sorted === "asc")}
-      className="-mx-1 inline-flex min-h-8 items-center gap-1 rounded-md px-1 font-medium text-foreground transition-colors hover:text-foreground-strong focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50 motion-reduce:transition-none"
+      className="-mx-1 inline-flex min-h-8 items-center gap-1 rounded-md px-1 font-medium text-foreground transition-colors hover:text-foreground-strong focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50 motion-reduce:transition-none"
     >
       {title}
       {sorted === "asc" ? (

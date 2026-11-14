@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 
+import { EmptyValue, isEmptyValue } from "@/components/admin/empty-value";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -17,14 +18,12 @@ type KpiCardProps = {
   className?: string;
 };
 
-function isEmptyValue(value: React.ReactNode) {
-  return value === null || value === undefined || value === "";
-}
-
 /**
  * Indicador de dashboard. Estrutura acessível: `<dl>` com `<dt>` (label +
  * ícone) e `<dd>` (valor e dica) como irmãos diretos — o label e o valor
- * ficam no mesmo elemento pai.
+ * ficam no mesmo elemento pai. Escala: rótulo/dica 16 → número 24 (no
+ * máximo 2 degraus entre vizinhos). No destaque (`bg-secondary`), o texto
+ * secundário usa `subtle-foreground` (o `muted-foreground` daria 4,30:1).
  */
 export function KpiCard({
   label,
@@ -35,6 +34,8 @@ export function KpiCard({
   loading = false,
   className,
 }: KpiCardProps) {
+  const secondaryText = highlight ? "text-subtle-foreground" : "text-muted-foreground";
+
   if (loading) {
     return (
       <Card
@@ -43,10 +44,10 @@ export function KpiCard({
         variant={highlight ? "highlight" : "default"}
       >
         <div className="flex items-start justify-between gap-2">
-          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-6 w-28" />
           {Icon ? <Skeleton className="size-4" /> : null}
         </div>
-        <Skeleton className="mt-2 h-9 w-20" />
+        <Skeleton className="mt-2 h-8 w-20" />
         <span className="sr-only">Carregando {label}</span>
       </Card>
     );
@@ -58,24 +59,22 @@ export function KpiCard({
       variant={highlight ? "highlight" : "default"}
     >
       <dl className="flex flex-col">
-        <dt className="flex items-start justify-between gap-2 text-sm leading-4 text-muted-foreground">
+        <dt
+          className={cn(
+            "flex items-start justify-between gap-2 text-base",
+            secondaryText,
+          )}
+        >
           {label}
           {Icon ? (
-            <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            <Icon aria-hidden="true" className="mt-1 size-4 shrink-0" />
           ) : null}
         </dt>
         <dd className="mt-2 text-kpi font-bold text-foreground tabular-nums">
-          {isEmptyValue(value) ? (
-            <>
-              <span aria-hidden="true">—</span>
-              <span className="sr-only">sem dados</span>
-            </>
-          ) : (
-            value
-          )}
+          {isEmptyValue(value) ? <EmptyValue /> : value}
         </dd>
         {hint ? (
-          <dd className="mt-1 text-sm text-muted-foreground">{hint}</dd>
+          <dd className={cn("mt-1 text-base", secondaryText)}>{hint}</dd>
         ) : null}
       </dl>
     </Card>

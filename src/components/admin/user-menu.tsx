@@ -54,6 +54,9 @@ export function UserMenu() {
         render={
           <Button
             variant="ghost"
+            // Abaixo de 640px só as iniciais ficam visíveis: o nome descreve
+            // a função do botão e mantém o nome visível dentro dele.
+            aria-label={user ? `Menu do usuário: ${user.fullName}` : "Menu do usuário"}
             className="h-10 gap-3 rounded-full pr-2 pl-1 text-header-foreground"
           >
             <Avatar>

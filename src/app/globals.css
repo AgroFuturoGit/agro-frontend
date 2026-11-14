@@ -80,15 +80,23 @@
      (ações de linha, paginação, chips). Geram h-control, size-control etc. */
   --spacing-control: 2.25rem;
   --spacing-control-sm: 2rem;
-  /* Escala tipográfica do painel: 12 → 14 → 16 → 20 → 28 → 30. */
+  /* Respiro entre blocos de página (gap-section) e entre blocos do mesmo
+     grupo, ex. toolbar → tabela → paginação (gap-section-sm). */
+  --spacing-section: var(--section-gap);
+  --spacing-section-sm: var(--section-gap-sm);
+  /* Escala tipográfica do painel, sobre a escala canônica
+     36 → 30 → 24 → 20 → 18 → 16 → 14 → 12. Textos vizinhos pulam no
+     máximo 2 degraus: título 30 → descrição 18; número de KPI/gauge 24 →
+     rótulo 16. O Figma tinha número 30 (KPI) e 28 (gauge); reduzidos para
+     24 para cumprir a progressão sem inflar os rótulos. */
   --text-page-title: 1.875rem;
   --text-page-title--line-height: 2.25rem;
   --text-section-title: 1.25rem;
   --text-section-title--line-height: 1.75rem;
-  --text-kpi: 1.875rem;
-  --text-kpi--line-height: 2.25rem;
-  --text-gauge: 1.75rem;
-  --text-gauge--line-height: 1.75rem;
+  --text-kpi: 1.5rem;
+  --text-kpi--line-height: 2rem;
+  --text-gauge: 1.5rem;
+  --text-gauge--line-height: 2rem;
   --text-body: 0.875rem;
   --text-body--line-height: 1.25rem;
   --text-caption: 0.75rem;
@@ -138,16 +146,19 @@
   --info-muted: oklch(0.932 0.032 255.6);
   /* Estrutura */
   --border: oklch(0.928 0.006 264.5);
-  --input: oklch(0.928 0.006 264.5);
+  /* Borda dos campos (input, select, textarea, native-select): mais escura
+     que --border para ter 3:1 sobre o branco (WCAG 1.4.11). */
+  --input: oklch(0.65 0.02 262);
   --input-background: oklch(1 0 0);
   --ring: oklch(0.523 0.135 144.3);
   --gauge-track: oklch(0.885 0 0);
-  /* Gráficos (categorias; não reutilizar success/warning/destructive). */
+  /* Gráficos (categorias; não reutilizar os matizes de warning/destructive:
+     laranja ~50 e vermelho ~27). chart-4 = azul-petróleo, chart-5 = violeta. */
   --chart-1: oklch(0.523 0.135 144.3);
   --chart-2: oklch(0.597 0.125 165.5);
   --chart-3: oklch(0.78 0.13 85);
-  --chart-4: oklch(0.62 0.16 50);
-  --chart-5: oklch(0.45 0.12 30);
+  --chart-4: oklch(0.55 0.1 220);
+  --chart-5: oklch(0.5 0.15 300);
   --radius: 0.5rem;
   /* Sidebar */
   --sidebar: oklch(0.985 0 0);
@@ -191,8 +202,8 @@
   --chart-1: oklch(0.62 0.16 145);
   --chart-2: oklch(0.75 0.15 110);
   --chart-3: oklch(0.78 0.13 85);
-  --chart-4: oklch(0.62 0.16 50);
-  --chart-5: oklch(0.45 0.12 30);
+  --chart-4: oklch(0.65 0.1 220);
+  --chart-5: oklch(0.65 0.15 300);
   --sidebar: oklch(0.205 0.005 145);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.65 0.15 145);

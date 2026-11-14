@@ -21,7 +21,8 @@ type PageHeaderProps = {
 
 /**
  * Cabeçalho de página do painel: breadcrumb opcional, link de retorno,
- * título 30/36 bold, descrição 16/24 medium e ações à direita.
+ * título 30/36 bold, descrição 18/28 medium (o Figma tem 16; 18 evita o
+ * salto de 3 degraus 30 → 16) e ações à direita.
  */
 export function PageHeader({
   title,
@@ -48,8 +49,9 @@ export function PageHeader({
               <div aria-busy="true" className="flex flex-col gap-1">
                 <Skeleton className="h-9 w-64 max-w-full" />
                 {description !== undefined ? (
-                  <Skeleton className="h-6 w-96 max-w-full" />
+                  <Skeleton className="h-7 w-96 max-w-full" />
                 ) : null}
+                <span className="sr-only">Carregando…</span>
               </div>
             ) : (
               <>
@@ -57,7 +59,7 @@ export function PageHeader({
                   {title}
                 </h2>
                 {description ? (
-                  <p className="text-base font-medium text-muted-foreground">
+                  <p className="text-lg font-medium text-muted-foreground">
                     {description}
                   </p>
                 ) : null}

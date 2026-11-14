@@ -7,8 +7,9 @@ import {
   type Row,
   type Table as ReactTableInstance,
 } from "@tanstack/react-table";
-import { AlertTriangle, FileX } from "lucide-react";
+import { FileX } from "lucide-react";
 
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/table";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+import { cellMetaClass, headerMetaClass } from "./column-meta";
 import { DataTableStatus } from "./data-table-status";
 
 const SKELETON_ROWS = 4;
@@ -51,6 +53,11 @@ type DataTableProps<TData, TValue> = {
    */
   emptyActionLabel?: string;
   onEmptyAction?: () => void;
+  /**
+   * Alternativa a `onEmptyAction` quando a ação de vazio é navegação (ex.:
+   * "Novo plano" → `/admin/planos/novo`): vira um link real.
+   */
+  emptyActionHref?: string;
   errorHint?: string;
   /**
    * Quando informado, o `DataTable` alterna para um layout de cards em
@@ -74,6 +81,7 @@ export function DataTable<TData, TValue>({
   emptyHint = "",
   emptyActionLabel,
   onEmptyAction,
+  emptyActionHref,
   errorHint = "Tente novamente em alguns instantes.",
   renderMobileCard,
 }: DataTableProps<TData, TValue>) {
@@ -89,15 +97,20 @@ export function DataTable<TData, TValue>({
     if (hasError) {
       // Erro é checado ANTES de "vazio": uma falha de rede nunca pode
       // aparecer como "nenhum registro cadastrado".
+      // InlineAlert destrutivo (role=alert) com "Tentar novamente": o erro
+      // não pode parecer um estado vazio.
       return (
-        <DataTableStatus
-          role="alert"
-          icon={AlertTriangle}
-          title="Não foi possível carregar os dados."
-          hint={errorHint}
-          actionLabel="Tentar novamente"
-          onAction={onRetry}
-        />
+        <div className="p-4 whitespace-normal">
+          <InlineAlert
+            variant="destructive"
+            action={
+              onRetry ? { label: "Tentar novamente", onClick: onRetry } : undefined
+            }
+          >
+            <p className="font-medium">Não foi possível carregar os dados.</p>
+            {errorHint ? <p>{errorHint}</p> : null}
+          </InlineAlert>
+        </div>
       );
     }
     return (
@@ -111,6 +124,8 @@ export function DataTable<TData, TValue>({
         hint={hasActiveFilters ? "Tente ajustar ou limpar os filtros." : emptyHint}
         actionLabel={hasActiveFilters ? "Limpar filtros" : emptyActionLabel}
         onAction={hasActiveFilters ? onClearFilters : onEmptyAction}
+        actionHref={hasActiveFilters ? undefined : emptyActionHref}
+        actionVariant={hasActiveFilters ? "outline" : "default"}
       />
     );
   }
@@ -161,7 +176,10 @@ export function DataTable<TData, TValue>({
                   <TableHead
                     key={header.id}
                     aria-sort={ariaSort}
-                    className={edgePadding(headerIndex, headerGroup.headers.length)}
+                    className={cn(
+                      edgePadding(headerIndex, headerGroup.headers.length),
+                      headerMetaClass(header.column.columnDef.meta),
+                    )}
                   >
                     {header.isPlaceholder
                       ? null
@@ -204,7 +222,10 @@ export function DataTable<TData, TValue>({
                 {row.getVisibleCells().map((cell, cellIndex, cells) => (
                   <TableCell
                     key={cell.id}
-                    className={edgePadding(cellIndex, cells.length)}
+                    className={cn(
+                      edgePadding(cellIndex, cells.length),
+                      cellMetaClass(cell.column.columnDef.meta),
+                    )}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>

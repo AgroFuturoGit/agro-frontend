@@ -105,3 +105,40 @@ describe("SectionHeader", () => {
     expect(screen.getByRole("button", { name: "Novo financiamento" })).toBeInTheDocument();
   });
 });
+
+describe("PageHeader/BackLink — escala e foco (A11Y-2/5/17)", () => {
+  afterEach(cleanup);
+
+  it("descrição em 18px (text-lg): no máximo 2 degraus abaixo do título de 30px", () => {
+    render(<PageHeader title="Usuários" description="Gerencie os usuários." />);
+
+    expect(screen.getByText("Gerencie os usuários.")).toHaveClass("text-lg");
+  });
+
+  it("loading anuncia 'Carregando…' para leitor de tela", () => {
+    render(<PageHeader title="Usuários" description="x" loading />);
+
+    expect(screen.getByText("Carregando…")).toHaveClass("sr-only");
+  });
+
+  it("BackLink e link do breadcrumb têm anel de foco opaco com offset", () => {
+    render(
+      <PageHeader
+        title="Plano"
+        breadcrumb={[{ label: "Planos", href: "/admin/planos" }, { label: "Plano 1" }]}
+        back={{ href: "/admin/planos", label: "Voltar para planos" }}
+      />,
+    );
+
+    for (const name of ["Planos", "Voltar para planos"]) {
+      const link = screen.getByRole("link", { name });
+      expect(link).toHaveClass(
+        "focus-visible:ring-2",
+        "focus-visible:ring-ring",
+        "focus-visible:ring-offset-2",
+      );
+      expect(link.className).not.toMatch(/ring-ring\/50/);
+    }
+  });
+});
+

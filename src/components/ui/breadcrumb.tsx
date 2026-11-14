@@ -49,7 +49,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps) {
                 <Link
                   href={item.href}
                   title={item.label}
-                  className="max-w-64 truncate rounded-sm transition-colors outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring/50 motion-reduce:transition-none"
+                  className="max-w-64 truncate rounded-sm transition-colors outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none"
                 >
                   {item.label}
                 </Link>

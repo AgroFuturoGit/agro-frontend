@@ -35,7 +35,7 @@ type DataTableToolbarProps<TData> = {
 };
 
 const CHIP_CLASS =
-  "inline-flex h-control-sm items-center gap-1 rounded-full bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none motion-reduce:transition-none";
+  "inline-flex h-control-sm items-center gap-1 rounded-full bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none";
 
 export function DataTableToolbar<TData>({
   table,
@@ -94,6 +94,8 @@ export function DataTableToolbar<TData>({
             type="search"
             value={rawSearch}
             placeholder={searchPlaceholder}
+            // O placeholder some ao digitar: o nome acessível vem do aria-label.
+            aria-label={searchPlaceholder.replace(/…$/, "").trim() || "Buscar na tabela"}
             className="pl-8"
             onChange={(e) => setRawSearch(e.target.value)}
           />
@@ -126,22 +128,29 @@ export function DataTableToolbar<TData>({
             <button
               type="button"
               onClick={clearSearch}
+              // O nome diz a ação (remover) e contém o texto visível do chip.
+              aria-label={`Remover filtro Busca: ${appliedSearch}`}
               className={CHIP_CLASS}
             >
               Busca: {appliedSearch} <X className="size-3" aria-hidden="true" />
             </button>
           )}
-          {activeColumnFilters.map(({ filter, value }) => (
-            <button
-              key={filter.columnId}
-              type="button"
-              onClick={() => table.getColumn(filter.columnId)?.setFilterValue(undefined)}
-              className={CHIP_CLASS}
-            >
-              {filter.label}: {filter.options.find((o) => o.value === value)?.label ?? value}{" "}
-              <X className="size-3" aria-hidden="true" />
-            </button>
-          ))}
+          {activeColumnFilters.map(({ filter, value }) => {
+            const valueLabel =
+              filter.options.find((o) => o.value === value)?.label ?? value;
+            return (
+              <button
+                key={filter.columnId}
+                type="button"
+                onClick={() => table.getColumn(filter.columnId)?.setFilterValue(undefined)}
+                aria-label={`Remover filtro ${filter.label}: ${valueLabel}`}
+                className={CHIP_CLASS}
+              >
+                {filter.label}: {valueLabel}{" "}
+                <X className="size-3" aria-hidden="true" />
+              </button>
+            );
+          })}
           <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
             Limpar
           </Button>

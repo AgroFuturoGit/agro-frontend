@@ -209,3 +209,38 @@ describe("SidebarNav — menu do celular", () => {
     expect(screen.getByTestId("open-mobile").textContent).toBe("false");
   });
 });
+
+describe("SidebarNav — item ativo acessível (A11Y-7)", () => {
+  afterEach(async () => {
+    cleanup();
+    vi.restoreAllMocks();
+    const { resetNavigationMock } = await import("@/test/next-navigation");
+    resetNavigationMock();
+  });
+
+  it("marca só o link da rota atual com aria-current='page'", async () => {
+    const { setPathname } = await import("@/test/next-navigation");
+    setPathname("/admin/culturas/123");
+    mockRole("ADMIN");
+    renderSidebarNav();
+
+    const active = await screen.findByRole("link", { name: /Culturas/ });
+    expect(active).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /Visão geral/ })).not.toHaveAttribute(
+      "aria-current",
+    );
+    expect(screen.getByRole("link", { name: /Safras/ })).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("'Visão geral' só é atual na rota exata /admin", async () => {
+    mockRole("ADMIN");
+    renderSidebarNav();
+
+    expect(await screen.findByRole("link", { name: /Visão geral/ })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+});

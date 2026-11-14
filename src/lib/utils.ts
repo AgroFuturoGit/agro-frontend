@@ -8,7 +8,7 @@ const twMerge = extendTailwindMerge({
   extend: {
     theme: {
       text: ["page-title", "section-title", "kpi", "gauge", "body", "caption"],
-      spacing: ["control", "control-sm"],
+      spacing: ["control", "control-sm", "section", "section-sm"],
       radius: ["nav"],
     },
   },

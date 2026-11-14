@@ -91,7 +91,11 @@ export function SidebarNav() {
               tooltip={label}
               className="gap-5 px-3 text-base"
               render={
-                <Link href={href} onClick={() => setOpenMobile(false)}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setOpenMobile(false)}
+                >
                   <Icon aria-hidden="true" />
                   <span>{label}</span>
                 </Link>

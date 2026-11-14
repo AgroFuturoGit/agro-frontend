@@ -10,7 +10,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarHeader,
-  SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -34,6 +33,7 @@ export default function AdminLayout({
             <SidebarHeader className="px-5 pt-7 pb-0 group-data-[collapsible=icon]:px-2">
               <Link
                 href="/admin"
+                aria-label="ProduPlan — Visão geral"
                 className="flex h-9 items-center gap-2 rounded-nav px-3 text-lg font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:px-0"
               >
                 <span className="grid size-9 shrink-0 place-items-center rounded-md bg-brand text-brand-foreground group-data-[collapsible=icon]:size-8">
@@ -46,7 +46,9 @@ export default function AdminLayout({
             </SidebarHeader>
             <SidebarContent>
               <SidebarGroup className="px-5 pt-8 group-data-[collapsible=icon]:px-2">
-                <SidebarNav />
+                <nav aria-label="Navegação principal">
+                  <SidebarNav />
+                </nav>
               </SidebarGroup>
             </SidebarContent>
             <SidebarFooter className="px-5 pb-7 group-data-[collapsible=icon]:px-2">
@@ -56,10 +58,13 @@ export default function AdminLayout({
             </SidebarFooter>
           </Sidebar>
 
-          <SidebarInset
-            id="conteudo-principal"
-            tabIndex={-1}
-            className="bg-background outline-none"
+          {/* Coluna do conteúdo. O <header> fica fora do <main> (vira o
+              landmark banner) e o skip link salta direto para o conteúdo da
+              página, sem passar de novo pelo gatilho e pelo menu do usuário.
+              Mesmo visual do SidebarInset, que sempre renderiza <main>. */}
+          <div
+            data-slot="sidebar-inset"
+            className="relative flex w-full min-w-0 flex-1 flex-col bg-background"
           >
             <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-header px-4 text-header-foreground md:h-(--header-height) md:px-6 lg:px-(--page-padding-x)">
               <SidebarTrigger className="-ml-1.5 size-control [&_svg:not([class*='size-'])]:size-6" />
@@ -70,10 +75,14 @@ export default function AdminLayout({
                 <UserMenu />
               </div>
             </header>
-            <div className="flex-1 overflow-y-auto p-4 md:px-6 md:pt-(--page-padding-y) md:pb-8 lg:px-(--page-padding-x)">
+            <main
+              id="conteudo-principal"
+              tabIndex={-1}
+              className="flex flex-1 flex-col gap-section overflow-y-auto p-4 outline-none md:px-6 md:pt-(--page-padding-y) md:pb-8 lg:px-(--page-padding-x)"
+            >
               {children}
-            </div>
-          </SidebarInset>
+            </main>
+          </div>
         </SidebarProvider>
       </TooltipProvider>
     </div>
