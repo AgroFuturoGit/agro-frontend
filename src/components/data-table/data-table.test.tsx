@@ -590,3 +590,36 @@ describe("DataTable — columnDef.meta e RowActions (UX-4/UX-5)", () => {
   });
 });
 
+
+describe("DataTableRowActions — title e tone primary (lote 4)", () => {
+  afterEach(cleanup);
+
+  it("title vira tooltip sem trocar o nome acessível (botão e link)", () => {
+    render(
+      <DataTableRowActions
+        actions={[
+          { label: "Ocorrências do apontamento", title: "Ocorrências", icon: Pencil, onClick: vi.fn() },
+          { label: "Ver plano", title: "Abrir", icon: Pencil, href: "/admin/planos/1" },
+          { label: "Sem dica", icon: Pencil, onClick: vi.fn() },
+        ]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Ocorrências do apontamento" })).toHaveAttribute(
+      "title",
+      "Ocorrências",
+    );
+    expect(screen.getByRole("link", { name: "Ver plano" })).toHaveAttribute("title", "Abrir");
+    expect(screen.getByRole("button", { name: "Sem dica" })).not.toHaveAttribute("title");
+  });
+
+  it("tone primary usa text-primary, sem cor destrutiva nem neutra", () => {
+    render(
+      <DataTableRowActions
+        actions={[{ label: "Validar", icon: Pencil, onClick: vi.fn(), tone: "primary" }]}
+      />,
+    );
+    const button = screen.getByRole("button", { name: "Validar" });
+    expect(button).toHaveClass("text-primary");
+    expect(button.className).not.toMatch(/text-destructive|text-muted-foreground/);
+  });
+});

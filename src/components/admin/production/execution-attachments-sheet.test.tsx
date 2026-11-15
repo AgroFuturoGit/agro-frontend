@@ -441,3 +441,21 @@ describe("ExecutionAttachmentsSheet — nova tentativa do envio (UNIT-003)", () 
     expect(screen.queryByRole("button", { name: /Tentar novamente x\.png/ })).toBeNull();
   });
 });
+
+describe("ExecutionAttachmentsSheet — lote 4", () => {
+  it("UX-L4-04: vazio com escrita tem um único botão de envio e o input preservado", async () => {
+    vi.mocked(listAttachments).mockResolvedValue([]);
+    renderSheet(true);
+    await screen.findByText("Nenhuma foto anexada.");
+    expect(screen.getAllByRole("button", { name: /Enviar/ })).toHaveLength(1);
+    expect(input()).toBeInTheDocument();
+  });
+
+  it("falha 500 com 'Erro 500' cru na lista mostra o texto padrão", async () => {
+    vi.mocked(listAttachments).mockRejectedValueOnce(new ApiError(500, "Erro 500", null));
+    renderSheet(true);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível carregar as fotos.");
+    expect(alert.textContent).not.toContain("Erro 500");
+  });
+});

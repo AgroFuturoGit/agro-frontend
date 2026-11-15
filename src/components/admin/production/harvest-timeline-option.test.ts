@@ -201,3 +201,18 @@ describe("buildChartSummary", () => {
     ).toBe("Realizado 1 kg validados e 2 kg pendentes");
   });
 });
+
+describe("buildHarvestChartOption — fonte do sistema (lote 4)", () => {
+  it("fontFamily vai para o textStyle global e o do tooltip; ausente quando não informado", () => {
+    const tl = timeline();
+    const withFont = buildHarvestChartOption(tl, { ...COLORS, fontFamily: "Inter" }, {
+      expectedYield: 1800,
+    }) as unknown as { textStyle: { fontFamily?: string }; tooltip: { textStyle: { fontFamily?: string } } };
+    expect(withFont.textStyle.fontFamily).toBe("Inter");
+    expect(withFont.tooltip.textStyle.fontFamily).toBe("Inter");
+
+    const without = build(tl) as unknown as { textStyle: object; tooltip: { textStyle: object } };
+    expect(without.textStyle).not.toHaveProperty("fontFamily");
+    expect(without.tooltip.textStyle).not.toHaveProperty("fontFamily");
+  });
+});

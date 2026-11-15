@@ -600,6 +600,10 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     );
   }
 
+  // Falha na primeira carga: sem plano não há o que listar, e a tabela vazia
+  // diria "nenhum apontamento" quando na verdade nada foi lido (UX-L4-01).
+  const showExecutions = !(error && !plan);
+
   const planTitle =
     !loading && plan?.crop
       ? `${plan.crop.name} — ${plan.crop.variety}`
@@ -652,53 +656,51 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         plan && <ContinuousHarvestChart plan={plan} executions={executions} />
       )}
 
-      {/* Falha na primeira carga: sem plano não há o que listar; a tabela vazia
-          diria "nenhum apontamento" quando na verdade nada foi lido. */}
-      {!(error && !plan) && (
-      <section
-        aria-labelledby="plan-executions-title"
-        className="flex flex-col gap-section-sm"
-      >
-        <SectionHeader
-          id="plan-executions-title"
-          title="Apontamentos de colheita"
-          description="Histórico diário do que foi colhido em campo. Somente apontamentos validados contam no realizado."
-          actions={
-            canWrite && plan ? (
-              <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
-                <Plus aria-hidden="true" />
-                Novo apontamento
-              </Button>
-            ) : undefined
-          }
-        />
+      {showExecutions && (
+        <section
+          aria-labelledby="plan-executions-title"
+          className="flex flex-col gap-section-sm"
+        >
+          <SectionHeader
+            id="plan-executions-title"
+            title="Apontamentos de colheita"
+            description="Histórico diário do que foi colhido em campo. Somente apontamentos validados contam no realizado."
+            actions={
+              canWrite && plan ? (
+                <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+                  <Plus aria-hidden="true" />
+                  Novo apontamento
+                </Button>
+              ) : undefined
+            }
+          />
 
-        {/*
-          Erro de carregamento é da tela inteira (plano, comparativo e
-          apontamentos vêm juntos) e já aparece no alerta do topo — por isso
-          o DataTable não recebe `hasError`.
-        */}
-        <DataTable
-          table={table}
-          columns={columns}
-          isLoading={loading}
-          emptyTitle="Nenhum apontamento registrado ainda."
-          emptyHint={
-            canWrite && plan
-              ? "Registre cada colheita com a data e a quantidade colhida."
-              : "Os apontamentos deste plano aparecem aqui quando forem registrados."
-          }
-          emptyActionLabel={
-            canWrite && plan ? "Criar primeiro apontamento" : undefined
-          }
-          onEmptyAction={
-            canWrite && plan ? () => setCreateOpen(true) : undefined
-          }
-          renderMobileCard={renderMobileCard}
-        />
+          {/*
+            Erro de carregamento é da tela inteira (plano, comparativo e
+            apontamentos vêm juntos) e já aparece no alerta do topo — por isso
+            o DataTable não recebe `hasError`.
+          */}
+          <DataTable
+            table={table}
+            columns={columns}
+            isLoading={loading}
+            emptyTitle="Nenhum apontamento registrado ainda."
+            emptyHint={
+              canWrite && plan
+                ? "Registre cada colheita com a data e a quantidade colhida."
+                : "Os apontamentos deste plano aparecem aqui quando forem registrados."
+            }
+            emptyActionLabel={
+              canWrite && plan ? "Criar primeiro apontamento" : undefined
+            }
+            onEmptyAction={
+              canWrite && plan ? () => setCreateOpen(true) : undefined
+            }
+            renderMobileCard={renderMobileCard}
+          />
 
-        <DataTablePagination table={table} />
-      </section>
+          <DataTablePagination table={table} />
+        </section>
       )}
 
       <ExecutionOccurrencesSheet
