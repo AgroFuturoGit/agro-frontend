@@ -6,10 +6,11 @@ import { OrganizationsPage } from "@/components/admin/organizations/organization
 import { useIsMobile } from "@/hooks/use-mobile";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { ApiError } from "@/lib/api";
-import { getMyManager } from "@/lib/managers";
+import { getMyManager, type Manager } from "@/lib/managers";
 import { listOrganizations, type Organization } from "@/lib/organizations";
-import type { Producer } from "@/lib/producers";
+import { getMyProducer, type Producer } from "@/lib/producers";
 import { getMyAssignedProducers } from "@/lib/technicians";
+import { resetNavigationMock, router } from "@/test/next-navigation";
 
 vi.mock("next/navigation", async () => {
   const { navigationMockModule } = await import("@/test/next-navigation");
@@ -36,6 +37,12 @@ vi.mock("@/lib/managers", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/managers")>("@/lib/managers");
   return { ...actual, getMyManager: vi.fn() };
+});
+
+vi.mock("@/lib/producers", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/producers")>("@/lib/producers");
+  return { ...actual, getMyProducer: vi.fn() };
 });
 
 vi.mock("@/lib/auth", async () => {
@@ -77,6 +84,7 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.mocked(useIsMobile).mockReturnValue(false);
   vi.useRealTimers();
+  resetNavigationMock();
 });
 
 describe("OrganizationsPage — listagem do ADMIN", () => {
@@ -308,5 +316,114 @@ describe("OrganizationsPage — redirecionamento do GESTOR", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Organizações" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeTruthy();
     expect(listOrganizations).not.toHaveBeenCalled();
+  });
+});
+
+/** Promessa controlada pelo teste: mantém o estado de espera na tela. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
+describe("OrganizationsPage — redirecionamento (espera e destino)", () => {
+  it("GESTOR: texto de espera com aria-busy e replace para a própria organização", async () => {
+    loginAs("MANAGER");
+    const manager = deferred<Manager>();
+    vi.mocked(getMyManager).mockReturnValueOnce(manager.promise);
+
+    render(<OrganizationsPage />);
+
+    const waiting = await screen.findByText("Abrindo a sua organização…");
+    expect(waiting).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Organizações" })).toBeTruthy();
+    expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Nova organização" })).toBeNull();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(listOrganizations).not.toHaveBeenCalled();
+
+    manager.resolve({ id: "m-1", organization: ORGANIZATIONS[1] } as Manager);
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith("/admin/organizacoes/org-a"),
+    );
+  });
+
+  it("AGRICULTOR: texto de espera e replace para os próprios planos", async () => {
+    loginAs("FARMER");
+    const me = deferred<Producer>();
+    vi.mocked(getMyProducer).mockReturnValueOnce(me.promise);
+
+    render(<OrganizationsPage />);
+
+    expect(await screen.findByText("Abrindo os seus planos de produção…")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Nova organização" })).toBeNull();
+    expect(listOrganizations).not.toHaveBeenCalled();
+
+    me.resolve(
+      producer("p-9", "Ana Lima", {
+        id: "c-1",
+        name: "Baixa Grande",
+        organization: ORGANIZATIONS[0],
+      }),
+    );
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith(
+        "/admin/organizacoes/org-c/comunidades/c-1/produtores/p-9",
+      ),
+    );
+  });
+
+  it("AGRICULTOR sem comunidade: alerta pedindo suporte, sem redirecionar", async () => {
+    loginAs("FARMER");
+    vi.mocked(getMyProducer).mockResolvedValueOnce(producer("p-9", "Ana Lima", null));
+
+    render(<OrganizationsPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Contate o suporte");
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("OrganizationsPage — paginação da lista do TÉCNICO", () => {
+  const many = (count: number) =>
+    Array.from({ length: count }, (_, i) =>
+      producer(`p-${i + 1}`, `Agricultor ${String(i + 1).padStart(2, "0")}`, null),
+    );
+
+  it("com 10 ou menos agricultores não mostra a paginação", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(getMyAssignedProducers).mockResolvedValue(many(10));
+
+    render(<OrganizationsPage />);
+
+    expect(await screen.findByText("Agricultor 10")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
+  });
+
+  it("acima de 10 pagina a lista", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(getMyAssignedProducers).mockResolvedValue(many(11));
+
+    render(<OrganizationsPage />);
+
+    expect(await screen.findByText("Agricultor 10")).toBeTruthy();
+    expect(screen.queryByText("Agricultor 11")).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Paginação" })).toBeTruthy();
+  });
+});
+
+describe("OrganizationsPage — erro sem mensagem de domínio (UX-L3-05)", () => {
+  it("'Erro 500' cai no texto padrão, sem mostrar o código", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listOrganizations).mockRejectedValueOnce(new ApiError(500, "Erro 500", null));
+
+    render(<OrganizationsPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Tente novamente em alguns instantes.");
+    expect(alert.textContent).not.toContain("Erro 500");
   });
 });

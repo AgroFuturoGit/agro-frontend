@@ -200,3 +200,36 @@ describe("OrganizationFormDrawer — erro de servidor com campo específico (gap
     expect(parseOrganizationFieldErrors).toHaveBeenCalledWith(errorPayload);
   });
 });
+
+function expectLinkedError(control: HTMLElement, message: string) {
+  expect(control.getAttribute("aria-invalid")).toBe("true");
+  const errorId = control.getAttribute("aria-describedby");
+  expect(errorId).toBeTruthy();
+  expect(document.getElementById(errorId as string)?.textContent).toBe(message);
+}
+
+describe("OrganizationFormDrawer — erros ligados aos campos (A11Y-L3-1)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("nome, CNPJ e tipo vazios: aria-invalid + aria-describedby para a mensagem", async () => {
+    renderDialog("create");
+    await screen.findByLabelText("Nome");
+    fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+
+    await screen.findByText("Informe o nome da organização");
+    expectLinkedError(screen.getByLabelText("Nome"), "Informe o nome da organização");
+    expectLinkedError(screen.getByLabelText("CNPJ"), "Informe o CNPJ");
+    expectLinkedError(screen.getByLabelText("Tipo"), "Selecione o tipo");
+  });
+
+  it("sem erro, os campos não apontam para mensagem nenhuma", async () => {
+    renderDialog("create");
+    const name = await screen.findByLabelText("Nome");
+    expect(name.getAttribute("aria-describedby")).toBeNull();
+    expect(name.getAttribute("aria-invalid")).toBe("false");
+  });
+});
+

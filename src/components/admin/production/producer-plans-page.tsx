@@ -65,8 +65,6 @@ type BreadcrumbNames = {
   producerLabel: string;
 };
 
-const cropLabel = planCropLabel;
-
 function PlanStatusBadge({ plan }: { plan: ProductionPlan }) {
   if (!plan.status) return <EmptyValue />;
   return (
@@ -85,7 +83,7 @@ function plansGlobalFilter(
   const query = filterValue.trim().toLowerCase();
   if (!query) return true;
   const plan = row.original;
-  return [cropLabel(plan), plan.harvest?.label].some((value) =>
+  return [planCropLabel(plan), plan.harvest?.label].some((value) =>
     value?.toLowerCase().includes(query),
   );
 }
@@ -313,7 +311,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
 
   const columns = useMemo(() => {
     const baseColumns = [
-      columnHelper.accessor((plan) => cropLabel(plan), {
+      columnHelper.accessor((plan) => planCropLabel(plan), {
         id: "crop",
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Cultivo" disabled={loading} />
@@ -321,7 +319,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         meta: { cellVariant: "primary" },
         cell: ({ row }) => (
           <Link href={planHref(row.original)} className="hover:underline">
-            {cropLabel(row.original) || <EmptyValue />}
+            {planCropLabel(row.original) || <EmptyValue />}
           </Link>
         ),
       }),
@@ -415,7 +413,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
               href={planHref(plan)}
               className="font-medium text-foreground hover:underline"
             >
-              {cropLabel(plan) || <EmptyValue />}
+              {planCropLabel(plan) || <EmptyValue />}
             </Link>
             <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {plan.harvest?.label || <EmptyValue />} · Plantio{" "}

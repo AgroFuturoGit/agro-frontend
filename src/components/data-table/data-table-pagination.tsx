@@ -17,6 +17,21 @@ import {
 const PAGE_BUTTON_CLASS =
   "inline-flex size-control-sm items-center justify-center text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent motion-reduce:transition-none";
 
+/** Tamanhos de página oferecidos em "Itens por página:". */
+export const PER_PAGE_OPTIONS = [10, 20, 30, 50];
+
+/**
+ * Listas curtas sem paginação no Figma (lista do técnico, seções do
+ * agricultor) só mostram o rodapé acima do menor tamanho de página: assim a
+ * troca de "Itens por página" nunca esconde o próprio seletor.
+ */
+export const PAGINATION_MIN_ROWS = PER_PAGE_OPTIONS[0];
+
+/** `true` quando a lista curta passa do menor tamanho de página. */
+export function needsPagination(rowCount: number): boolean {
+  return rowCount > PAGINATION_MIN_ROWS;
+}
+
 type DataTablePaginationProps<TData> = {
   /** Instância já criada pelo chamador via `useReactTable` — nunca criada aqui. */
   table: ReactTableInstance<TData>;
@@ -25,7 +40,7 @@ type DataTablePaginationProps<TData> = {
 
 export function DataTablePagination<TData>({
   table,
-  perPageOptions = [10, 20, 30, 50],
+  perPageOptions = PER_PAGE_OPTIONS,
 }: DataTablePaginationProps<TData>) {
   const perPageId = useId();
   const { pageIndex, pageSize } = table.getState().pagination;

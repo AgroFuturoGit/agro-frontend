@@ -287,7 +287,11 @@ describe("FamilyCompositionSection — visual do redesign", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Adicionar primeiro membro" }));
+    // BP-L3-01: CTA de seção com o mesmo peso (outline) do botão do cabeçalho.
+    const cta = screen.getByRole("button", { name: "Adicionar primeiro membro" });
+    expect(cta.className).toContain("border-border");
+    expect(cta.className).not.toContain("bg-primary");
+    fireEvent.click(cta);
     expect(await screen.findByRole("dialog")).toHaveTextContent("Novo membro familiar");
   });
 
@@ -310,3 +314,26 @@ describe("FamilyCompositionSection — visual do redesign", () => {
     expect(screen.getByLabelText("Nome").getAttribute("aria-describedby")).toBe(error.id);
   });
 });
+
+describe("FamilyCompositionSection — paginação e erro (UX-L3-05/06)", () => {
+  it("com 10 ou menos membros não mostra a paginação", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      ...MARIA,
+      id: `m-${i + 1}`,
+      name: `Membro ${String(i + 1).padStart(2, "0")}`,
+    }));
+    vi.mocked(listFamilyMembers).mockResolvedValue(ten);
+    render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+    await screen.findByText("Membro 10");
+    expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
+  });
+
+  it("erro sem mensagem de domínio (Erro 500) mostra o texto padrão, não o código", async () => {
+    vi.mocked(listFamilyMembers).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Tente novamente em alguns instantes.");
+    expect(alert.textContent).not.toContain("Erro 500");
+  });
+});
+

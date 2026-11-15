@@ -22,7 +22,10 @@ import { EmptyValue } from "@/components/admin/empty-value";
 import { PageHeader } from "@/components/admin/page-header";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
-import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTablePagination,
+  needsPagination,
+} from "@/components/data-table/data-table-pagination";
 import {
   DataTableRowActions,
   type DataTableRowAction,
@@ -481,7 +484,7 @@ export function OrganizationsPage() {
 
         {/* Como no Figma (135:898), sem paginação para listas curtas. Acima
             do menor tamanho de página, a lista passa a ser paginada (13.2). */}
-        {!loading && !error && sortedAssignedProducers.length > 10 ? (
+        {!loading && !error && needsPagination(sortedAssignedProducers.length) ? (
           <DataTablePagination table={producersTable} />
         ) : null}
       </div>

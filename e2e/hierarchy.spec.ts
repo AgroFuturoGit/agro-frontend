@@ -185,7 +185,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
       page.getByRole("cell", { name: organizationName, exact: true }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Criar gestor para" }).click();
+    await page.getByRole("button", { name: `Criar gestor para ${organizationName}` }).click();
 
     const managerDialog = page.getByRole("dialog");
     await expect(managerDialog).toBeVisible();

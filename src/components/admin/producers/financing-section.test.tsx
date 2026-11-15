@@ -315,7 +315,44 @@ describe("FinancingSection — visual do redesign", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Adicionar primeiro financiamento" }));
+    // BP-L3-01: CTA de seção com o mesmo peso (outline) do botão do cabeçalho.
+    const cta = screen.getByRole("button", { name: "Adicionar primeiro financiamento" });
+    expect(cta.className).toContain("border-border");
+    expect(cta.className).not.toContain("bg-primary");
+    fireEvent.click(cta);
     expect(await screen.findByRole("dialog")).toHaveTextContent("Novo financiamento");
   });
 });
+
+describe("FinancingSection — erros ligados aos campos (A11Y-L3-1)", () => {
+  it("'Situação' vazia: o select nativo aponta para a mensagem de erro", async () => {
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    await screen.findByText("PRONAF Custeio");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar financiamento" }));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    const error = await screen.findByText("A situação é obrigatória");
+    const select = screen.getByLabelText("Situação");
+    expect(select.getAttribute("aria-invalid")).toBe("true");
+    expect(select.getAttribute("aria-describedby")).toBe("financing-status-error");
+    expect(error.id).toBe("financing-status-error");
+    const description = screen.getByLabelText("Descrição");
+    expect(description.getAttribute("aria-describedby")).toBe(
+      screen.getByText("A descrição é obrigatória").id,
+    );
+  });
+
+  it("com 10 ou menos financiamentos não mostra a paginação", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      ...PRONAF,
+      id: `fin-${i + 1}`,
+      description: `Financiamento ${String(i + 1).padStart(2, "0")}`,
+    }));
+    vi.mocked(listFinancings).mockResolvedValue(ten);
+    render(<FinancingSection farmerId="f-1" canWrite={false} />);
+    await screen.findByText("Financiamento 10");
+    expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
+  });
+});
+

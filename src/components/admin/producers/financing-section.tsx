@@ -36,7 +36,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable } from "@/components/data-table/data-table";
-import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTablePagination,
+  needsPagination,
+} from "@/components/data-table/data-table-pagination";
 import {
   DataTableRowActions,
   type DataTableRowAction,
@@ -385,7 +388,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
       )}
       {/* Paginação só acima do menor tamanho de página (10), como na lista
           do técnico: as seções raramente passam disso. */}
-      {showTotal && items.length > 10 ? <DataTablePagination table={table} /> : null}
+      {showTotal && needsPagination(items.length) ? <DataTablePagination table={table} /> : null}
 
       {canWrite && (
         <>

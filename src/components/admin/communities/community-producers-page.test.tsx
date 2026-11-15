@@ -471,3 +471,26 @@ describe("CommunityProducersPage — diálogo de exclusão (UX-L3-02)", () => {
     );
   });
 });
+
+describe("CommunityProducersPage — exclusão de agricultor sem login", () => {
+  it("sem usuário vinculado: não fala de acesso ao painel e, sem CPF, não mostra parênteses", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([
+      { ...PRODUCER_ALFA, id: "producer-9", fullName: "Sem Login", cpf: null, user: null },
+    ]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    await userEvent.setup().click(
+      await screen.findByRole("button", { name: "Excluir agricultor Sem Login" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Sem Login");
+    expect(dialog.textContent).not.toContain("acesso dele ao painel");
+    expect(dialog.textContent).not.toContain("(CPF");
+    expect(dialog.textContent).toContain(
+      "Agricultores com planos de produção não podem ser excluídos.",
+    );
+  });
+});
+
