@@ -293,3 +293,38 @@ describe("ExecutionOccurrencesSheet — formulário (UNIT-005)", () => {
     await waitFor(() => expect(listOccurrences).toHaveBeenCalledTimes(2));
   });
 });
+
+describe("ExecutionOccurrencesSheet — revisão r1 do lote 4", () => {
+  it("A11Y-L4-2: erros de campo ficam em aria-describedby", async () => {
+    renderSheet(true);
+    await screen.findByText("Lagarta do cartucho");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar ocorrência" }));
+    await screen.findByText("Nova ocorrência");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    const typeError = await screen.findByText("O tipo de ocorrência é obrigatório");
+    expect(screen.getByLabelText("Tipo").getAttribute("aria-describedby")).toBe(typeError.id);
+    const descError = screen.getByText("A descrição é obrigatória");
+    expect(screen.getByLabelText("Descrição").getAttribute("aria-describedby")).toBe(descError.id);
+  });
+
+  it("A11Y-L4-5: abrir o formulário foca o Tipo; voltar devolve o foco ao botão", async () => {
+    renderSheet(true);
+    await screen.findByText("Lagarta do cartucho");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar ocorrência" }));
+    await screen.findByText("Nova ocorrência");
+    await waitFor(() => expect(document.activeElement?.id).toBe("occurrence-type"));
+    fireEvent.click(screen.getByRole("button", { name: "Voltar à lista" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Adicionar ocorrência" }),
+      ),
+    );
+  });
+
+  it("UX-L4-04: lista vazia não repete o CTA (só o botão do topo)", async () => {
+    vi.mocked(listOccurrences).mockResolvedValue([]);
+    renderSheet(true);
+    await screen.findByText("Nenhuma ocorrência registrada neste apontamento");
+    expect(screen.getAllByRole("button", { name: /Adicionar/ })).toHaveLength(1);
+  });
+});

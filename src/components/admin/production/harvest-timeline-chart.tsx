@@ -113,6 +113,24 @@ function useThemeVersion(
   return version;
 }
 
+/**
+ * Skeleton com a forma do card pronto (título, descrição, gráfico de 320px e
+ * legenda), para a seção de baixo não saltar quando o gráfico chega.
+ */
+export function HarvestChartSkeleton() {
+  return (
+    <Card aria-busy="true" aria-label="Carregando gráfico" className="p-6">
+      <div className="flex flex-col gap-1">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-6 w-64 max-w-full" />
+      </div>
+      <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />
+      <Skeleton className="h-4 w-56" />
+      <span className="sr-only">Carregando gráfico…</span>
+    </Card>
+  );
+}
+
 type Props = {
   plan: ProductionPlan;
   executions: ProductionExecution[];
@@ -263,7 +281,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   }
 
   if (loading && data === null) {
-    return <Skeleton className="h-80 w-full rounded-xl" aria-label="Carregando gráfico" />;
+    return <HarvestChartSkeleton />;
   }
 
   if (isEmpty) {
@@ -308,8 +326,10 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
                   className={cn(
                     "min-w-11 px-4 text-sm font-medium transition-colors outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none",
                     index > 0 && "border-l border-input",
+                    // --ring = --primary: no segmento ativo (fundo verde) o anel
+                    // vira o primary-foreground para continuar visível.
                     active === value
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground focus-visible:ring-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >

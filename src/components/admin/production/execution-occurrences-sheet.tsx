@@ -122,6 +122,21 @@ export function ExecutionOccurrencesSheet({
 
   // Sequência da última carga: respostas de apontamento ou carga antigos são descartadas.
   const loadSeq = useRef(0);
+  // Abrir/fechar o formulário desmonta o botão focado: o foco vai para o
+  // primeiro campo ao abrir e volta para "Adicionar ocorrência" ao fechar.
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const focusAfterToggle = useRef<"form" | "add" | null>(null);
+
+  useEffect(() => {
+    const target = focusAfterToggle.current;
+    if (!target) return;
+    focusAfterToggle.current = null;
+    if (target === "form" && formVisible) {
+      document.getElementById("occurrence-type")?.focus();
+    } else if (target === "add" && !formVisible) {
+      addButtonRef.current?.focus();
+    }
+  }, [formVisible]);
 
   const refresh = useCallback(async () => {
     if (!executionId) return;
@@ -167,6 +182,7 @@ export function ExecutionOccurrencesSheet({
     );
     setFieldErrors({});
     setFormError(null);
+    focusAfterToggle.current = "form";
     setFormVisible(true);
   }
 
@@ -202,6 +218,7 @@ export function ExecutionOccurrencesSheet({
     try {
       if (editTarget) await updateOccurrence(editTarget.id, payload);
       else await createOccurrence(executionId, payload);
+      focusAfterToggle.current = "add";
       setFormVisible(false);
       setEditTarget(null);
       await refresh();
@@ -269,12 +286,7 @@ export function ExecutionOccurrencesSheet({
           title="Nenhuma ocorrência registrada neste apontamento"
           hint={
             canWrite
-              ? "Registre clima, pragas ou doenças observadas na colheita."
-              : undefined
-          }
-          action={
-            canWrite
-              ? { label: "Adicionar primeira ocorrência", onClick: () => openForm(null) }
+              ? "Use “Adicionar ocorrência” para registrar clima, pragas ou doenças observadas."
               : undefined
           }
         />
@@ -377,9 +389,8 @@ export function ExecutionOccurrencesSheet({
               <h4 className="text-sm font-medium">
                 {editTarget ? "Editar ocorrência" : "Nova ocorrência"}
               </h4>
-              <div aria-live="polite">
-                {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
-              </div>
+              {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta. */}
+              {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="occurrence-type">Tipo</Label>
                 <NativeSelect
@@ -389,6 +400,7 @@ export function ExecutionOccurrencesSheet({
                   onChange={(e) => update("logType", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.logType)}
+                  aria-describedby={fieldErrors.logType ? "occurrence-type-error" : undefined}
                 >
                   <NativeSelectOption value="">Selecione…</NativeSelectOption>
                   {OCCURRENCE_TYPES.map((type) => (
@@ -398,7 +410,7 @@ export function ExecutionOccurrencesSheet({
                   ))}
                 </NativeSelect>
                 {fieldErrors.logType && (
-                  <p className="text-sm text-destructive">{fieldErrors.logType}</p>
+                  <p id="occurrence-type-error" className="text-sm text-destructive">{fieldErrors.logType}</p>
                 )}
               </div>
               <div className="flex flex-col gap-2">
@@ -411,10 +423,11 @@ export function ExecutionOccurrencesSheet({
                   onChange={(e) => update("description", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.description)}
+                  aria-describedby={fieldErrors.description ? "occurrence-description-error" : undefined}
                   className="min-h-20"
                 />
                 {fieldErrors.description && (
-                  <p className="text-sm text-destructive">{fieldErrors.description}</p>
+                  <p id="occurrence-description-error" className="text-sm text-destructive">{fieldErrors.description}</p>
                 )}
               </div>
               <div className="flex flex-col gap-2">
@@ -426,9 +439,10 @@ export function ExecutionOccurrencesSheet({
                   onChange={(e) => update("weatherObservation", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.weatherObservation)}
+                  aria-describedby={fieldErrors.weatherObservation ? "occurrence-weather-error" : undefined}
                 />
                 {fieldErrors.weatherObservation && (
-                  <p className="text-sm text-destructive">
+                  <p id="occurrence-weather-error" className="text-sm text-destructive">
                     {fieldErrors.weatherObservation}
                   </p>
                 )}
@@ -444,9 +458,10 @@ export function ExecutionOccurrencesSheet({
                   disabled={submitting}
                   placeholder="https://…"
                   aria-invalid={Boolean(fieldErrors.evidenceUrl)}
+                  aria-describedby={fieldErrors.evidenceUrl ? "occurrence-evidence-error" : undefined}
                 />
                 {fieldErrors.evidenceUrl && (
-                  <p className="text-sm text-destructive">{fieldErrors.evidenceUrl}</p>
+                  <p id="occurrence-evidence-error" className="text-sm text-destructive">{fieldErrors.evidenceUrl}</p>
                 )}
               </div>
             </div>
@@ -454,7 +469,10 @@ export function ExecutionOccurrencesSheet({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setFormVisible(false)}
+                onClick={() => {
+                  focusAfterToggle.current = "add";
+                  setFormVisible(false);
+                }}
                 disabled={submitting}
               >
                 Voltar à lista
@@ -475,7 +493,12 @@ export function ExecutionOccurrencesSheet({
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
             {canWrite && (
               <div>
-                <Button type="button" variant="outline" onClick={() => openForm(null)}>
+                <Button
+                  ref={addButtonRef}
+                  type="button"
+                  variant="outline"
+                  onClick={() => openForm(null)}
+                >
                   <Plus aria-hidden="true" />
                   Adicionar ocorrência
                 </Button>

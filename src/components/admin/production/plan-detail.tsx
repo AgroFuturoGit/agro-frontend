@@ -34,11 +34,12 @@ import {
   DataTableRowActions,
   type DataTableRowAction,
 } from "@/components/data-table/data-table-row-actions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { unitLabel } from "@/lib/crops";
@@ -65,7 +66,10 @@ import { ExecutionFormDrawer } from "./execution-form-drawer";
 import { ExecutionAttachmentsSheet } from "./execution-attachments-sheet";
 import { ExecutionOccurrencesSheet } from "./execution-occurrences-sheet";
 import { ExecutionStatusBadge } from "./execution-status-badge";
-import { ContinuousHarvestChart } from "./harvest-timeline-chart";
+import {
+  ContinuousHarvestChart,
+  HarvestChartSkeleton,
+} from "./harvest-timeline-chart";
 
 type Props = {
   orgId: string;
@@ -116,6 +120,50 @@ function canDecideExecution(role: Role | null, execution: ProductionExecution) {
 function canWriteEvidence(role: Role | null, execution: ProductionExecution | null) {
   if (role === "FARMER") return execution?.status !== "VALIDATED";
   return role === "ADMIN" || role === "TECHNICIAN";
+}
+
+/** Rótulos de safra costumam já começar com "Safra": evita "Safra Safra 2026". */
+function harvestText(label: string | null | undefined): string {
+  const value = label?.trim();
+  if (!value) return "Safra —";
+  return /^safra\b/i.test(value) ? value : `Safra ${value}`;
+}
+
+/**
+ * Metadados do plano no PageHeader: cada par fica inteiro na mesma linha
+ * (a quebra acontece só entre itens) e o status usa o mesmo Badge da lista
+ * de planos.
+ */
+function PlanMeta({ plan }: { plan: ProductionPlan }) {
+  const items: string[] = [
+    harvestText(plan.harvest?.label),
+    `Área ${formatNumber(plan.plantedArea)} ha`,
+    `Plantio ${formatPlanDate(plan.plannedPlantingDate)}`,
+  ];
+  if (plan.expectedHarvestStart || plan.expectedHarvestEnd) {
+    items.push(
+      `Colheita prevista ${formatPlanDate(plan.expectedHarvestStart)} a ${formatPlanDate(plan.expectedHarvestEnd)}`,
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      {items.map((item, index) => (
+        <span key={item} className="whitespace-nowrap">
+          {index > 0 ? (
+            <span aria-hidden="true" className="mr-2">
+              ·
+            </span>
+          ) : null}
+          {item}
+        </span>
+      ))}
+      {plan.status ? (
+        <Badge variant={PLAN_STATUS_VARIANT[plan.status]}>
+          {PLAN_STATUS_LABELS[plan.status]}
+        </Badge>
+      ) : null}
+    </span>
+  );
 }
 
 const UUID_PATTERN =
@@ -326,6 +374,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             label: "Validar apontamento",
             title: "Validar",
             icon: Check,
+            tone: "primary",
             onClick: () => setDecision({ mode: "validate", execution }),
           },
           {
@@ -581,24 +630,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         back={{ href: backToPlansHref, label: "Voltar para planos" }}
         loading={loading}
         title={planTitle}
-        description={
-          plan ? (
-            <>
-              Safra {plan.harvest?.label ?? "—"} · Área{" "}
-              {formatNumber(plan.plantedArea)} ha · Plantio{" "}
-              {formatPlanDate(plan.plannedPlantingDate)}
-              {plan.status && <> · {PLAN_STATUS_LABELS[plan.status]}</>}
-              {(plan.expectedHarvestStart || plan.expectedHarvestEnd) && (
-                <>
-                  {" "}
-                  · Colheita prevista{" "}
-                  {formatPlanDate(plan.expectedHarvestStart)} a{" "}
-                  {formatPlanDate(plan.expectedHarvestEnd)}
-                </>
-              )}
-            </>
-          ) : undefined
-        }
+        description={plan ? <PlanMeta plan={plan} /> : undefined}
       />
 
       {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta. */}
@@ -615,11 +647,14 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
       {/* Mesmos dados já carregados pela tela — sem chamada extra (AC-015). */}
       {loading ? (
-        <Skeleton className="h-80 w-full rounded-xl" />
+        <HarvestChartSkeleton />
       ) : (
         plan && <ContinuousHarvestChart plan={plan} executions={executions} />
       )}
 
+      {/* Falha na primeira carga: sem plano não há o que listar; a tabela vazia
+          diria "nenhum apontamento" quando na verdade nada foi lido. */}
+      {!(error && !plan) && (
       <section
         aria-labelledby="plan-executions-title"
         className="flex flex-col gap-section-sm"
@@ -654,7 +689,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               : "Os apontamentos deste plano aparecem aqui quando forem registrados."
           }
           emptyActionLabel={
-            canWrite && plan ? "Registrar primeira colheita" : undefined
+            canWrite && plan ? "Criar primeiro apontamento" : undefined
           }
           onEmptyAction={
             canWrite && plan ? () => setCreateOpen(true) : undefined
@@ -664,6 +699,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
         <DataTablePagination table={table} />
       </section>
+      )}
 
       <ExecutionOccurrencesSheet
         execution={occurrencesTarget}

@@ -341,10 +341,9 @@ export function ExecutionAttachmentsSheet({
           icon={Images}
           className="py-8"
           title="Nenhuma foto anexada."
-          hint={canWrite ? "Envie fotos da colheita como evidência do apontamento." : undefined}
-          action={
-            canWrite && !uploading
-              ? { label: "Enviar primeiras fotos", onClick: () => inputRef.current?.click() }
+          hint={
+            canWrite
+              ? "Use “Enviar fotos” para anexar fotos da colheita como evidência."
               : undefined
           }
         />

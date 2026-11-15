@@ -15,8 +15,11 @@ export type DataTableRowAction = {
   onClick?: () => void;
   /** Quando informado, a ação é um link (navegação) em vez de botão. */
   href?: string;
-  /** `destructive` só para excluir/remover (ícone vermelho). */
-  tone?: "default" | "destructive";
+  /**
+   * `destructive` só para excluir/remover/rejeitar (ícone vermelho);
+   * `primary` para a ação afirmativa principal da linha (ex.: validar).
+   */
+  tone?: "default" | "primary" | "destructive";
   disabled?: boolean;
 };
 
@@ -35,6 +38,7 @@ type DataTableRowActionsProps = {
 
 const TONE_CLASS: Record<NonNullable<DataTableRowAction["tone"]>, string> = {
   default: "text-muted-foreground hover:text-foreground",
+  primary: "text-primary hover:bg-secondary hover:text-primary-hover",
   destructive:
     "text-destructive hover:bg-destructive-muted hover:text-destructive-strong",
 };

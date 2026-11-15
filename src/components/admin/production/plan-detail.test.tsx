@@ -227,7 +227,7 @@ function queryWriteAffordances() {
       name: /Novo apontamento/i,
     }),
     primeiraColheita: screen.queryByRole("button", {
-      name: /Registrar primeira colheita/i,
+      name: /Criar primeiro apontamento/i,
     }),
     editar: screen.queryByRole("button", { name: /^Editar( apontamento)?$/ }),
     excluir: screen.queryByRole("button", { name: "Excluir apontamento" }),
@@ -320,14 +320,14 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     },
   );
 
-  it("FARMER sem apontamentos: vê 'Registrar primeira colheita'", async () => {
+  it("FARMER sem apontamentos: vê 'Criar primeiro apontamento'", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue([]);
 
     renderPlanDetail();
 
     expect(
-      await screen.findByRole("button", { name: /Registrar primeira colheita/i }),
+      await screen.findByRole("button", { name: /Criar primeiro apontamento/i }),
     ).toBeTruthy();
     expect(
       screen.getByText("Nenhum apontamento registrado ainda."),
@@ -543,14 +543,14 @@ describe("PlanDetail — tabela de apontamentos", () => {
     expect(dates).toEqual(["20/06/2026", "10/05/2026", "02/04/2026"]);
   });
 
-  it("sem apontamentos, 'Registrar primeira colheita' abre o drawer", async () => {
+  it("sem apontamentos, 'Criar primeiro apontamento' abre o drawer", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue([]);
 
     renderPlanDetail();
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "Registrar primeira colheita" }),
+      await screen.findByRole("button", { name: "Criar primeiro apontamento" }),
     );
 
     const drawer = await screen.findByRole("dialog");
@@ -1085,5 +1085,42 @@ describe("PlanDetail — evidências de apontamento validado", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fotos do apontamento" }));
     await waitFor(() => expect(listAttachments).toHaveBeenCalled());
     expect(screen.queryByTestId("attachment-input")).not.toBeNull();
+  });
+});
+
+describe("PlanDetail — revisão r1 do lote 4", () => {
+  it("UX-L4-01: erro na primeira carga não mostra o vazio falso dos apontamentos", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockRejectedValue(new ApiError(500, "Erro 500", {}));
+
+    renderPlanDetail();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível carregar o plano de produção.");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(screen.queryByText("Nenhum apontamento registrado ainda.")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Apontamentos de colheita" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Novo apontamento/ })).toBeNull();
+  });
+
+  it("UX-L4-02: 'Validar' tem tom afirmativo (primary) e 'Rejeitar' destrutivo", async () => {
+    loginAs("TECHNICIAN");
+    renderPlanDetail();
+
+    const validate = (await screen.findAllByRole("button", { name: "Validar apontamento" }))[0];
+    const reject = screen.getAllByRole("button", { name: "Rejeitar apontamento" })[0];
+    expect(validate.className).toContain("text-primary");
+    expect(reject.className).toContain("text-destructive");
+  });
+
+  it("UX-L4-03: carregando mostra o skeleton com a forma do card do gráfico", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockReturnValue(new Promise(() => {}));
+
+    renderPlanDetail();
+
+    const skeleton = await screen.findByLabelText("Carregando gráfico");
+    expect(skeleton.getAttribute("data-slot")).toBe("card");
+    expect(skeleton.getAttribute("aria-busy")).toBe("true");
   });
 });

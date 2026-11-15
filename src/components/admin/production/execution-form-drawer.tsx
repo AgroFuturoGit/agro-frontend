@@ -234,11 +234,8 @@ export function ExecutionFormDrawer({
           className="flex flex-1 flex-col overflow-y-auto"
         >
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
-            <div aria-live="polite">
-              {formError && (
-                <InlineAlert variant="destructive">{formError}</InlineAlert>
-              )}
-            </div>
+            {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta. */}
+            {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
 
             {!isCreate && execution?.status === "REJECTED" && (
               // Aviso informativo de quem corrige: não interrompe o leitor.
@@ -271,9 +268,12 @@ export function ExecutionFormDrawer({
                   required
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.quantity)}
+                  aria-describedby={fieldErrors.quantity ? "execution-quantity-error" : undefined}
                 />
                 {fieldErrors.quantity && (
-                  <p className="text-sm text-destructive">{fieldErrors.quantity}</p>
+                  <p id="execution-quantity-error" className="text-sm text-destructive">
+                    {fieldErrors.quantity}
+                  </p>
                 )}
               </div>
 
@@ -298,9 +298,12 @@ export function ExecutionFormDrawer({
                 required
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.harvestedAt)}
+                aria-describedby={fieldErrors.harvestedAt ? "execution-date-error" : undefined}
               />
               {fieldErrors.harvestedAt && (
-                <p className="text-sm text-destructive">{fieldErrors.harvestedAt}</p>
+                <p id="execution-date-error" className="text-sm text-destructive">
+                  {fieldErrors.harvestedAt}
+                </p>
               )}
             </div>
 

@@ -320,3 +320,22 @@ describe("ContinuousHarvestChart", () => {
     document.documentElement.classList.remove("dark");
   });
 });
+
+describe("ContinuousHarvestChart — revisão r1 do lote 4", () => {
+  it("A11Y-L4-1: o segmento ativo troca a cor do anel de foco (ring = primary)", async () => {
+    await renderChart();
+    const active = screen.getByRole("button", { name: "Semana" });
+    const inactive = screen.getByRole("button", { name: "Mês" });
+    expect(active.className).toContain("focus-visible:ring-primary-foreground");
+    expect(inactive.className).not.toContain("focus-visible:ring-primary-foreground");
+    expect(inactive.className).toContain("focus-visible:ring-ring");
+  });
+
+  it("UX-L4-03: o skeleton da primeira carga tem o formato do card (título, gráfico, legenda)", () => {
+    vi.mocked(getHarvestTimeline).mockReturnValue(new Promise(() => {}));
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    const skeleton = screen.getByLabelText("Carregando gráfico");
+    expect(skeleton.getAttribute("data-slot")).toBe("card");
+    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(4);
+  });
+});

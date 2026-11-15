@@ -333,3 +333,19 @@ describe("ExecutionFormDrawer — QA (UNIT-003 / UNIT-004)", () => {
     expect(updateProductionExecution).not.toHaveBeenCalled();
   });
 });
+
+describe("ExecutionFormDrawer — A11Y-L4-2 (erro ligado ao campo)", () => {
+  it("erro de data fica em aria-describedby do campo", async () => {
+    renderForm("create", BOX);
+    fireEvent.change(await screen.findByLabelText("Quantidade colhida (caixas)"), {
+      target: { value: "5" },
+    });
+    const date = screen.getByLabelText("Data da colheita");
+    expect(date.getAttribute("aria-describedby")).toBeNull();
+    fireEvent.change(date, { target: { value: "2999-01-01" } });
+    submit();
+    const message = await screen.findByText("A data da colheita não pode ser futura");
+    expect(date.getAttribute("aria-describedby")).toBe(message.id);
+    expect(message.id).toBe("execution-date-error");
+  });
+});
