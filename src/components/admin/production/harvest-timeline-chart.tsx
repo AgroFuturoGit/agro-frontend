@@ -12,11 +12,20 @@ import {
 import { init, use as registerEcharts, type ECharts } from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { ChartNoAxesColumn, Info } from "lucide-react";
+
+import { EmptyState } from "@/components/admin/empty-state";
+import { SectionHeader } from "@/components/admin/section-header";
+import {
+  readChartFontFamily,
+  readToken,
+  toRgb,
+} from "@/components/admin/dashboard/chart-tokens";
+import { Card } from "@/components/ui/card";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getHarvestTimeline } from "@/lib/analytics";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   hasValidExpectedWindow,
@@ -51,35 +60,15 @@ const NO_WINDOW_WARNING =
   "Defina o início e o fim previstos da colheita para ver a curva prevista.";
 const EMPTY_MESSAGE =
   "Ainda não há dados para o gráfico. Registre um apontamento ou defina a janela de colheita.";
-
-/**
- * Converte um valor CSS de cor (inclusive oklch) em "rgb()/rgba()" que o
- * canvas do ECharts entende, pintando 1 pixel e lendo-o de volta.
- */
-function toRgb(value: string, alpha = 1): string {
-  try {
-    const ctx = document.createElement("canvas").getContext("2d", {
-      willReadFrequently: true,
-    });
-    if (!ctx) return value;
-    ctx.clearRect(0, 0, 1, 1);
-    ctx.fillStyle = value;
-    ctx.fillRect(0, 0, 1, 1);
-    const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
-    const total = Math.round((a / 255) * alpha * 100) / 100;
-    return total >= 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${total})`;
-  } catch {
-    return value;
-  }
-}
+const LOAD_ERROR = "Não foi possível carregar o gráfico de colheita.";
+const TITLE = "Previsto × realizado";
 
 /**
  * BR-012: lê os tokens do tema já resolvidos no escopo do próprio gráfico
  * (a área admin força `.light` num wrapper; ler só do <html> divergiria).
  */
 function readChartColors(scope: Element): ChartColors {
-  const style = getComputedStyle(scope);
-  const token = (name: string) => style.getPropertyValue(name).trim();
+  const token = (name: string) => readToken(scope, name);
   return {
     validated: toRgb(token("--chart-1")),
     pending: toRgb(token("--chart-1"), PENDING_OPACITY),
@@ -88,6 +77,7 @@ function readChartColors(scope: Element): ChartColors {
     grid: toRgb(token("--border")),
     popover: toRgb(token("--popover")),
     popoverText: toRgb(token("--popover-foreground")),
+    fontFamily: readChartFontFamily(),
   };
 }
 
@@ -123,6 +113,24 @@ function useThemeVersion(
   return version;
 }
 
+/**
+ * Skeleton com a forma do card pronto (título, descrição, gráfico de 320px e
+ * legenda), para a seção de baixo não saltar quando o gráfico chega.
+ */
+export function HarvestChartSkeleton() {
+  return (
+    <Card aria-busy="true" aria-label="Carregando gráfico" className="p-6">
+      <div className="flex flex-col gap-1">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-6 w-64 max-w-full" />
+      </div>
+      <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />
+      <Skeleton className="h-4 w-56" />
+      <span className="sr-only">Carregando gráfico…</span>
+    </Card>
+  );
+}
+
 type Props = {
   plan: ProductionPlan;
   executions: ProductionExecution[];
@@ -156,10 +164,10 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
     } catch (err) {
       if (request !== requestRef.current) return;
       setData(null);
+      // "Erro 500" cru não ajuda o usuário: cai na mensagem genérica.
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar o gráfico de colheita.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          LOAD_ERROR,
       );
     } finally {
       if (request === requestRef.current) setLoading(false);
@@ -260,32 +268,27 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="py-4">
-          <div
-            role="alert"
-            className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          >
-            <span>{error}</span>
-            <Button type="button" variant="outline" size="sm" onClick={() => load()}>
-              Tentar novamente
-            </Button>
-          </div>
-        </CardContent>
+      <Card className="p-6">
+        <SectionHeader title={TITLE} />
+        <InlineAlert
+          variant="destructive"
+          action={{ label: "Tentar novamente", onClick: () => load() }}
+        >
+          {error}
+        </InlineAlert>
       </Card>
     );
   }
 
   if (loading && data === null) {
-    return <Skeleton className="h-80 w-full rounded-xl" aria-label="Carregando gráfico" />;
+    return <HarvestChartSkeleton />;
   }
 
   if (isEmpty) {
     return (
-      <Card>
-        <CardContent className="py-6">
-          <p className="text-sm text-muted-foreground">{EMPTY_MESSAGE}</p>
-        </CardContent>
+      <Card className="p-6">
+        <SectionHeader title={TITLE} />
+        <EmptyState icon={ChartNoAxesColumn} title={EMPTY_MESSAGE} className="py-8" />
       </Card>
     );
   }
@@ -294,90 +297,91 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   const refreshing = loading && data !== null;
 
   return (
-    <Card>
-      <CardContent className="flex flex-col gap-3 py-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className="text-lg font-semibold tracking-tight">
-              Previsto × realizado
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {isContinuous
-                ? `Colheita por ${active === "WEEK" ? "semana" : "mês"}, em kg.`
-                : "Total previsto e total colhido, em kg."}
-            </p>
-          </div>
-          {isContinuous && (
+    <Card className="p-6">
+      <SectionHeader
+        title={TITLE}
+        description={
+          isContinuous
+            ? `Colheita por ${active === "WEEK" ? "semana" : "mês"}, em kg.`
+            : "Total previsto e total colhido, em kg."
+        }
+        actions={
+          isContinuous ? (
             <div
               role="group"
               aria-label="Agrupar por"
-              className="inline-flex rounded-md border p-0.5"
+              className="inline-flex h-control overflow-hidden rounded-lg border border-input bg-card"
             >
               {(
                 [
                   ["WEEK", "Semana"],
                   ["MONTH", "Mês"],
                 ] as const
-              ).map(([value, text]) => (
+              ).map(([value, text], index) => (
                 <button
                   key={value}
                   type="button"
                   aria-pressed={active === value}
                   onClick={() => setChoice(value)}
                   className={cn(
-                    "rounded-sm px-3 py-1 text-sm transition-colors",
+                    "min-w-11 px-4 text-sm font-medium transition-colors outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset motion-reduce:transition-none",
+                    index > 0 && "border-l border-input",
+                    // --ring = --primary: no segmento ativo (fundo verde) o anel
+                    // vira o primary-foreground para continuar visível.
                     active === value
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted",
+                      ? "bg-primary text-primary-foreground focus-visible:ring-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   {text}
                 </button>
               ))}
             </div>
-          )}
-        </div>
+          ) : undefined
+        }
+      />
 
-        {isContinuous && !timeline.hasExpectedWindow && (
-          <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-            {NO_WINDOW_WARNING}
+      {isContinuous && !timeline.hasExpectedWindow && (
+        // Dica estática (não é live region): o aviso não muda sozinho.
+        <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-subtle px-4 py-3 text-sm text-muted-foreground">
+          <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <p>{NO_WINDOW_WARNING}</p>
+        </div>
+      )}
+
+      {/*
+        Recarga com dados já na tela (troca Semana/Mês ou novo apontamento):
+        o gráfico anterior fica esmaecido e marcado como ocupado até a
+        resposta chegar, em vez de parecer já atualizado.
+      */}
+      <div className="relative" aria-busy={refreshing}>
+        <div
+          ref={containerRef}
+          role="img"
+          aria-label={ariaLabel}
+          data-mode={isContinuous ? "composite" : "simple"}
+          data-granularity={isContinuous ? active : undefined}
+          data-points={isContinuous ? points.length : 2}
+          data-has-window={String(hasExpected)}
+          style={{ height: CHART_HEIGHT }}
+          className={cn(
+            "w-full max-w-full transition-opacity motion-reduce:transition-none",
+            refreshing && "opacity-40",
+          )}
+        />
+        {refreshing && (
+          <p
+            role="status"
+            className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground"
+          >
+            Atualizando gráfico…
           </p>
         )}
+      </div>
 
-        {/*
-          Recarga com dados já na tela (troca Semana/Mês ou novo apontamento):
-          o gráfico anterior fica esmaecido e marcado como ocupado até a
-          resposta chegar, em vez de parecer já atualizado.
-        */}
-        <div className="relative" aria-busy={refreshing}>
-          <div
-            ref={containerRef}
-            role="img"
-            aria-label={ariaLabel}
-            data-mode={isContinuous ? "composite" : "simple"}
-            data-granularity={isContinuous ? active : undefined}
-            data-points={isContinuous ? points.length : 2}
-            data-has-window={String(hasExpected)}
-            style={{ height: CHART_HEIGHT }}
-            className={cn(
-              "w-full max-w-full transition-opacity",
-              refreshing && "opacity-40",
-            )}
-          />
-          {refreshing && (
-            <p
-              role="status"
-              className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground"
-            >
-              Atualizando gráfico…
-            </p>
-          )}
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          Somente validados contam no realizado oficial.
-        </p>
-      </CardContent>
+      <p className="text-xs text-muted-foreground">
+        Somente validados contam no realizado oficial.
+      </p>
     </Card>
   );
 }

@@ -228,6 +228,15 @@ describe("ContinuousHarvestChart", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("erro 'Erro 500' cru da API cai na mensagem genérica (InlineAlert)", async () => {
+    vi.mocked(getHarvestTimeline).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível carregar o gráfico de colheita.");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.getAttribute("data-slot")).toBe("inline-alert");
+  });
+
   it("UNIT-008: erro que não é ApiError usa a mensagem genérica", async () => {
     vi.mocked(getHarvestTimeline).mockRejectedValue(new Error("boom"));
     render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
@@ -309,5 +318,24 @@ describe("ContinuousHarvestChart", () => {
     screen.getByRole("img").parentElement!.classList.add("light");
     await vi.waitFor(() => expect(chart.setOption).toHaveBeenCalledTimes(base + 2));
     document.documentElement.classList.remove("dark");
+  });
+});
+
+describe("ContinuousHarvestChart — revisão r1 do lote 4", () => {
+  it("A11Y-L4-1: o segmento ativo troca a cor do anel de foco (ring = primary)", async () => {
+    await renderChart();
+    const active = screen.getByRole("button", { name: "Semana" });
+    const inactive = screen.getByRole("button", { name: "Mês" });
+    expect(active.className).toContain("focus-visible:ring-primary-foreground");
+    expect(inactive.className).not.toContain("focus-visible:ring-primary-foreground");
+    expect(inactive.className).toContain("focus-visible:ring-ring");
+  });
+
+  it("UX-L4-03: o skeleton da primeira carga tem o formato do card (título, gráfico, legenda)", () => {
+    vi.mocked(getHarvestTimeline).mockReturnValue(new Promise(() => {}));
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    const skeleton = screen.getByLabelText("Carregando gráfico");
+    expect(skeleton.getAttribute("data-slot")).toBe("card");
+    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(4);
   });
 });

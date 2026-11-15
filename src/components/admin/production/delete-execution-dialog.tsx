@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -13,7 +13,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ApiError } from "@/lib/api";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { unitLabel, type MeasurementUnit } from "@/lib/crops";
 import {
   deleteProductionExecution,
@@ -61,9 +62,8 @@ export function DeleteExecutionDialog({
       // Registro já removido: recarrega a lista para refletir o estado real.
       if (err instanceof ApiError && err.status === 404) onDeleted();
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir o apontamento.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          "Não foi possível excluir o apontamento.",
       );
     } finally {
       setSubmitting(false);
@@ -92,15 +92,7 @@ export function DeleteExecutionDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {error && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <InlineAlert variant="destructive">{error}</InlineAlert>}
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
@@ -111,7 +103,7 @@ export function DeleteExecutionDialog({
           >
             {submitting ? (
               <>
-                <Loader2 className="animate-spin" />
+                <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                 Excluindo…
               </>
             ) : (

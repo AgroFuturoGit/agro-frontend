@@ -333,3 +333,48 @@ describe("ExecutionFormDrawer — QA (UNIT-003 / UNIT-004)", () => {
     expect(updateProductionExecution).not.toHaveBeenCalled();
   });
 });
+
+describe("ExecutionFormDrawer — A11Y-L4-2 (erro ligado ao campo)", () => {
+  it("erro de data fica em aria-describedby do campo", async () => {
+    renderForm("create", BOX);
+    fireEvent.change(await screen.findByLabelText("Quantidade colhida (caixas)"), {
+      target: { value: "5" },
+    });
+    const date = screen.getByLabelText("Data da colheita");
+    expect(date.getAttribute("aria-describedby")).toBeNull();
+    fireEvent.change(date, { target: { value: "2999-01-01" } });
+    submit();
+    const message = await screen.findByText("A data da colheita não pode ser futura");
+    expect(date.getAttribute("aria-describedby")).toBe(message.id);
+    expect(message.id).toBe("execution-date-error");
+  });
+});
+
+describe("ExecutionFormDrawer — erros (lote 4)", () => {
+  it("'Erro 500' cru vira a mensagem padrão, fora de região aria-live (A11Y-L4-3)", async () => {
+    vi.mocked(createProductionExecution).mockRejectedValue(new ApiError(500, "Erro 500", {}));
+    renderForm("create", BOX);
+    fireEvent.change(await screen.findByLabelText("Quantidade colhida (caixas)"), {
+      target: { value: "5" },
+    });
+    fireEvent.change(screen.getByLabelText("Data da colheita"), {
+      target: { value: "2026-01-10" },
+    });
+    submit();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível salvar o apontamento.");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.parentElement?.closest("[aria-live]")).toBeNull();
+  });
+
+  it("A11Y-L4-2: erro de quantidade fica em aria-describedby", async () => {
+    renderForm("create", BOX);
+    const quantity = await screen.findByLabelText("Quantidade colhida (caixas)");
+    fireEvent.change(quantity, { target: { value: "1e3" } });
+    submit();
+    await waitFor(() =>
+      expect(document.getElementById("execution-quantity-error")).not.toBeNull(),
+    );
+    expect(quantity.getAttribute("aria-describedby")).toBe("execution-quantity-error");
+  });
+});

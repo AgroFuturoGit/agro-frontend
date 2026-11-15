@@ -9,12 +9,17 @@ import { cn } from "@/lib/utils";
 export type DataTableRowAction = {
   /** Nome acessível do botão (ex.: "Editar usuário Ana Souza"). Obrigatório: o botão só tem ícone. */
   label: string;
+  /** Dica visual ao passar o mouse (opcional; o nome acessível continua em `label`). */
+  title?: string;
   icon: LucideIcon;
   onClick?: () => void;
   /** Quando informado, a ação é um link (navegação) em vez de botão. */
   href?: string;
-  /** `destructive` só para excluir/remover (ícone vermelho). */
-  tone?: "default" | "destructive";
+  /**
+   * `destructive` só para excluir/remover/rejeitar (ícone vermelho);
+   * `primary` para a ação afirmativa principal da linha (ex.: validar).
+   */
+  tone?: "default" | "primary" | "destructive";
   disabled?: boolean;
 };
 
@@ -33,6 +38,7 @@ type DataTableRowActionsProps = {
 
 const TONE_CLASS: Record<NonNullable<DataTableRowAction["tone"]>, string> = {
   default: "text-muted-foreground hover:text-foreground",
+  primary: "text-primary hover:bg-secondary hover:text-primary-hover",
   destructive:
     "text-destructive hover:bg-destructive-muted hover:text-destructive-strong",
 };
@@ -57,7 +63,7 @@ export function DataTableRowActions({
         className,
       )}
     >
-      {actions.map(({ label, icon: Icon, onClick, href, tone = "default", disabled }, index) => {
+      {actions.map(({ label, title, icon: Icon, onClick, href, tone = "default", disabled }, index) => {
         const toneClass = TONE_CLASS[tone];
         const icon = <Icon aria-hidden="true" className="size-4" />;
 
@@ -67,6 +73,7 @@ export function DataTableRowActions({
               key={`${index}-${label}`}
               href={href}
               aria-label={label}
+              title={title}
               onClick={onClick}
               className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), toneClass)}
             >
@@ -82,6 +89,7 @@ export function DataTableRowActions({
             variant="ghost"
             size="icon-sm"
             aria-label={label}
+            title={title}
             disabled={disabled}
             onClick={onClick}
             className={toneClass}

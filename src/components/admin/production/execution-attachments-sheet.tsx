@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { AlertCircle, Download, ImageOff, Loader2, Trash2, Upload } from "lucide-react";
+import { Download, ImageOff, Images, Loader2, Trash2, Upload } from "lucide-react";
 
 import {
   AlertDialog,
@@ -13,6 +13,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/admin/empty-state";
+import { DataTableRowActions } from "@/components/data-table/data-table-row-actions";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,8 +30,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_MAX_COUNT,
@@ -63,16 +66,9 @@ function isRetryable(err: unknown): boolean {
   return !(err instanceof ApiError) || err.status >= 500;
 }
 
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-    >
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  );
+/** Mensagem da API para o usuário; "Erro 500" cru cai no texto padrão. */
+function apiMessage(err: unknown, fallback: string): string {
+  return (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ?? fallback;
 }
 
 /**
@@ -139,7 +135,7 @@ export function ExecutionAttachmentsSheet({
     } catch (err) {
       if (seq !== loadSeq.current) return;
       setError(
-        err instanceof ApiError ? err.message : "Não foi possível carregar as fotos.",
+        apiMessage(err, "Não foi possível carregar as fotos."),
       );
     } finally {
       if (seq === loadSeq.current) setLoading(false);
@@ -218,7 +214,7 @@ export function ExecutionAttachmentsSheet({
           key: `${file.name}-${failed.length}`,
           name: file.name,
           message: `${file.name}: ${
-            err instanceof ApiError ? err.message : "Não foi possível enviar a foto."
+            apiMessage(err, "Não foi possível enviar a foto.")
           }`,
           file: isRetryable(err) ? file : null,
         });
@@ -257,7 +253,7 @@ export function ExecutionAttachmentsSheet({
       saveBlob(blob, filename);
     } catch (err) {
       setActionError(
-        err instanceof ApiError ? err.message : "Não foi possível baixar a foto.",
+        apiMessage(err, "Não foi possível baixar a foto."),
       );
     }
   }
@@ -290,7 +286,7 @@ export function ExecutionAttachmentsSheet({
         await refresh();
       } else {
         setDeleteError(
-          err instanceof ApiError ? err.message : "Não foi possível excluir a foto.",
+          apiMessage(err, "Não foi possível excluir a foto."),
         );
       }
     } finally {
@@ -304,7 +300,7 @@ export function ExecutionAttachmentsSheet({
     if (src === "error") {
       return (
         <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border bg-muted text-xs text-muted-foreground">
-          <ImageOff className="size-5" />
+          <ImageOff aria-hidden="true" className="size-5" />
           Prévia indisponível
         </div>
       );
@@ -330,36 +326,38 @@ export function ExecutionAttachmentsSheet({
     }
     if (error) {
       return (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        <InlineAlert
+          variant="destructive"
+          action={{ label: "Tentar novamente", onClick: () => refresh() }}
         >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={refresh}>
-            Tentar novamente
-          </Button>
-        </div>
+          {error}
+        </InlineAlert>
       );
     }
     if (items.length === 0) {
       return (
-        <p className="rounded-lg border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhuma foto anexada.
-        </p>
+        <EmptyState
+          variant="card"
+          icon={Images}
+          className="py-8"
+          title="Nenhuma foto anexada."
+          hint={
+            canWrite
+              ? "Use “Enviar fotos” para anexar fotos da colheita como evidência."
+              : undefined
+          }
+        />
       );
     }
     return (
       <ul className="grid grid-cols-2 gap-3">
         {items.map((item) => (
-          <li key={item.id} className="flex min-w-0 flex-col gap-2 rounded-lg border bg-card p-2">
+          <li key={item.id} className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-2">
             <button
               type="button"
               aria-label={`Abrir ${item.filename}`}
               onClick={() => setViewTarget(item)}
-              className="block w-full rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="block w-full rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {renderThumb(item)}
             </button>
@@ -371,34 +369,31 @@ export function ExecutionAttachmentsSheet({
                 {formatFileSize(item.sizeBytes)} · {formatPlanDate(item.createdAt)}
               </p>
             </div>
-            <div className="flex items-center justify-end gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Baixar ${item.filename}`}
-                title="Baixar"
-                onClick={() => handleDownload(item)}
-              >
-                <Download />
-              </Button>
-              {canWrite && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Excluir ${item.filename}`}
-                  title="Excluir"
-                  onClick={() => {
-                    setDeleteError(null);
-                    setDeleteTarget(item);
-                  }}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 />
-                </Button>
-              )}
-            </div>
+            <DataTableRowActions
+              align="end"
+              actions={[
+                {
+                  label: `Baixar ${item.filename}`,
+                  title: "Baixar",
+                  icon: Download,
+                  onClick: () => handleDownload(item),
+                },
+                ...(canWrite
+                  ? [
+                      {
+                        label: `Excluir ${item.filename}`,
+                        title: "Excluir",
+                        icon: Trash2,
+                        tone: "destructive" as const,
+                        onClick: () => {
+                          setDeleteError(null);
+                          setDeleteTarget(item);
+                        },
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           </li>
         ))}
       </ul>
@@ -433,19 +428,18 @@ export function ExecutionAttachmentsSheet({
               />
               <Button
                 type="button"
-                size="sm"
                 variant="outline"
                 disabled={uploading || atLimit || loading}
                 onClick={() => inputRef.current?.click()}
               >
                 {uploading ? (
                   <>
-                    <Loader2 className="animate-spin" />
+                    <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                     Enviando…
                   </>
                 ) : (
                   <>
-                    <Upload />
+                    <Upload aria-hidden="true" />
                     Enviar fotos
                   </>
                 )}
@@ -459,7 +453,7 @@ export function ExecutionAttachmentsSheet({
           <div aria-live="polite" className="flex flex-col gap-2">
             {failures.map((failure) => (
               <div key={failure.key} className="flex flex-col gap-1">
-                <ErrorBox message={failure.message} />
+                <InlineAlert variant="destructive">{failure.message}</InlineAlert>
                 {failure.file && (
                   <div className="flex items-center gap-2 text-sm text-destructive">
                     <strong>Falhou</strong>
@@ -477,7 +471,7 @@ export function ExecutionAttachmentsSheet({
                 )}
               </div>
             ))}
-            {actionError && <ErrorBox message={actionError} />}
+            {actionError && <InlineAlert variant="destructive">{actionError}</InlineAlert>}
           </div>
 
           {renderList()}
@@ -516,7 +510,7 @@ export function ExecutionAttachmentsSheet({
                   size="sm"
                   onClick={() => handleDownload(viewTarget)}
                 >
-                  <Download />
+                  <Download aria-hidden="true" />
                   Baixar
                 </Button>
               </div>
@@ -540,7 +534,7 @@ export function ExecutionAttachmentsSheet({
                   do apontamento. Não é possível desfazer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              {deleteError && <ErrorBox message={deleteError} />}
+              {deleteError && <InlineAlert variant="destructive">{deleteError}</InlineAlert>}
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
@@ -550,7 +544,7 @@ export function ExecutionAttachmentsSheet({
                 >
                   {deleting ? (
                     <>
-                      <Loader2 className="animate-spin" />
+                      <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                       Excluindo…
                     </>
                   ) : (

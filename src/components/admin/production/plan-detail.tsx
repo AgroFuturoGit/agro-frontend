@@ -1,11 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
-  AlertCircle,
-  ArrowLeft,
   Check,
+  FileQuestion,
   Images,
   MessageSquareWarning,
   Pencil,
@@ -25,14 +23,23 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { BackLink } from "@/components/admin/back-link";
+import { EmptyState } from "@/components/admin/empty-state";
+import { PageHeader } from "@/components/admin/page-header";
+import { SectionHeader } from "@/components/admin/section-header";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { unitLabel } from "@/lib/crops";
@@ -59,7 +66,10 @@ import { ExecutionFormDrawer } from "./execution-form-drawer";
 import { ExecutionAttachmentsSheet } from "./execution-attachments-sheet";
 import { ExecutionOccurrencesSheet } from "./execution-occurrences-sheet";
 import { ExecutionStatusBadge } from "./execution-status-badge";
-import { ContinuousHarvestChart } from "./harvest-timeline-chart";
+import {
+  ContinuousHarvestChart,
+  HarvestChartSkeleton,
+} from "./harvest-timeline-chart";
 
 type Props = {
   orgId: string;
@@ -110,6 +120,50 @@ function canDecideExecution(role: Role | null, execution: ProductionExecution) {
 function canWriteEvidence(role: Role | null, execution: ProductionExecution | null) {
   if (role === "FARMER") return execution?.status !== "VALIDATED";
   return role === "ADMIN" || role === "TECHNICIAN";
+}
+
+/** Rótulos de safra costumam já começar com "Safra": evita "Safra Safra 2026". */
+function harvestText(label: string | null | undefined): string {
+  const value = label?.trim();
+  if (!value) return "Safra —";
+  return /^safra\b/i.test(value) ? value : `Safra ${value}`;
+}
+
+/**
+ * Metadados do plano no PageHeader: cada par fica inteiro na mesma linha
+ * (a quebra acontece só entre itens) e o status usa o mesmo Badge da lista
+ * de planos.
+ */
+function PlanMeta({ plan }: { plan: ProductionPlan }) {
+  const items: string[] = [
+    harvestText(plan.harvest?.label),
+    `Área ${formatNumber(plan.plantedArea)} ha`,
+    `Plantio ${formatPlanDate(plan.plannedPlantingDate)}`,
+  ];
+  if (plan.expectedHarvestStart || plan.expectedHarvestEnd) {
+    items.push(
+      `Colheita prevista ${formatPlanDate(plan.expectedHarvestStart)} a ${formatPlanDate(plan.expectedHarvestEnd)}`,
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      {items.map((item, index) => (
+        <span key={item} className="whitespace-nowrap">
+          {index > 0 ? (
+            <span aria-hidden="true" className="mr-2">
+              ·
+            </span>
+          ) : null}
+          {item}
+        </span>
+      ))}
+      {plan.status ? (
+        <Badge variant={PLAN_STATUS_VARIANT[plan.status]}>
+          {PLAN_STATUS_LABELS[plan.status]}
+        </Badge>
+      ) : null}
+    </span>
+  );
 }
 
 const UUID_PATTERN =
@@ -275,10 +329,10 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         setNotFound(true);
         return;
       }
+      // "Erro 500" cru não ajuda: cai na mensagem genérica.
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar o plano de produção.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          "Não foi possível carregar o plano de produção.",
       );
     } finally {
       setLoading(false);
@@ -296,6 +350,64 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     [cropUnit],
   );
 
+  // Ações de linha (desktop): mesma ordem e mesmos nomes acessíveis de antes
+  // (leitura → decisão → edição → exclusão).
+  const rowActions = useCallback(
+    (execution: ProductionExecution): DataTableRowAction[] => {
+      const actions: DataTableRowAction[] = [
+        {
+          label: "Ocorrências do apontamento",
+          title: "Ocorrências",
+          icon: MessageSquareWarning,
+          onClick: () => setOccurrencesTarget(execution),
+        },
+        {
+          label: "Fotos do apontamento",
+          title: "Fotos",
+          icon: Images,
+          onClick: () => setAttachmentsTarget(execution),
+        },
+      ];
+      if (canDecideExecution(currentRole, execution)) {
+        actions.push(
+          {
+            label: "Validar apontamento",
+            title: "Validar",
+            icon: Check,
+            tone: "primary",
+            onClick: () => setDecision({ mode: "validate", execution }),
+          },
+          {
+            label: "Rejeitar apontamento",
+            title: "Rejeitar",
+            icon: X,
+            tone: "destructive",
+            onClick: () => setDecision({ mode: "reject", execution }),
+          },
+        );
+      }
+      if (canEditExecution(currentRole, execution)) {
+        actions.push({
+          label: "Editar apontamento",
+          title: "Editar",
+          icon: Pencil,
+          onClick: () => setEditTarget(execution),
+        });
+      }
+      if (canDelete && canDeleteExecution(currentRole, execution)) {
+        actions.push({
+          label: "Excluir apontamento",
+          title: "Excluir",
+          icon: Trash2,
+          tone: "destructive",
+          onClick: () => setDeleteTarget(execution),
+        });
+      }
+      return actions;
+    },
+    [canDelete, currentRole],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       // ISO `YYYY-MM-DD`: a comparação lexicográfica já ordena por data.
@@ -308,11 +420,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             disabled={loading}
           />
         ),
-        cell: ({ row }) => (
-          <span className="font-medium text-foreground">
-            {formatPlanDate(row.original.harvestedAt)}
-          </span>
-        ),
+        meta: { cellVariant: "primary", cellClassName: "tabular-nums" },
+        cell: ({ row }) => formatPlanDate(row.original.harvestedAt),
       }),
       columnHelper.accessor("quantity", {
         header: ({ column }) => (
@@ -324,11 +433,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             />
           </div>
         ),
-        cell: ({ row }) => (
-          <span className="block text-right tabular-nums">
-            {formatQuantity(row.original.quantity)}
-          </span>
-        ),
+        meta: { numeric: true },
+        cell: ({ row }) => formatQuantity(row.original.quantity),
       }),
       columnHelper.accessor("quantityKg", {
         header: ({ column }) => (
@@ -340,11 +446,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             />
           </div>
         ),
-        cell: (info) => (
-          <span className="block text-right tabular-nums">
-            {formatNumber(info.getValue())}
-          </span>
-        ),
+        meta: { numeric: true, cellVariant: "secondary" },
+        cell: (info) => formatNumber(info.getValue()),
       }),
       columnHelper.accessor((execution) => execution.status ?? "", {
         id: "status",
@@ -364,83 +467,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       id: "actions",
       // Só "Ocorrências" e "Fotos" (leitura, 4 roles) ⇒ o cabeçalho não sugere escrita.
       header: canWrite || canDecide ? "Ações" : "Ocorrências e fotos",
-      cell: ({ row }) => {
-        const execution = row.original;
-        const edit = canEditExecution(currentRole, execution);
-        const remove = canDelete && canDeleteExecution(currentRole, execution);
-        const decide = canDecideExecution(currentRole, execution);
-        return (
-          <div className="inline-flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Ocorrências do apontamento"
-              title="Ocorrências"
-              onClick={() => setOccurrencesTarget(execution)}
-            >
-              <MessageSquareWarning />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Fotos do apontamento"
-              title="Fotos"
-              onClick={() => setAttachmentsTarget(execution)}
-            >
-              <Images />
-            </Button>
-            {decide && (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Validar apontamento"
-                  onClick={() => setDecision({ mode: "validate", execution })}
-                  className="text-primary hover:text-primary"
-                >
-                  <Check />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Rejeitar apontamento"
-                  onClick={() => setDecision({ mode: "reject", execution })}
-                  className="text-destructive hover:text-destructive"
-                >
-                  <X />
-                </Button>
-              </>
-            )}
-            {edit && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Editar apontamento"
-                onClick={() => setEditTarget(execution)}
-              >
-                <Pencil />
-              </Button>
-            )}
-            {remove && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Excluir apontamento"
-                onClick={() => setDeleteTarget(execution)}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 />
-              </Button>
-            )}
-          </div>
-        );
-      },
+      cell: ({ row }) => <DataTableRowActions actions={rowActions(row.original)} />,
     });
 
     // "Ocorrências" e "Fotos" são leitura liberada às 4 roles: a coluna sempre existe.
@@ -448,7 +475,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       ProductionExecution,
       unknown
     >[];
-  }, [canWrite, canDelete, canDecide, currentRole, loading, formatQuantity]);
+  }, [canWrite, canDecide, loading, formatQuantity, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -559,37 +586,36 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
 
   if (notFound) {
     return (
-      <div className="flex flex-col gap-6">
-        <div
+      <div className="flex flex-col gap-section-sm">
+        <BackLink href={backToPlansHref}>Voltar para planos</BackLink>
+        <EmptyState
+          variant="card"
           role="alert"
-          className="flex flex-col items-start gap-3 rounded-xl border bg-card px-6 py-8"
-        >
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Plano não encontrado
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            O plano de produção não existe ou o endereço está incorreto.
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            nativeButton={false}
-            render={
-              <Link href={backToPlansHref}>
-                <ArrowLeft />
-                Voltar para planos
-              </Link>
-            }
-          />
-        </div>
+          headingLevel="h2"
+          icon={FileQuestion}
+          title="Plano não encontrado"
+          hint="O plano de produção não existe ou o endereço está incorreto."
+        />
       </div>
     );
   }
 
+  // Falha na primeira carga: sem plano não há o que listar, e a tabela vazia
+  // diria "nenhum apontamento" quando na verdade nada foi lido (UX-L4-01).
+  const showExecutions = !(error && !plan);
+
+  const planTitle =
+    !loading && plan?.crop
+      ? `${plan.crop.name} — ${plan.crop.variety}`
+      : "Plano de produção";
+
   return (
-    <div className="flex flex-col gap-6">
-      <Breadcrumb
-        items={[
+    // Entre blocos maiores (cabeçalho → resumo → gráfico → apontamentos):
+    // gap-section (24px), como no Figma 156:29.
+    <div className="flex flex-col gap-section">
+      {/* Figma 156:29: breadcrumb com ">" + "← Voltar para planos" + título. */}
+      <PageHeader
+        breadcrumb={[
           { label: "Organizações", href: "/admin/organizacoes" },
           {
             label: names?.organizationName ?? "Organização",
@@ -603,130 +629,79 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             label: names?.producerLabel ?? "Agricultor",
             href: backToPlansHref,
           },
-          {
-            label:
-              !loading && plan?.crop
-                ? `${plan.crop.name} — ${plan.crop.variety}`
-                : "Plano de produção",
-          },
+          { label: planTitle },
         ]}
+        back={{ href: backToPlansHref, label: "Voltar para planos" }}
+        loading={loading}
+        title={planTitle}
+        description={plan ? <PlanMeta plan={plan} /> : undefined}
       />
 
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          nativeButton={false}
-          className="-ml-2 mb-2 text-muted-foreground"
-          render={
-            <Link href={backToPlansHref}>
-              <ArrowLeft />
-              Voltar para planos
-            </Link>
-          }
-        />
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {loading ? (
-              <Skeleton className="h-7 w-64" />
-            ) : plan?.crop ? (
-              `${plan.crop.name} — ${plan.crop.variety}`
-            ) : (
-              "Plano de produção"
-            )}
-          </h2>
-          {!loading && plan && (
-            <p className="text-sm text-muted-foreground">
-              Safra {plan.harvest?.label ?? "—"} · Área{" "}
-              {formatNumber(plan.plantedArea)} ha · Plantio{" "}
-              {formatPlanDate(plan.plannedPlantingDate)}
-              {plan.status && <> · {PLAN_STATUS_LABELS[plan.status]}</>}
-              {(plan.expectedHarvestStart || plan.expectedHarvestEnd) && (
-                <>
-                  {" "}
-                  · Colheita prevista{" "}
-                  {formatPlanDate(plan.expectedHarvestStart)} a{" "}
-                  {formatPlanDate(plan.expectedHarvestEnd)}
-                </>
-              )}
-            </p>
-          )}
-        </div>
-      </div>
-
+      {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta. */}
       {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        <InlineAlert
+          variant="destructive"
+          action={{ label: "Tentar novamente", onClick: () => refresh() }}
         >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => refresh()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+          {error}
+        </InlineAlert>
       )}
 
-      {loading ? (
-        <Skeleton className="h-40 w-full rounded-xl" />
-      ) : (
-        comparison && <ComparisonSummary comparison={comparison} />
-      )}
+      <ComparisonSummary comparison={comparison} loading={loading} />
 
       {/* Mesmos dados já carregados pela tela — sem chamada extra (AC-015). */}
       {loading ? (
-        <Skeleton className="h-80 w-full rounded-xl" />
+        <HarvestChartSkeleton />
       ) : (
         plan && <ContinuousHarvestChart plan={plan} executions={executions} />
       )}
 
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold tracking-tight">
-              Apontamentos de colheita
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              Histórico diário do que foi colhido em campo. Somente apontamentos
-              validados contam no realizado.
-            </p>
-          </div>
-          {canWrite && plan && (
-            <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus />
-              Novo apontamento
-            </Button>
-          )}
-        </div>
+      {showExecutions && (
+        <section
+          aria-labelledby="plan-executions-title"
+          className="flex flex-col gap-section-sm"
+        >
+          <SectionHeader
+            id="plan-executions-title"
+            title="Apontamentos de colheita"
+            description="Histórico diário do que foi colhido em campo. Somente apontamentos validados contam no realizado."
+            actions={
+              canWrite && plan ? (
+                <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+                  <Plus aria-hidden="true" />
+                  Novo apontamento
+                </Button>
+              ) : undefined
+            }
+          />
 
-        {/*
-          Erro de carregamento é da tela inteira (plano, comparativo e
-          apontamentos vêm juntos) e já aparece no alerta do topo — por isso
-          o DataTable não recebe `hasError`.
-        */}
-        <DataTable
-          table={table}
-          columns={columns}
-          isLoading={loading}
-          emptyTitle="Nenhum apontamento registrado ainda."
-          emptyActionLabel={
-            canWrite && plan ? "Registrar primeira colheita" : undefined
-          }
-          onEmptyAction={
-            canWrite && plan ? () => setCreateOpen(true) : undefined
-          }
-          renderMobileCard={renderMobileCard}
-        />
+          {/*
+            Erro de carregamento é da tela inteira (plano, comparativo e
+            apontamentos vêm juntos) e já aparece no alerta do topo — por isso
+            o DataTable não recebe `hasError`.
+          */}
+          <DataTable
+            table={table}
+            columns={columns}
+            isLoading={loading}
+            emptyTitle="Nenhum apontamento registrado ainda."
+            emptyHint={
+              canWrite && plan
+                ? "Registre cada colheita com a data e a quantidade colhida."
+                : "Os apontamentos deste plano aparecem aqui quando forem registrados."
+            }
+            emptyActionLabel={
+              canWrite && plan ? "Criar primeiro apontamento" : undefined
+            }
+            onEmptyAction={
+              canWrite && plan ? () => setCreateOpen(true) : undefined
+            }
+            renderMobileCard={renderMobileCard}
+          />
 
-        <DataTablePagination table={table} />
-      </div>
+          <DataTablePagination table={table} />
+        </section>
+      )}
 
       <ExecutionOccurrencesSheet
         execution={occurrencesTarget}

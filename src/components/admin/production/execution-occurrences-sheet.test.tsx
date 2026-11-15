@@ -293,3 +293,87 @@ describe("ExecutionOccurrencesSheet — formulário (UNIT-005)", () => {
     await waitFor(() => expect(listOccurrences).toHaveBeenCalledTimes(2));
   });
 });
+
+describe("ExecutionOccurrencesSheet — revisão r1 do lote 4", () => {
+  it("A11Y-L4-2: erros de campo ficam em aria-describedby", async () => {
+    renderSheet(true);
+    await screen.findByText("Lagarta do cartucho");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar ocorrência" }));
+    await screen.findByText("Nova ocorrência");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    const typeError = await screen.findByText("O tipo de ocorrência é obrigatório");
+    expect(screen.getByLabelText("Tipo").getAttribute("aria-describedby")).toBe(typeError.id);
+    const descError = screen.getByText("A descrição é obrigatória");
+    expect(screen.getByLabelText("Descrição").getAttribute("aria-describedby")).toBe(descError.id);
+  });
+
+  it("A11Y-L4-5: abrir o formulário foca o Tipo; voltar devolve o foco ao botão", async () => {
+    renderSheet(true);
+    await screen.findByText("Lagarta do cartucho");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar ocorrência" }));
+    await screen.findByText("Nova ocorrência");
+    await waitFor(() => expect(document.activeElement?.id).toBe("occurrence-type"));
+    fireEvent.click(screen.getByRole("button", { name: "Voltar à lista" }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Adicionar ocorrência" }),
+      ),
+    );
+  });
+
+  it("UX-L4-04: lista vazia não repete o CTA (só o botão do topo)", async () => {
+    vi.mocked(listOccurrences).mockResolvedValue([]);
+    renderSheet(true);
+    await screen.findByText("Nenhuma ocorrência registrada neste apontamento");
+    expect(screen.getAllByRole("button", { name: /Adicionar/ })).toHaveLength(1);
+  });
+});
+
+describe("ExecutionOccurrencesSheet — erros e campos (lote 4)", () => {
+  it("falha 500 na lista mostra o texto padrão e 'Tentar novamente'", async () => {
+    vi.mocked(listOccurrences).mockRejectedValueOnce(new ApiError(500, "Erro 500", null));
+    renderSheet(true);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível carregar as ocorrências.");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeInTheDocument();
+  });
+
+  it("A11Y-L4-2: clima e evidência ligam o erro por aria-describedby", async () => {
+    renderSheet(true);
+    await screen.findByText("Lagarta do cartucho");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar ocorrência" }));
+    await screen.findByText("Nova ocorrência");
+    type("Tipo", "PEST");
+    type("Descrição", "Lagarta");
+    type("Observação climática (opcional)", "x".repeat(300));
+    type("Link da evidência (opcional)", "javascript:alert(1)");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    const urlError = await screen.findByText("Informe um link http:// ou https:// válido");
+    expect(screen.getByLabelText("Link da evidência (opcional)").getAttribute("aria-describedby")).toBe(urlError.id);
+    const weather = screen.getByLabelText("Observação climática (opcional)");
+    expect(weather.getAttribute("aria-describedby")).toBe("occurrence-weather-error");
+    expect(document.getElementById("occurrence-weather-error")).not.toBeNull();
+  });
+
+  it("A11Y-L4-3: erro do envio não fica dentro de região aria-live", async () => {
+    vi.mocked(createOccurrence).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    renderSheet(true);
+    await screen.findByText("Lagarta do cartucho");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar ocorrência" }));
+    await screen.findByText("Nova ocorrência");
+    type("Tipo", "PEST");
+    type("Descrição", "Lagarta");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível salvar a ocorrência.");
+    expect(alert.parentElement?.closest("[aria-live]")).toBeNull();
+  });
+
+  it("tipo em Badge outline com data-type", async () => {
+    renderSheet(true);
+    const badge = (await screen.findByText("Praga")).closest("[data-slot=badge]");
+    expect(badge?.getAttribute("data-type")).toBe("PEST");
+    expect(badge?.getAttribute("data-variant")).toBe("outline");
+  });
+});

@@ -227,7 +227,7 @@ function queryWriteAffordances() {
       name: /Novo apontamento/i,
     }),
     primeiraColheita: screen.queryByRole("button", {
-      name: /Registrar primeira colheita/i,
+      name: /Criar primeiro apontamento/i,
     }),
     editar: screen.queryByRole("button", { name: /^Editar( apontamento)?$/ }),
     excluir: screen.queryByRole("button", { name: "Excluir apontamento" }),
@@ -320,14 +320,14 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
     },
   );
 
-  it("FARMER sem apontamentos: vê 'Registrar primeira colheita'", async () => {
+  it("FARMER sem apontamentos: vê 'Criar primeiro apontamento'", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue([]);
 
     renderPlanDetail();
 
     expect(
-      await screen.findByRole("button", { name: /Registrar primeira colheita/i }),
+      await screen.findByRole("button", { name: /Criar primeiro apontamento/i }),
     ).toBeTruthy();
     expect(
       screen.getByText("Nenhum apontamento registrado ainda."),
@@ -379,6 +379,17 @@ describe("PlanDetail — exclusão de apontamento pelo FARMER", () => {
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Excluir" })).toBeTruthy();
     expect(vi.mocked(listProductionExecutions).mock.calls.length).toBe(1);
+  });
+
+  it("'Erro 500' cru na exclusão vira a mensagem padrão (userFacingErrorHint)", async () => {
+    await openDeleteDialog();
+    vi.mocked(deleteProductionExecution).mockRejectedValue(new ApiError(500, "Erro 500", null));
+
+    fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível excluir o apontamento.");
+    expect(alert.textContent).not.toContain("Erro 500");
   });
 
   it("sucesso: chama a API, fecha o dialog e recarrega os 3 GET da tela", async () => {
@@ -543,14 +554,14 @@ describe("PlanDetail — tabela de apontamentos", () => {
     expect(dates).toEqual(["20/06/2026", "10/05/2026", "02/04/2026"]);
   });
 
-  it("sem apontamentos, 'Registrar primeira colheita' abre o drawer", async () => {
+  it("sem apontamentos, 'Criar primeiro apontamento' abre o drawer", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue([]);
 
     renderPlanDetail();
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "Registrar primeira colheita" }),
+      await screen.findByRole("button", { name: "Criar primeiro apontamento" }),
     );
 
     const drawer = await screen.findByRole("dialog");
@@ -1085,5 +1096,98 @@ describe("PlanDetail — evidências de apontamento validado", () => {
     fireEvent.click(screen.getByRole("button", { name: "Fotos do apontamento" }));
     await waitFor(() => expect(listAttachments).toHaveBeenCalled());
     expect(screen.queryByTestId("attachment-input")).not.toBeNull();
+  });
+});
+
+describe("PlanDetail — revisão r1 do lote 4", () => {
+  it("UX-L4-01: erro na primeira carga não mostra o vazio falso dos apontamentos", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockRejectedValue(new ApiError(500, "Erro 500", {}));
+
+    renderPlanDetail();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível carregar o plano de produção.");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(screen.queryByText("Nenhum apontamento registrado ainda.")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Apontamentos de colheita" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Novo apontamento/ })).toBeNull();
+  });
+
+  it("UX-L4-02: 'Validar' tem tom afirmativo (primary) e 'Rejeitar' destrutivo", async () => {
+    loginAs("TECHNICIAN");
+    renderPlanDetail();
+
+    const validate = (await screen.findAllByRole("button", { name: "Validar apontamento" }))[0];
+    const reject = screen.getAllByRole("button", { name: "Rejeitar apontamento" })[0];
+    expect(validate.className).toContain("text-primary");
+    expect(reject.className).toContain("text-destructive");
+  });
+
+  it("UX-L4-03: carregando mostra o skeleton com a forma do card do gráfico", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockReturnValue(new Promise(() => {}));
+
+    renderPlanDetail();
+
+    const skeleton = await screen.findByLabelText("Carregando gráfico");
+    expect(skeleton.getAttribute("data-slot")).toBe("card");
+    expect(skeleton.getAttribute("aria-busy")).toBe("true");
+  });
+});
+
+describe("PlanDetail — metadados do cabeçalho (UX-L4-06)", () => {
+  it("rótulo que já começa com 'Safra' não é duplicado", async () => {
+    loginAs("ADMIN");
+    renderPlanDetail();
+    await screen.findByRole("heading", { name: "Milho — BRS 1010" });
+    expect(screen.getByText("Safra 2025/2026")).toBeInTheDocument();
+    expect(screen.queryByText(/Safra Safra/)).toBeNull();
+    expect(document.body.textContent).not.toContain("Safra Safra");
+  });
+
+  it("rótulo sem o prefixo ganha 'Safra'; sem safra mostra 'Safra —'", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockResolvedValue({
+      ...PLAN,
+      harvest: { ...PLAN.harvest!, label: "2027" },
+    });
+    renderPlanDetail();
+    expect(await screen.findByText("Safra 2027")).toBeInTheDocument();
+
+    cleanup();
+    vi.mocked(getProductionPlan).mockResolvedValue({ ...PLAN, harvest: null });
+    renderPlanDetail();
+    expect(await screen.findByText("Safra —")).toBeInTheDocument();
+  });
+
+  it("status do plano em Badge (mesma variante da lista) e pares sem quebra interna", async () => {
+    loginAs("ADMIN");
+    renderPlanDetail();
+    const badge = (await screen.findByText("Ativo")).closest("[data-slot=badge]");
+    expect(badge?.getAttribute("data-variant")).toBe("success");
+    expect(screen.getByText(/^Área .* ha$/).closest(".whitespace-nowrap")).not.toBeNull();
+  });
+});
+
+describe("PlanDetail — estados acessíveis (lote 4)", () => {
+  it("404: EmptyState com role=alert e título h2", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockRejectedValue(new ApiError(404, "Plano não encontrado.", {}));
+    renderPlanDetail();
+    const heading = await screen.findByRole("heading", { level: 2, name: "Plano não encontrado" });
+    expect(heading.closest("[role=alert]")).not.toBeNull();
+  });
+
+  it("carregando: título e os 4 cards do resumo em skeleton", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getProductionPlan).mockReturnValue(new Promise(() => {}));
+    renderPlanDetail();
+    expect(await screen.findByText("Carregando meta alcançada")).toBeInTheDocument();
+    expect(screen.getByText("Carregando Previsto")).toBeInTheDocument();
+    expect(
+      document.querySelector("[data-slot=page-header] [aria-busy=true]"),
+    ).not.toBeNull();
+    expect(screen.queryByRole("heading", { name: "Milho — BRS 1010" })).toBeNull();
   });
 });

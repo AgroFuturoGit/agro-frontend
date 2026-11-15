@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -13,8 +13,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Label } from "@/components/ui/label";
-import { ApiError } from "@/lib/api";
+import { Textarea } from "@/components/ui/textarea";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { unitLabel, type MeasurementUnit } from "@/lib/crops";
 import {
   formatNumber,
@@ -78,11 +80,10 @@ export function ExecutionDecisionDialog({
       onOpenChange(false);
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : isReject
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          (isReject
             ? "Não foi possível rejeitar o apontamento."
-            : "Não foi possível validar o apontamento.",
+            : "Não foi possível validar o apontamento."),
       );
     } finally {
       setSubmitting(false);
@@ -118,27 +119,19 @@ export function ExecutionDecisionDialog({
         {isReject && (
           <div className="flex flex-col gap-2">
             <Label htmlFor="execution-rejection-reason">Motivo (opcional)</Label>
-            <textarea
+            <Textarea
               id="execution-rejection-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               maxLength={MAX_REASON_LENGTH}
               rows={3}
               disabled={submitting}
-              className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 md:text-sm dark:bg-input/30"
+              className="min-h-20"
             />
           </div>
         )}
 
-        {error && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <InlineAlert variant="destructive">{error}</InlineAlert>}
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
@@ -149,7 +142,7 @@ export function ExecutionDecisionDialog({
           >
             {submitting ? (
               <>
-                <Loader2 className="animate-spin" />
+                <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                 {isReject ? "Rejeitando…" : "Validando…"}
               </>
             ) : isReject ? (

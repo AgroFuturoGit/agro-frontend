@@ -1,9 +1,11 @@
-import { cn } from "@/lib/utils";
+import { EmptyValue } from "@/components/admin/empty-value";
+import { Badge } from "@/components/ui/badge";
 import {
   EXECUTION_STATUS_LABELS,
   formatPlanDate,
   type ExecutionStatus,
 } from "@/lib/production";
+import { EXECUTION_STATUS_VARIANT } from "@/lib/status-variants";
 
 type Props = {
   status: ExecutionStatus | null;
@@ -13,15 +15,11 @@ type Props = {
   decidedAt?: string | null;
 };
 
-const STYLES: Record<ExecutionStatus, string> = {
-  PENDING: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-  VALIDATED: "bg-primary/10 text-primary",
-  REJECTED: "bg-destructive/10 text-destructive",
-};
-
 /**
- * Status de validação do apontamento — somente exibição (sem ações). Mostra,
- * quando existem, o motivo da rejeição e a data da decisão.
+ * Status de validação do apontamento — somente exibição (sem ações). Badge
+ * semântico (pendente = atenção, validado = sucesso, rejeitado = erro) com
+ * `data-status`; mostra, quando existem, o motivo da rejeição e a data da
+ * decisão.
  */
 export function ExecutionStatusBadge({
   status,
@@ -29,30 +27,24 @@ export function ExecutionStatusBadge({
   decidedAt = null,
 }: Props) {
   if (!status) {
-    return <span className="text-muted-foreground">—</span>;
+    return <EmptyValue />;
   }
 
   const reason = status === "REJECTED" ? rejectionReason?.trim() : null;
   const decided = status !== "PENDING" && decidedAt ? decidedAt : null;
 
   return (
-    <div className="flex flex-col items-start gap-0.5">
-      <span
-        data-status={status}
-        className={cn(
-          "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
-          STYLES[status],
-        )}
-      >
+    <div className="flex flex-col items-start gap-1">
+      <Badge data-status={status} variant={EXECUTION_STATUS_VARIANT[status]}>
         {EXECUTION_STATUS_LABELS[status]}
-      </span>
+      </Badge>
       {decided && (
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground tabular-nums">
           Decidido em {formatPlanDate(decided)}
         </span>
       )}
       {reason && (
-        <span className="max-w-64 text-xs text-muted-foreground">
+        <span className="max-w-64 text-xs whitespace-normal text-muted-foreground">
           Motivo: {reason}
         </span>
       )}

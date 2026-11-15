@@ -120,3 +120,39 @@ describe("ComparisonSummary — GoalGauge + 3 StatCards", () => {
     expect(screen.queryByText("Meta de colheita atingida")).toBeNull();
   });
 });
+
+describe("ComparisonSummary — loading e null (lote 4)", () => {
+  afterEach(cleanup);
+
+  it("loading: 4 cards em skeleton com sr-only e nenhum número", () => {
+    const { container } = render(<ComparisonSummary comparison={null} loading />);
+    expect(container.querySelectorAll("[data-slot=card]").length).toBe(4);
+    expect(screen.getByText("Carregando meta alcançada")).toBeInTheDocument();
+    expect(screen.getByText("Carregando Previsto")).toBeInTheDocument();
+    expect(screen.getByText("Carregando Realizado")).toBeInTheDocument();
+    expect(screen.getByText("Carregando Diferença")).toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: /da meta alcançada/ })).toBeNull();
+  });
+
+  it("loading tem prioridade mesmo com comparison preenchido", () => {
+    render(
+      <ComparisonSummary
+        comparison={{
+          productionPlanId: "p1",
+          expectedYield: 10,
+          totalActualYield: 5,
+          difference: -5,
+          percentageRealized: 50,
+        }}
+        loading
+      />,
+    );
+    expect(screen.queryByText("10 kg")).toBeNull();
+    expect(screen.getByText("Carregando Previsto")).toBeInTheDocument();
+  });
+
+  it("comparison null sem loading não renderiza nada", () => {
+    const { container } = render(<ComparisonSummary comparison={null} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});

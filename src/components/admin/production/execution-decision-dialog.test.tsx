@@ -130,3 +130,19 @@ describe("ExecutionDecisionDialog — rejeitar (UNIT-003)", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 });
+
+describe("ExecutionDecisionDialog — userFacingErrorHint (lote 4)", () => {
+  it.each([
+    ["validate", "Validar", "Não foi possível validar o apontamento."],
+    ["reject", "Rejeitar", "Não foi possível rejeitar o apontamento."],
+  ] as const)("'Erro 500' cru ao %s vira a mensagem padrão no InlineAlert", async (mode, button, text) => {
+    vi.mocked(validateProductionExecution).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    vi.mocked(rejectProductionExecution).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    renderDialog(mode);
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(text);
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.getAttribute("data-slot")).toBe("inline-alert");
+  });
+});

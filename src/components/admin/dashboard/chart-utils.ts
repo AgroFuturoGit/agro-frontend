@@ -18,6 +18,10 @@ import { CanvasRenderer } from "echarts/renderers";
 
 import { formatNumber } from "@/lib/production";
 
+import { readToken, toRgb } from "./chart-tokens";
+
+export { readChartFontFamily, readToken, toRgb } from "./chart-tokens";
+
 registerEcharts([
   BarChart,
   PieChart,
@@ -52,26 +56,9 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function toRgb(value: string): string {
-  try {
-    const ctx = document.createElement("canvas").getContext("2d", {
-      willReadFrequently: true,
-    });
-    if (!ctx) return value;
-    ctx.clearRect(0, 0, 1, 1);
-    ctx.fillStyle = value;
-    ctx.fillRect(0, 0, 1, 1);
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-    return `rgb(${r}, ${g}, ${b})`;
-  } catch {
-    return value;
-  }
-}
-
 /** Lê os tokens de cor (CSS vars) do tema vigente no escopo informado. */
 export function readChartColors(scope: Element): ChartColors {
-  const style = getComputedStyle(scope);
-  const token = (name: string) => toRgb(style.getPropertyValue(name).trim());
+  const token = (name: string) => toRgb(readToken(scope, name));
   return {
     palette: ["--chart-1", "--chart-2", "--chart-3", "--chart-4", "--chart-5"].map(token),
     target: token("--chart-4"),
