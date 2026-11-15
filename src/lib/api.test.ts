@@ -404,7 +404,15 @@ describe("apiErrorMessage", () => {
   it("cai no fallback com o próximo passo para o 'Erro NNN' cru e mensagem vazia", () => {
     expect(apiErrorMessage(new ApiError(500, "Erro 500", null), "Falhou.")).toBe(FALLBACK);
     expect(apiErrorMessage(new ApiError(502, " Erro 502 ", null), "Falhou.")).toBe(FALLBACK);
-    expect(apiErrorMessage(new ApiError(400, "", null), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(503, "", null), "Falhou.")).toBe(FALLBACK);
+  });
+
+  it("UX-L6-R2-3: 4xx sem mensagem de domínio não manda repetir (exceto 408 e 429)", () => {
+    expect(apiErrorMessage(new ApiError(400, "", null), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(422, "Erro 422", null), "Falhou")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(404, "Erro 404", null), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(408, "Erro 408", null), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(429, "Erro 429", null), "Falhou.")).toBe(FALLBACK);
   });
 
   it("cai no fallback com o próximo passo para erro que não veio da API", () => {

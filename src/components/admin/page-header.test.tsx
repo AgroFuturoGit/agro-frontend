@@ -68,6 +68,8 @@ describe("PageHeader", () => {
     const loadingTitle = document.getElementById("t");
     expect(loadingTitle?.tagName).toBe("H2");
     expect(loadingTitle).toHaveAccessibleName("Carregando…");
+    // A11Y-L6-R2-1: o alvo do foco não fica aria-busy (leitores omitiriam o conteúdo).
+    expect(loadingTitle).not.toHaveAttribute("aria-busy");
     expect(loadingTitle).toHaveClass("focus-visible:ring-2", "focus-visible:ring-ring", "outline-none");
     expect(loadingTitle?.className).not.toMatch(/(^| )ring-2/);
 

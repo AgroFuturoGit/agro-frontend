@@ -50,20 +50,32 @@ const HAS_NEXT_STEP = /tente novamente|contate|verifique|recarregue/i;
 export function withRetryHint(fallback: string): string {
   const text = fallback.trim();
   if (!text || HAS_NEXT_STEP.test(text)) return fallback;
-  return `${/[.!?…]$/.test(text) ? text : `${text}.`} ${RETRY_HINT}`;
+  return `${closeSentence(text)} ${RETRY_HINT}`;
 }
 
 /**
  * Mensagem de erro para a tela a partir de qualquer exceção: usa a mensagem
  * de domínio do `ApiError` (via `userFacingErrorHint`) e, para "Erro NNN"
  * cru, mensagem vazia ou erro que não veio da API, cai em `fallback` com o
- * próximo passo (`withRetryHint`).
+ * próximo passo (`withRetryHint`). Em 4xx (exceto 408/429) o fallback vai
+ * sem o "Tente novamente", porque repetir o mesmo pedido não resolve.
  */
 export function apiErrorMessage(err: unknown, fallback: string): string {
-  return (
-    (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-    withRetryHint(fallback)
-  );
+  const domain = err instanceof ApiError ? userFacingErrorHint(err.message) : undefined;
+  if (domain !== undefined) return domain;
+  // 4xx (fora 408/429) é erro do pedido: repetir sem mudar nada não resolve,
+  // então o fallback vai sem o "Tente novamente" (UX-L6-R2-3).
+  if (err instanceof ApiError && isClientError(err.status)) return closeSentence(fallback);
+  return withRetryHint(fallback);
+}
+
+function isClientError(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+function closeSentence(text: string): string {
+  const trimmed = text.trim();
+  return !trimmed || /[.!?…]$/.test(trimmed) ? text : `${trimmed}.`;
 }
 
 /** 409 de edição simultânea: o back devolve o registro atual em `current`. */

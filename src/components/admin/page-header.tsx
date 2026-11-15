@@ -66,7 +66,6 @@ export function PageHeader({
               <>
                 <h2
                   id={titleId}
-                  aria-busy={loading ? true : undefined}
                   className={cn(
                     "text-page-title font-bold text-foreground",
                     titleId && cn("rounded-sm", FOCUS_TARGET),

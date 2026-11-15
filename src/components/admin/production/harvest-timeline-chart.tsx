@@ -120,14 +120,14 @@ function useThemeVersion(
  */
 export function HarvestChartSkeleton() {
   return (
-    <Card aria-busy="true" aria-label="Carregando gráfico" className="p-6">
+    <Card role="group" aria-busy="true" aria-label="Carregando gráfico" className="p-6">
       <div className="flex flex-col gap-1">
         <Skeleton className="h-7 w-48" />
         <Skeleton className="h-6 w-64 max-w-full" />
       </div>
       <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />
       <Skeleton className="h-4 w-56" />
-      <span className="sr-only">Carregando gráfico…</span>
+      <span role="status" className="sr-only">Carregando gráfico…</span>
     </Card>
   );
 }
@@ -294,11 +294,23 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
     // Recarga depois do erro: mesma raiz <Card> com o título real, para o
     // foco do "Tentar novamente" não se perder. Na primeira carga também.
     return (
-      <Card aria-busy="true" aria-label="Carregando gráfico" className="p-6">
-        <SectionHeader id={titleId} title={TITLE} />
+      // role="group": nome em <div> genérico é proibido (A11Y-L6-R2-2). A
+      // descrição em skeleton evita o salto quando o gráfico chega (UX-L6-R2-1).
+      <Card role="group" aria-busy="true" aria-label="Carregando gráfico" className="p-6">
+        <SectionHeader
+          id={titleId}
+          title={TITLE}
+          description={
+            <span
+              aria-hidden="true"
+              data-slot="skeleton"
+              className="block h-6 w-64 max-w-full animate-pulse rounded-md bg-muted"
+            />
+          }
+        />
         <Skeleton aria-hidden="true" className="w-full" style={{ height: CHART_HEIGHT }} />
         <Skeleton aria-hidden="true" className="h-4 w-56" />
-        <span className="sr-only">Carregando gráfico…</span>
+        <span role="status" className="sr-only">Carregando gráfico…</span>
       </Card>
     );
   }

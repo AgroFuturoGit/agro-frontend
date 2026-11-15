@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { ContinuousHarvestChart } from "@/components/admin/production/harvest-timeline-chart";
 import { getHarvestTimeline, type HarvestTimelineResponse } from "@/lib/analytics";
@@ -341,7 +341,13 @@ describe("ContinuousHarvestChart — revisão r1 do lote 4", () => {
     expect(skeleton).toContainElement(
       screen.getByRole("heading", { level: 3, name: "Previsto × realizado" }),
     );
-    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(2);
+    // UX-L6-R2-1: descrição em skeleton para o card não saltar quando o
+    // gráfico chega (título + descrição + gráfico + legenda).
+    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(3);
+    // A11Y-L6-R2-2: grupo nomeado (não <div> genérico) e o carregamento
+    // anunciado numa região viva.
+    expect(skeleton.getAttribute("role")).toBe("group");
+    expect(within(skeleton).getByRole("status")).toHaveTextContent("Carregando gráfico…");
   });
 
   it("A11Y-L6-5: 'Tentar novamente' leva o foco ao título do card, que fica montado", async () => {

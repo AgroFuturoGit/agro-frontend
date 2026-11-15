@@ -1212,7 +1212,7 @@ describe("PlanDetail — estados acessíveis (lote 4)", () => {
     expect(await screen.findByText("Carregando meta alcançada")).toBeInTheDocument();
     expect(screen.getByText("Carregando Previsto")).toBeInTheDocument();
     expect(
-      document.querySelector("[data-slot=page-header] [aria-busy=true]"),
+      document.querySelector("[data-slot=page-header] h2 [data-slot=skeleton]"),
     ).not.toBeNull();
     expect(screen.queryByRole("heading", { name: "Milho — BRS 1010" })).toBeNull();
   });
