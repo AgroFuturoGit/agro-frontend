@@ -315,7 +315,7 @@ describe("FinancingSection — visual do redesign", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Criar primeiro financiamento" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar primeiro financiamento" }));
     expect(await screen.findByRole("dialog")).toHaveTextContent("Novo financiamento");
   });
 });

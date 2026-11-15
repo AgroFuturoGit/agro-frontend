@@ -330,7 +330,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
           action={
             canWrite
               ? {
-                  label: "Criar primeiro membro",
+                  label: "Adicionar primeiro membro",
                   onClick: openCreate,
                   variant: "outline",
                 }

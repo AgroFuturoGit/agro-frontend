@@ -287,7 +287,7 @@ describe("FamilyCompositionSection — visual do redesign", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Criar primeiro membro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar primeiro membro" }));
     expect(await screen.findByRole("dialog")).toHaveTextContent("Novo membro familiar");
   });
 

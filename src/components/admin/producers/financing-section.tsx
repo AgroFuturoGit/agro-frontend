@@ -365,7 +365,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
           action={
             canWrite
               ? {
-                  label: "Criar primeiro financiamento",
+                  label: "Adicionar primeiro financiamento",
                   onClick: openCreate,
                   variant: "outline",
                 }
