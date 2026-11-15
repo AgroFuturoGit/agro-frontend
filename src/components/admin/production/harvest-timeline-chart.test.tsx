@@ -228,6 +228,15 @@ describe("ContinuousHarvestChart", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("erro 'Erro 500' cru da API cai na mensagem genérica (InlineAlert)", async () => {
+    vi.mocked(getHarvestTimeline).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível carregar o gráfico de colheita.");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.getAttribute("data-slot")).toBe("inline-alert");
+  });
+
   it("UNIT-008: erro que não é ApiError usa a mensagem genérica", async () => {
     vi.mocked(getHarvestTimeline).mockRejectedValue(new Error("boom"));
     render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);

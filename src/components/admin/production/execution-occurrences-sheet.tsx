@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { AlertCircle, ExternalLink, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, MessageSquareWarning, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -13,9 +13,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/admin/empty-state";
+import { EmptyValue } from "@/components/admin/empty-value";
+import { DataTableRowActions } from "@/components/data-table/data-table-row-actions";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import {
   Sheet,
   SheetContent,
@@ -25,7 +31,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { Textarea } from "@/components/ui/textarea";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import {
   OCCURRENCE_TYPES,
   OCCURRENCE_TYPE_LABELS,
@@ -39,6 +46,7 @@ import {
   type OccurrenceType,
 } from "@/lib/occurrences";
 import { formatPlanDate, type ProductionExecution } from "@/lib/production";
+import { OCCURRENCE_TYPE_VARIANT } from "@/lib/status-variants";
 import { LIMITS } from "@/lib/validation";
 
 type Props = {
@@ -66,12 +74,6 @@ const MAX_DESCRIPTION = LIMITS.OCCURRENCE_DESCRIPTION;
 const MAX_WEATHER = LIMITS.OCCURRENCE_WEATHER;
 const MAX_URL = LIMITS.OCCURRENCE_EVIDENCE_URL;
 
-const TYPE_STYLES: Record<OccurrenceType, string> = {
-  CLIMATE: "bg-sky-500/15 text-sky-800 dark:text-sky-300",
-  PEST: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-  DISEASE: "bg-destructive/10 text-destructive",
-};
-
 function validate(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
   if (!values.logType) errors.logType = "O tipo de ocorrência é obrigatório";
@@ -88,18 +90,6 @@ function validate(values: FormValues): Record<string, string> {
       errors.evidenceUrl = "Informe um link http:// ou https:// válido";
   }
   return errors;
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-    >
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  );
 }
 
 /**
@@ -144,9 +134,8 @@ export function ExecutionOccurrencesSheet({
     } catch (err) {
       if (seq !== loadSeq.current) return;
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar as ocorrências.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          "Não foi possível carregar as ocorrências.",
       );
     } finally {
       if (seq === loadSeq.current) setLoading(false);
@@ -222,7 +211,9 @@ export function ExecutionOccurrencesSheet({
         if (Object.keys(fromApi).length > 0) {
           setFieldErrors(fromApi);
         } else {
-          setFormError(err.message);
+          setFormError(
+            userFacingErrorHint(err.message) ?? "Não foi possível salvar a ocorrência.",
+          );
         }
       } else {
         setFormError("Não foi possível salvar a ocorrência.");
@@ -242,9 +233,8 @@ export function ExecutionOccurrencesSheet({
       await refresh();
     } catch (err) {
       setDeleteError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir a ocorrência.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          "Não foi possível excluir a ocorrência.",
       );
     } finally {
       setDeleting(false);
@@ -252,28 +242,42 @@ export function ExecutionOccurrencesSheet({
   }
 
   function renderList() {
-    if (loading) return <Skeleton className="h-24 w-full rounded-xl" />;
+    if (loading) {
+      return (
+        <div aria-busy="true" className="flex flex-col gap-3">
+          <Skeleton className="h-24 w-full rounded-xl" />
+          <span className="sr-only">Carregando ocorrências…</span>
+        </div>
+      );
+    }
     if (error) {
       return (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+        <InlineAlert
+          variant="destructive"
+          action={{ label: "Tentar novamente", onClick: () => refresh() }}
         >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={refresh}>
-            Tentar novamente
-          </Button>
-        </div>
+          {error}
+        </InlineAlert>
       );
     }
     if (items.length === 0) {
       return (
-        <p className="rounded-lg border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhuma ocorrência registrada neste apontamento
-        </p>
+        <EmptyState
+          variant="card"
+          icon={MessageSquareWarning}
+          className="py-8"
+          title="Nenhuma ocorrência registrada neste apontamento"
+          hint={
+            canWrite
+              ? "Registre clima, pragas ou doenças observadas na colheita."
+              : undefined
+          }
+          action={
+            canWrite
+              ? { label: "Adicionar primeira ocorrência", onClick: () => openForm(null) }
+              : undefined
+          }
+        />
       );
     }
     return (
@@ -281,48 +285,45 @@ export function ExecutionOccurrencesSheet({
         {items.map((item) => {
           const label = item.logType ? OCCURRENCE_TYPE_LABELS[item.logType] : "Ocorrência";
           return (
-            <li key={item.id} className="rounded-lg border bg-card p-3">
+            <li key={item.id} className="rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col items-start gap-1">
                   {item.logType ? (
-                    <span
+                    // Tipo é categoria, não status: badge outline (sem cor semântica).
+                    <Badge
                       data-type={item.logType}
-                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${TYPE_STYLES[item.logType]}`}
+                      variant={OCCURRENCE_TYPE_VARIANT[item.logType]}
                     >
                       {label}
-                    </span>
+                    </Badge>
                   ) : (
-                    <span className="text-muted-foreground">—</span>
+                    <EmptyValue />
                   )}
                   <span className="text-xs text-muted-foreground">
                     Registrada em {formatPlanDate(item.createdAt)}
                   </span>
                 </div>
                 {canWrite && (
-                  <div className="inline-flex shrink-0 items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Editar ocorrência ${label}`}
-                      onClick={() => openForm(item)}
-                    >
-                      <Pencil />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Excluir ocorrência ${label}`}
-                      onClick={() => {
-                        setDeleteError(null);
-                        setDeleteTarget(item);
-                      }}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
+                  <DataTableRowActions
+                    align="end"
+                    className="shrink-0"
+                    actions={[
+                      {
+                        label: `Editar ocorrência ${label}`,
+                        icon: Pencil,
+                        onClick: () => openForm(item),
+                      },
+                      {
+                        label: `Excluir ocorrência ${label}`,
+                        icon: Trash2,
+                        tone: "destructive",
+                        onClick: () => {
+                          setDeleteError(null);
+                          setDeleteTarget(item);
+                        },
+                      },
+                    ]}
+                  />
                 )}
               </div>
               <p className="mt-2 whitespace-pre-wrap text-sm">{item.description}</p>
@@ -337,10 +338,10 @@ export function ExecutionOccurrencesSheet({
                     href={item.evidenceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    className="mt-1 inline-flex items-center gap-1 rounded-sm text-sm text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     Ver evidência
-                    <ExternalLink className="size-3.5" />
+                    <ExternalLink aria-hidden="true" className="size-3.5" />
                   </a>
                 ) : (
                   <p className="mt-1 break-all text-sm text-muted-foreground">
@@ -377,32 +378,32 @@ export function ExecutionOccurrencesSheet({
                 {editTarget ? "Editar ocorrência" : "Nova ocorrência"}
               </h4>
               <div aria-live="polite">
-                {formError && <ErrorBox message={formError} />}
+                {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="occurrence-type">Tipo</Label>
-                <select
+                <NativeSelect
                   id="occurrence-type"
+                  className="w-full"
                   value={values.logType}
                   onChange={(e) => update("logType", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.logType)}
-                  className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive md:text-sm dark:bg-input/30"
                 >
-                  <option value="">Selecione…</option>
+                  <NativeSelectOption value="">Selecione…</NativeSelectOption>
                   {OCCURRENCE_TYPES.map((type) => (
-                    <option key={type} value={type}>
+                    <NativeSelectOption key={type} value={type}>
                       {OCCURRENCE_TYPE_LABELS[type]}
-                    </option>
+                    </NativeSelectOption>
                   ))}
-                </select>
+                </NativeSelect>
                 {fieldErrors.logType && (
                   <p className="text-sm text-destructive">{fieldErrors.logType}</p>
                 )}
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="occurrence-description">Descrição</Label>
-                <textarea
+                <Textarea
                   id="occurrence-description"
                   rows={3}
                   maxLength={MAX_DESCRIPTION}
@@ -410,7 +411,7 @@ export function ExecutionOccurrencesSheet({
                   onChange={(e) => update("description", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.description)}
-                  className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-base outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive md:text-sm dark:bg-input/30"
+                  className="min-h-20"
                 />
                 {fieldErrors.description && (
                   <p className="text-sm text-destructive">{fieldErrors.description}</p>
@@ -461,7 +462,7 @@ export function ExecutionOccurrencesSheet({
               <Button type="submit" disabled={submitting}>
                 {submitting ? (
                   <>
-                    <Loader2 className="animate-spin" />
+                    <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                     Salvando…
                   </>
                 ) : (
@@ -474,8 +475,8 @@ export function ExecutionOccurrencesSheet({
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
             {canWrite && (
               <div>
-                <Button type="button" size="sm" variant="outline" onClick={() => openForm(null)}>
-                  <Plus />
+                <Button type="button" variant="outline" onClick={() => openForm(null)}>
+                  <Plus aria-hidden="true" />
                   Adicionar ocorrência
                 </Button>
               </div>
@@ -504,7 +505,7 @@ export function ExecutionOccurrencesSheet({
                   ({deleteTarget?.description}) do apontamento. Não é possível desfazer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              {deleteError && <ErrorBox message={deleteError} />}
+              {deleteError && <InlineAlert variant="destructive">{deleteError}</InlineAlert>}
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
@@ -514,7 +515,7 @@ export function ExecutionOccurrencesSheet({
                 >
                   {deleting ? (
                     <>
-                      <Loader2 className="animate-spin" />
+                      <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                       Excluindo…
                     </>
                   ) : (

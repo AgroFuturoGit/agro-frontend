@@ -12,6 +12,8 @@ export type ChartColors = {
   grid: string;
   popover: string;
   popoverText: string;
+  /** Fonte do sistema (a do `<body>`); sem ela, o ECharts usa a própria. */
+  fontFamily?: string;
 };
 
 export type ChartOptionInput = {
@@ -233,7 +235,10 @@ export function buildHarvestChartOption(
       decal: { show: false },
       ...(input.ariaLabel ? { label: { description: input.ariaLabel } } : {}),
     },
-    textStyle: { color: colors.text },
+    textStyle: {
+      color: colors.text,
+      ...(colors.fontFamily ? { fontFamily: colors.fontFamily } : {}),
+    },
     legend: {
       data: legend,
       top: 0,
@@ -255,7 +260,11 @@ export function buildHarvestChartOption(
       axisPointer: { type: "shadow", shadowStyle: { color: colors.grid, opacity: 0.3 } },
       backgroundColor: colors.popover,
       borderColor: colors.grid,
-      textStyle: { color: colors.popoverText, fontSize: 12 },
+      textStyle: {
+        color: colors.popoverText,
+        fontSize: 12,
+        ...(colors.fontFamily ? { fontFamily: colors.fontFamily } : {}),
+      },
       formatter: (params: unknown) => {
         const first = Array.isArray(params) ? params[0] : params;
         const index = (first as { dataIndex?: number } | undefined)?.dataIndex ?? -1;

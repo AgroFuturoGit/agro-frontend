@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import {
   Sheet,
   SheetContent,
@@ -14,7 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { unitFactorKg, unitLabel, type Crop } from "@/lib/crops";
 import {
   createProductionExecution,
@@ -206,9 +207,8 @@ export function ExecutionFormDrawer({
         return;
       }
       setFormError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível salvar o apontamento.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          "Não foi possível salvar o apontamento.",
       );
     } finally {
       setSubmitting(false);
@@ -236,24 +236,15 @@ export function ExecutionFormDrawer({
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
             <div aria-live="polite">
               {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-                >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
+                <InlineAlert variant="destructive">{formError}</InlineAlert>
               )}
             </div>
 
             {!isCreate && execution?.status === "REJECTED" && (
-              <div
-                role="status"
-                className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{RESUBMIT_WARNING}</span>
-              </div>
+              // Aviso informativo de quem corrige: não interrompe o leitor.
+              <InlineAlert variant="warning" role="status">
+                {RESUBMIT_WARNING}
+              </InlineAlert>
             )}
 
             {!isCreate && execution?.status === "REJECTED" && execution.rejectionReason && (
@@ -263,13 +254,7 @@ export function ExecutionFormDrawer({
             )}
 
             {blocked && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>{MISSING_UNIT_WEIGHT_MESSAGE}</span>
-              </div>
+              <InlineAlert variant="warning">{MISSING_UNIT_WEIGHT_MESSAGE}</InlineAlert>
             )}
 
             <div className="flex flex-col gap-4 sm:flex-row">
@@ -343,7 +328,7 @@ export function ExecutionFormDrawer({
             <Button type="submit" disabled={submitting || !isDirty || blocked}>
               {submitting ? (
                 <>
-                  <Loader2 className="animate-spin" />
+                  <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                   Salvando…
                 </>
               ) : isCreate ? (
