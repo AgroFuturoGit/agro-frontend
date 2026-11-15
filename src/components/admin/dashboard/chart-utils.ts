@@ -18,7 +18,7 @@ import { CanvasRenderer } from "echarts/renderers";
 
 import { formatNumber } from "@/lib/production";
 
-import { readToken, toRgb } from "./chart-tokens";
+import { readChartFontFamily, readToken, toRgb } from "./chart-tokens";
 
 export { readChartFontFamily, readToken, toRgb } from "./chart-tokens";
 
@@ -44,6 +44,8 @@ export type ChartColors = {
   popover: string;
   popoverText: string;
   background: string;
+  /** Fonte do sistema (a do `<body>`) para eixos, legendas e tooltip. */
+  fontFamily?: string;
 };
 
 export const kg = (value: number) => `${formatNumber(value)} kg`;
@@ -69,6 +71,7 @@ export function readChartColors(scope: Element): ChartColors {
     popover: token("--popover"),
     popoverText: token("--popover-foreground"),
     background: token("--card"),
+    fontFamily: readChartFontFamily(),
   };
 }
 

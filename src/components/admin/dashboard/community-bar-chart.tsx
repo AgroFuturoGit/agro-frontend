@@ -42,7 +42,10 @@ export function buildCommunityChartOption(
   return {
     animation: false,
     aria: { enabled: true, label: { description: ariaLabel } },
-    textStyle: { color: colors.text },
+    textStyle: {
+      color: colors.text,
+      ...(colors.fontFamily ? { fontFamily: colors.fontFamily } : {}),
+    },
     legend: {
       data: ["Meta", "Realizado", "Pendente"],
       top: 0,
@@ -54,7 +57,10 @@ export function buildCommunityChartOption(
       axisPointer: { type: "shadow" },
       backgroundColor: colors.popover,
       borderColor: colors.grid,
-      textStyle: { color: colors.popoverText },
+      textStyle: {
+        color: colors.popoverText,
+        ...(colors.fontFamily ? { fontFamily: colors.fontFamily } : {}),
+      },
       formatter: (params: unknown) => {
         const items = (Array.isArray(params) ? params : [params]) as {
           dataIndex: number;

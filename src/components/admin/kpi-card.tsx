@@ -13,7 +13,10 @@ type KpiCardProps = {
   /** Ícone decorativo à direita do label. */
   icon?: LucideIcon;
   highlight?: boolean;
-  /** Skeleton do label, do ícone e do número no tamanho final. */
+  /**
+   * Skeleton do label, do ícone e do número no tamanho final. Com `hint`
+   * informado, também reserva a linha da dica (sem pulo de layout).
+   */
   loading?: boolean;
   className?: string;
 };
@@ -48,6 +51,7 @@ export function KpiCard({
           {Icon ? <Skeleton className="size-4" /> : null}
         </div>
         <Skeleton className="mt-2 h-8 w-20" />
+        {hint ? <Skeleton className="mt-1 h-6 w-32" /> : null}
         <span className="sr-only">Carregando {label}</span>
       </Card>
     );

@@ -67,6 +67,15 @@ describe("KpiCard", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("loading com hint reserva a linha da dica (mesma altura do pronto)", () => {
+    const { container } = render(
+      <KpiCard label="Agricultores" value="3" hint="em dia" icon={Users} loading />,
+    );
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(4);
+    expect(screen.queryByText("em dia")).toBeNull();
+  });
+
   it("KpiGrid: 2 colunas e 4 a partir de lg", () => {
     const { container } = render(
       <KpiGrid className="mt-4">

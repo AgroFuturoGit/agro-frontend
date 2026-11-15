@@ -1,7 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, Sprout } from "lucide-react";
+import {
+  CircleAlert,
+  CircleCheck,
+  ClipboardList,
+  Hourglass,
+  LandPlot,
+  MapPin,
+  Sprout,
+  Target,
+  TrendingUp,
+  Users,
+  Wheat,
+  type LucideIcon,
+} from "lucide-react";
 import {
   getCoreRowModel,
   getPaginationRowModel,
@@ -12,10 +25,19 @@ import {
 } from "@tanstack/react-table";
 
 import { CommunityBarChart } from "@/components/admin/dashboard/community-bar-chart";
+import {
+  DashboardToolbar,
+  FilterSelect,
+  type FilterOption,
+} from "@/components/admin/dashboard/dashboard-toolbar";
 import { WarningCard } from "@/components/admin/dashboard/warning-card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { ExportMenu } from "@/components/admin/dashboard/export-menu";
+import { EmptyState } from "@/components/admin/empty-state";
+import { KpiCard, KpiGrid } from "@/components/admin/kpi-card";
+import { SectionHeader } from "@/components/admin/section-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,14 +45,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   exportTechnicianSummary,
@@ -39,7 +54,7 @@ import {
   type TechnicianSummary,
   type TechnicianWarning,
 } from "@/lib/analytics";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { listCrops, type Crop } from "@/lib/crops";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { formatNumber, formatPlanDate } from "@/lib/production";
@@ -50,7 +65,25 @@ const CURRENT = "__current__";
 
 type Paths = Record<string, { org: string; community: string }>;
 
-type Option = { value: string; label: string };
+type Option = FilterOption;
+
+const LOAD_ERROR = "Não foi possível carregar o resumo da carteira.";
+
+/** Ícone decorativo de cada indicador (o rótulo é o que comunica). */
+const KPI_ICONS: Record<string, LucideIcon> = {
+  "Comunidades atendidas": MapPin,
+  "Agricultores assistidos": Users,
+  "Planos de produção": ClipboardList,
+  "Área plantada": LandPlot,
+  Meta: Target,
+  "Realizado (validado)": Wheat,
+  "Pendente de validação": Hourglass,
+  Conclusão: TrendingUp,
+};
+const KPI_LABELS = Object.keys(KPI_ICONS);
+/** Indicadores que têm a linha de dica (o skeleton reserva a altura). */
+const KPI_WITH_HINT = new Set(["Planos de produção", "Pendente de validação"]);
+const HIGHLIGHT_KPI = "Conclusão";
 
 function planHref(paths: Paths, warning: TechnicianWarning): string | null {
   if (!warning.farmerId) return null;
@@ -65,58 +98,16 @@ function sortWarnings(list: TechnicianWarning[]): TechnicianWarning[] {
   return [...high, ...rest];
 }
 
-function FilterSelect({
-  id,
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Option[];
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <Label htmlFor={id} className="font-normal text-muted-foreground">
-        {label}
-      </Label>
-      <Select value={value} onValueChange={(v) => onChange(v ?? options[0].value)}>
-        <SelectTrigger id={id} className="min-w-40">
-          <SelectValue>
-            {(v) =>
-              options.find((o) => o.value === v)?.label ?? options[0].label
-            }
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
+/** Situação do agricultor: texto + ícone (a cor só reforça). */
 function ComplianceBadge({ compliant }: { compliant: boolean }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-        compliant ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-900"
-      }`}
-    >
-      {compliant ? (
-        <CheckCircle2 className="size-3" aria-hidden />
-      ) : (
-        <AlertCircle className="size-3" aria-hidden />
-      )}
-      {compliant ? "Em dia" : "Pendências"}
-    </span>
+  return compliant ? (
+    <Badge variant="success" icon={CircleCheck}>
+      Em dia
+    </Badge>
+  ) : (
+    <Badge variant="warning" icon={CircleAlert}>
+      Pendências
+    </Badge>
   );
 }
 
@@ -224,7 +215,7 @@ function FarmersTable({ farmers }: { farmers: TechnicianFarmerSummary[] }) {
   // `contain: inline-size` impede que as 11 colunas alarguem a página: a
   // tabela rola na horizontal dentro do próprio contêiner.
   return (
-    <div className="w-full min-w-0 [contain:inline-size]">
+    <div className="flex w-full min-w-0 flex-col gap-3 [contain:inline-size]">
       <DataTable
         table={table}
         columns={farmerColumns}
@@ -343,9 +334,8 @@ export function TechnicianDashboard() {
       setSummary(null);
       setError({
         message:
-          err instanceof ApiError
-            ? err.message
-            : "Não foi possível carregar o resumo da carteira.",
+          (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          LOAD_ERROR,
         status: err instanceof ApiError ? err.status : null,
       });
     } finally {
@@ -371,7 +361,7 @@ export function TechnicianDashboard() {
   );
 
   const filters = (
-    <div className="flex flex-wrap items-center gap-3">
+    <>
       <FilterSelect
         id="tech-harvest"
         label="Safra"
@@ -409,83 +399,82 @@ export function TechnicianDashboard() {
           })
         }
       />
-    </div>
+    </>
   );
 
   let body: React.ReactNode = null;
   if (loading) {
     body = (
       <div
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-8"
         aria-busy="true"
         aria-label="Carregando painel"
       >
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
+        <KpiGrid>
+          {KPI_LABELS.map((label) => (
+            <KpiCard
+              key={label}
+              label={label}
+              value={null}
+              hint={KPI_WITH_HINT.has(label) ? "…" : undefined}
+              icon={KPI_ICONS[label]}
+              highlight={label === HIGHLIGHT_KPI}
+              loading
+            />
           ))}
+        </KpiGrid>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-7 w-40" />
+          <Skeleton className="h-48 w-full rounded-xl" />
         </div>
-        <Skeleton className="h-40 w-full rounded-xl" />
       </div>
     );
   } else if (error) {
     body = (
-      <div
-        role="alert"
-        className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-      >
-        <div className="flex items-start gap-2">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+      <InlineAlert>
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <span>{error.message}</span>
-        </div>
-        <div className="flex gap-2">
-          {error.status === 403 && communityId !== ALL && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setCommunityId(ALL)}
-            >
-              Voltar para Todas
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => load(harvestId, communityId, cropId)}
-          >
-            Tentar novamente
-          </Button>
-        </div>
-      </div>
-    );
-  } else if (summary) {
-    if (summary.isEmpty) {
-      body = (
-        <Card className="border-dashed bg-transparent ring-0 shadow-none">
-          <CardHeader className="items-center text-center">
-            <Sprout className="size-6 text-muted-foreground" aria-hidden />
-            <CardTitle className="text-base">
-              Nenhum plano na carteira para este recorte
-            </CardTitle>
-            <CardDescription>
-              Quando os agricultores assistidos tiverem planos de produção, os
-              indicadores e alertas aparecem aqui.
-            </CardDescription>
-            {hasFilters && (
+          <div className="flex flex-wrap gap-2">
+            {error.status === 403 && communityId !== ALL && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="mt-2"
-                onClick={clearFilters}
+                className="text-foreground"
+                onClick={() => setCommunityId(ALL)}
               >
-                Limpar filtros
+                Voltar para Todas
               </Button>
             )}
-          </CardHeader>
-        </Card>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-foreground"
+              onClick={() => load(harvestId, communityId, cropId)}
+            >
+              Tentar novamente
+            </Button>
+          </div>
+        </div>
+      </InlineAlert>
+    );
+  } else if (summary) {
+    if (summary.isEmpty) {
+      body = (
+        <EmptyState
+          variant="dashed"
+          icon={Sprout}
+          title="Nenhum plano na carteira para este recorte"
+          hint={
+            hasFilters
+              ? "Quando os agricultores assistidos tiverem planos de produção, os indicadores e alertas aparecem aqui. Tente outro recorte ou limpe os filtros."
+              : "Quando os agricultores assistidos tiverem planos de produção, os indicadores e alertas aparecem aqui."
+          }
+          action={
+            hasFilters ? { label: "Limpar filtros", onClick: clearFilters } : undefined
+          }
+        />
       );
     } else {
       const totals: [string, string, string?][] = [
@@ -507,36 +496,37 @@ export function TechnicianDashboard() {
         ["Conclusão", `${formatNumber(summary.overallCompletionPct)}%`],
       ];
       body = (
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {totals.map(([label, value, hint]) => (
-              <Card
-                key={label}
-                className={label === "Conclusão" ? "border-primary/40 bg-primary/5" : undefined}
-              >
-                <CardHeader>
-                  <CardDescription>{label}</CardDescription>
-                  <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
-                    {value}
-                  </CardTitle>
-                  {hint && <CardDescription>{hint}</CardDescription>}
-                </CardHeader>
-              </Card>
-            ))}
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <KpiGrid>
+              {totals.map(([label, value, hint]) => (
+                <KpiCard
+                  key={label}
+                  label={label}
+                  value={value}
+                  hint={hint}
+                  icon={KPI_ICONS[label]}
+                  highlight={label === HIGHLIGHT_KPI}
+                />
+              ))}
+            </KpiGrid>
+            <p className="text-sm text-muted-foreground">
+              O realizado conta apenas apontamentos validados; o pendente são
+              apontamentos que aguardam validação.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            O realizado conta apenas apontamentos validados; o pendente são
-            apontamentos que aguardam validação.
-          </p>
 
-          <section className="flex flex-col gap-3" aria-labelledby="tech-alerts">
-            <h3 id="tech-alerts" className="text-lg font-semibold tracking-tight">
-              Alertas ({formatNumber(summary.totalWarningsCount)})
-            </h3>
+          <section className="flex min-w-0 flex-col gap-4" aria-labelledby="tech-alerts">
+            <SectionHeader
+              id="tech-alerts"
+              title={`Alertas (${formatNumber(summary.totalWarningsCount)})`}
+            />
             {warnings.length === 0 ? (
-              <p className="rounded-md border border-dashed px-3 py-4 text-sm text-muted-foreground">
-                Nenhum alerta na carteira
-              </p>
+              // Sem `role`: o painel carregado tem uma única região de status (a paginação).
+              <div className="flex items-center gap-3 rounded-xl border border-dashed border-border px-4 py-4 text-sm text-muted-foreground">
+                <CircleCheck aria-hidden="true" className="size-4 shrink-0" />
+                <p>Nenhum alerta na carteira</p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {warnings.map((w) => (
@@ -547,20 +537,16 @@ export function TechnicianDashboard() {
           </section>
 
           {summary.communities.length > 0 && (
-            <section className="flex flex-col gap-3" aria-labelledby="tech-communities">
-              <h3 id="tech-communities" className="text-lg font-semibold tracking-tight">
-                Por comunidade
-              </h3>
-              <Card className="p-4">
+            <section className="flex min-w-0 flex-col gap-4" aria-labelledby="tech-communities">
+              <SectionHeader id="tech-communities" title="Por comunidade" />
+              <Card className="p-6">
                 <CommunityBarChart communities={summary.communities} />
               </Card>
             </section>
           )}
 
-          <section className="flex flex-col gap-3" aria-labelledby="tech-farmers">
-            <h3 id="tech-farmers" className="text-lg font-semibold tracking-tight">
-              Agricultores
-            </h3>
+          <section className="flex min-w-0 flex-col gap-4" aria-labelledby="tech-farmers">
+            <SectionHeader id="tech-farmers" title="Agricultores" />
             <FarmersTable farmers={summary.farmers} />
           </section>
         </div>
@@ -568,14 +554,18 @@ export function TechnicianDashboard() {
     }
   }
 
+  const heading =
+    loading && !summary ? (
+      <Skeleton aria-hidden="true" className="h-6 w-40" />
+    ) : summary?.currentHarvest ? (
+      <p className="text-base font-medium text-foreground">
+        {`Safra: ${summary.currentHarvest.label}`}
+      </p>
+    ) : null;
+
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : ""}
-        </p>
-        {filters}
-      </div>
+    <div className="flex min-w-0 flex-col gap-6">
+      <DashboardToolbar heading={heading}>{filters}</DashboardToolbar>
       {body}
     </div>
   );
