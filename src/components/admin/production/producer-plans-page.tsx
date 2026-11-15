@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -18,17 +18,24 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { EmptyValue } from "@/components/admin/empty-value";
+import { PageHeader } from "@/components/admin/page-header";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
 import { FinancingSection } from "@/components/admin/producers/financing-section";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
@@ -37,8 +44,11 @@ import {
   formatNumber,
   formatPlanDate,
   listProductionPlans,
+  planCropLabel,
+  planDisplayName,
   type ProductionPlan,
 } from "@/lib/production";
+import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
 
 import { DeletePlanDialog } from "./delete-plan-dialog";
 import { PlanFormDrawer } from "./plan-form-drawer";
@@ -55,8 +65,13 @@ type BreadcrumbNames = {
   producerLabel: string;
 };
 
-function cropLabel(plan: ProductionPlan): string {
-  return plan.crop ? `${plan.crop.name} — ${plan.crop.variety}` : "";
+function PlanStatusBadge({ plan }: { plan: ProductionPlan }) {
+  if (!plan.status) return <EmptyValue />;
+  return (
+    <Badge variant={PLAN_STATUS_VARIANT[plan.status]}>
+      {PLAN_STATUS_LABELS[plan.status]}
+    </Badge>
+  );
 }
 
 /** Busca livre por cultivo, variedade ou safra, case-insensitive. */
@@ -68,7 +83,7 @@ function plansGlobalFilter(
   const query = filterValue.trim().toLowerCase();
   if (!query) return true;
   const plan = row.original;
-  return [cropLabel(plan), plan.harvest?.label].some((value) =>
+  return [planCropLabel(plan), plan.harvest?.label].some((value) =>
     value?.toLowerCase().includes(query),
   );
 }
@@ -255,6 +270,31 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     [orgId, communityId, producerId],
   );
 
+  // Mesmos nomes acessíveis na tabela e no card mobile: prefixo fixo
+  // ("Editar plano", "Excluir plano") + cultura e safra do registro.
+  const rowActions = useCallback(
+    (plan: ProductionPlan): DataTableRowAction[] => {
+      const name = planDisplayName(plan);
+      const actions: DataTableRowAction[] = [
+        {
+          label: `Editar plano ${name}`,
+          icon: Pencil,
+          onClick: () => setEditTarget(plan),
+        },
+      ];
+      if (canDelete) {
+        actions.push({
+          label: `Excluir plano ${name}`,
+          icon: Trash2,
+          tone: "destructive",
+          onClick: () => setDeleteTarget(plan),
+        });
+      }
+      return actions;
+    },
+    [canDelete],
+  );
+
   const harvestOptions = useMemo(
     () =>
       Array.from(
@@ -271,18 +311,15 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
 
   const columns = useMemo(() => {
     const baseColumns = [
-      columnHelper.accessor((plan) => cropLabel(plan), {
+      columnHelper.accessor((plan) => planCropLabel(plan), {
         id: "crop",
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Cultivo" disabled={loading} />
         ),
+        meta: { cellVariant: "primary" },
         cell: ({ row }) => (
-          <Link
-            href={planHref(row.original)}
-            className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
-          >
-            {cropLabel(row.original) || "—"}
-            <ArrowRight className="size-3.5 text-muted-foreground" />
+          <Link href={planHref(row.original)} className="hover:underline">
+            {planCropLabel(row.original) || <EmptyValue />}
           </Link>
         ),
       }),
@@ -291,9 +328,8 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Safra" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="text-muted-foreground">{info.getValue() || "—"}</span>
-        ),
+        meta: { cellVariant: "secondary" },
+        cell: (info) => info.getValue() || <EmptyValue />,
         filterFn: (row, columnId, filterValue) =>
           !filterValue || row.getValue(columnId) === filterValue,
       }),
@@ -303,11 +339,8 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
             <DataTableColumnHeader column={column} title="Área (ha)" disabled={loading} />
           </div>
         ),
-        cell: (info) => (
-          <span className="block text-right tabular-nums">
-            {formatNumber(info.getValue())}
-          </span>
-        ),
+        meta: { numeric: true, cellVariant: "primary" },
+        cell: (info) => formatNumber(info.getValue()),
       }),
       columnHelper.accessor("expectedYield", {
         header: ({ column }) => (
@@ -315,22 +348,16 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
             <DataTableColumnHeader column={column} title="Meta (kg)" disabled={loading} />
           </div>
         ),
+        meta: { numeric: true, cellVariant: "primary" },
         // Plano legado sem produtividade => meta 0 => "—".
-        cell: (info) => (
-          <span className="block text-right tabular-nums">
-            {info.getValue() > 0 ? formatNumber(info.getValue()) : "—"}
-          </span>
-        ),
+        cell: (info) =>
+          info.getValue() > 0 ? formatNumber(info.getValue()) : <EmptyValue />,
       }),
       columnHelper.accessor((plan) => plan.status ?? "", {
         id: "status",
         header: "Status",
         enableSorting: false,
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">
-            {row.original.status ? PLAN_STATUS_LABELS[row.original.status] : "—"}
-          </span>
-        ),
+        cell: ({ row }) => <PlanStatusBadge plan={row.original} />,
       }),
       // ISO `YYYY-MM-DD`: a comparação lexicográfica já ordena por data.
       columnHelper.accessor((plan) => plan.plannedPlantingDate ?? "", {
@@ -338,49 +365,27 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Plantio" disabled={loading} />
         ),
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">
-            {formatPlanDate(row.original.plannedPlantingDate)}
-          </span>
-        ),
+        meta: { cellVariant: "secondary", cellClassName: "tabular-nums" },
+        cell: ({ row }) =>
+          row.original.plannedPlantingDate ? (
+            formatPlanDate(row.original.plannedPlantingDate)
+          ) : (
+            <EmptyValue />
+          ),
       }),
     ];
 
     const actionsColumn = columnHelper.display({
       id: "actions",
       header: "Ações",
-      cell: ({ row }) => (
-        <div className="inline-flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Editar plano"
-            onClick={() => setEditTarget(row.original)}
-          >
-            <Pencil />
-          </Button>
-          {canDelete && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Excluir plano"
-              onClick={() => setDeleteTarget(row.original)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 />
-            </Button>
-          )}
-        </div>
-      ),
+      cell: ({ row }) => <DataTableRowActions actions={rowActions(row.original)} />,
     });
 
     return (canWrite ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
       ProductionPlan,
       unknown
     >[];
-  }, [canWrite, canDelete, loading, planHref]);
+  }, [canWrite, loading, planHref, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -406,13 +411,12 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
           <div className="min-w-0 flex-1">
             <Link
               href={planHref(plan)}
-              className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
+              className="font-medium text-foreground hover:underline"
             >
-              {cropLabel(plan) || "—"}
-              <ArrowRight className="size-3.5 text-muted-foreground" />
+              {planCropLabel(plan) || <EmptyValue />}
             </Link>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {plan.harvest?.label ?? "—"} · Plantio{" "}
+            <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+              {plan.harvest?.label || <EmptyValue />} · Plantio{" "}
               {formatPlanDate(plan.plannedPlantingDate)}
             </p>
             <p className="mt-1 text-sm tabular-nums">
@@ -420,32 +424,19 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
               {plan.expectedYield > 0
                 ? `${formatNumber(plan.expectedYield)} kg de meta`
                 : "Sem meta"}
-              {plan.status && <> · {PLAN_STATUS_LABELS[plan.status]}</>}
             </p>
+            {plan.status ? (
+              <div className="mt-2">
+                <PlanStatusBadge plan={plan} />
+              </div>
+            ) : null}
           </div>
           {canWrite && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setEditTarget(plan)}
-              >
-                <Pencil />
-                Editar
-              </Button>
-              {canDelete && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Excluir plano"
-                  onClick={() => setDeleteTarget(plan)}
-                >
-                  <Trash2 />
-                </Button>
-              )}
-            </div>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(plan)}
+            />
           )}
         </div>
       </Card>
@@ -453,100 +444,105 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   }
 
   if (redirecting) {
+    // AGRICULTOR na URL de outro: nada desse cadastro aparece enquanto o
+    // redirecionamento acontece (só a estrutura da página).
     return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-4 w-64" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+      <div className="flex flex-col gap-section-sm">
+        {/* Texto de espera visível (sem role=status permanente), como em
+            organizations-page. */}
+        <PageHeader
+          title="Planos de produção"
+          description="Abrindo os seus planos de produção…"
+        />
+        <div aria-busy="true">
+          <Skeleton aria-hidden="true" className="h-40 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
 
   if (guardError) {
     return (
-      <div className="flex flex-col gap-6">
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+      <div className="flex flex-col gap-section-sm">
+        <PageHeader title="Planos de produção" />
+        <InlineAlert
+          variant="destructive"
+          action={{ label: "Tentar novamente", onClick: () => runGuard() }}
         >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{guardError}</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => runGuard()}
-          >
-            Tentar novamente
-          </Button>
-        </div>
+          {guardError}
+        </InlineAlert>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Breadcrumb
-        items={[
-          { label: "Organizações", href: "/admin/organizacoes" },
-          {
-            label: names?.organizationName ?? "Organização",
-            href: `/admin/organizacoes/${orgId}`,
-          },
-          {
-            label: names?.communityName ?? "Comunidade",
-            href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
-          },
-          { label: names?.producerLabel ?? "Agricultor" },
-        ]}
-      />
+    // Entre blocos da página (planos, composição familiar, financiamentos):
+    // gap-section (24px); dentro do bloco dos planos: gap-section-sm (16px).
+    <div className="flex flex-col gap-section">
+      <div className="flex flex-col gap-section-sm">
+        {/* Figma 129:569: breadcrumb de 4 níveis acima do título. */}
+        <PageHeader
+          breadcrumb={[
+            { label: "Organizações", href: "/admin/organizacoes" },
+            {
+              label: names?.organizationName ?? "Organização",
+              href: `/admin/organizacoes/${orgId}`,
+            },
+            {
+              label: names?.communityName ?? "Comunidade",
+              href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
+            },
+            { label: names?.producerLabel ?? "Agricultor" },
+          ]}
+          title="Planos de produção"
+          description={`Planos de ${names?.producerLabel ?? "produção"}.`}
+          // Até os nomes chegarem, skeleton no lugar do título e da descrição
+          // (nada de "Planos de produção." provisório).
+          loading={names === null}
+          actions={
+            canWrite && guardPassed ? (
+              <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+                <Plus aria-hidden="true" />
+                Novo plano
+              </Button>
+            ) : undefined
+          }
+        />
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Planos de produção
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Planos de {names?.producerLabel ?? "produção"}.
-          </p>
-        </div>
-        {canWrite && guardPassed && (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Novo plano
-          </Button>
-        )}
+        <DataTableToolbar
+          table={table}
+          searchPlaceholder="Buscar por cultivo ou safra…"
+          filters={[{ columnId: "harvest", label: "Safra", options: harvestOptions }]}
+        />
+
+        <DataTable
+          table={table}
+          columns={columns}
+          isLoading={loading}
+          hasError={Boolean(error)}
+          onRetry={refresh}
+          errorHint={userFacingErrorHint(error)}
+          hasActiveFilters={
+            Boolean(table.getState().globalFilter) ||
+            table.getState().columnFilters.length > 0
+          }
+          onClearFilters={() => {
+            table.setGlobalFilter("");
+            table.resetColumnFilters();
+          }}
+          emptyTitle="Nenhum plano de produção cadastrado ainda."
+          emptyHint={
+            canWrite
+              ? "Crie um plano escolhendo a cultura, a safra, a área plantada e as datas previstas."
+              : "Os planos deste agricultor aparecem aqui quando forem cadastrados."
+          }
+          emptyActionLabel={canWrite ? "Criar primeiro plano" : undefined}
+          onEmptyAction={canWrite ? () => setCreateOpen(true) : undefined}
+          renderMobileCard={renderMobileCard}
+        />
+
+        <DataTablePagination table={table} />
       </div>
-
-      <DataTableToolbar
-        table={table}
-        searchPlaceholder="Buscar por cultivo ou safra…"
-        filters={[{ columnId: "harvest", label: "Safra", options: harvestOptions }]}
-      />
-
-      <DataTable
-        table={table}
-        columns={columns}
-        isLoading={loading}
-        hasError={Boolean(error)}
-        onRetry={refresh}
-        errorHint={error ?? undefined}
-        hasActiveFilters={
-          Boolean(table.getState().globalFilter) ||
-          table.getState().columnFilters.length > 0
-        }
-        onClearFilters={() => {
-          table.setGlobalFilter("");
-          table.resetColumnFilters();
-        }}
-        emptyTitle="Nenhum plano de produção cadastrado ainda."
-        emptyActionLabel={canWrite ? "Criar primeiro plano" : undefined}
-        onEmptyAction={canWrite ? () => setCreateOpen(true) : undefined}
-        renderMobileCard={renderMobileCard}
-      />
-
-      <DataTablePagination table={table} />
 
       {/* Dados sociais do agricultor: carregam e falham de forma independente
           dos planos. Escrita: ADMIN, TECHNICIAN e FARMER (o back decide o

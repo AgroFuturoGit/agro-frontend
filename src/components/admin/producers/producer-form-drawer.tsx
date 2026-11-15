@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Sheet,
@@ -239,7 +240,12 @@ function Field({ id, label, error, className, children }: FieldProps) {
     <div className={cn("flex min-w-0 flex-col gap-2", className)}>
       <Label htmlFor={id}>{label}</Label>
       {children}
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {/* O controle aponta para este id via aria-describedby quando há erro. */}
+      {error && (
+        <p id={`${id}-error`} className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -453,17 +459,9 @@ export function ProducerFormDrawer({
           className="flex flex-1 flex-col overflow-y-auto"
         >
           <div className="flex flex-1 flex-col gap-6 px-4 pb-6">
-            <div aria-live="polite">
-              {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-                >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-            </div>
+            {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta
+                (evita anúncio duplicado). */}
+            {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
 
             <Section title="Comunidade">
               {isCreate ? (
@@ -482,6 +480,7 @@ export function ProducerFormDrawer({
                       id="producer-community"
                       className="w-full"
                       aria-invalid={Boolean(fieldErrors.communityId)}
+                      aria-describedby={fieldErrors.communityId ? "producer-community-error" : undefined}
                     >
                       <SelectValue placeholder={communityPlaceholder}>
                         {(value) =>
@@ -532,6 +531,7 @@ export function ProducerFormDrawer({
                   disabled={submitting}
                   autoComplete="name"
                   aria-invalid={Boolean(fieldErrors.fullName)}
+                  aria-describedby={fieldErrors.fullName ? "producer-full-name-error" : undefined}
                 />
               </Field>
 
@@ -548,6 +548,7 @@ export function ProducerFormDrawer({
                     placeholder="000.000.000-00"
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.cpf)}
+                    aria-describedby={fieldErrors.cpf ? "producer-cpf-error" : undefined}
                   />
                 </Field>
               ) : (
@@ -574,6 +575,7 @@ export function ProducerFormDrawer({
                   onBlur={() => handleBlur("dateOfBirth")}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.dateOfBirth)}
+                  aria-describedby={fieldErrors.dateOfBirth ? "producer-date-of-birth-error" : undefined}
                 />
               </Field>
 
@@ -639,6 +641,7 @@ export function ProducerFormDrawer({
                       disabled={submitting}
                       autoComplete="email"
                       aria-invalid={Boolean(fieldErrors.email)}
+                      aria-describedby={fieldErrors.email ? "producer-email-error" : undefined}
                     />
                   </Field>
 
@@ -659,6 +662,7 @@ export function ProducerFormDrawer({
                       disabled={submitting}
                       autoComplete="new-password"
                       aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? "producer-password-error" : undefined}
                     />
                   </Field>
                 </>
@@ -730,6 +734,7 @@ export function ProducerFormDrawer({
                     placeholder="AL"
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.state)}
+                    aria-describedby={fieldErrors.state ? "producer-state-error" : undefined}
                   />
                 </Field>
 
@@ -750,6 +755,7 @@ export function ProducerFormDrawer({
                     placeholder="0000000"
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.ibgeCode)}
+                    aria-describedby={fieldErrors.ibgeCode ? "producer-ibge-code-error" : undefined}
                   />
                 </Field>
               </div>
@@ -766,6 +772,7 @@ export function ProducerFormDrawer({
                   placeholder="-9.665"
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.latitude)}
+                  aria-describedby={fieldErrors.latitude ? "producer-latitude-error" : undefined}
                 />
               </Field>
 
@@ -783,6 +790,7 @@ export function ProducerFormDrawer({
                   placeholder="-35.735"
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.longitude)}
+                  aria-describedby={fieldErrors.longitude ? "producer-longitude-error" : undefined}
                 />
               </Field>
 
@@ -814,7 +822,7 @@ export function ProducerFormDrawer({
             <Button type="submit" disabled={submitting || !isDirty}>
               {submitting ? (
                 <>
-                  <Loader2 className="animate-spin" />
+                  <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                   Salvando…
                 </>
               ) : isCreate ? (

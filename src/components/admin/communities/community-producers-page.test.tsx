@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 
 import { CommunityProducersPage } from "@/components/admin/communities/community-producers-page";
 import { ApiError } from "@/lib/api";
@@ -146,7 +146,10 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
 
     expect(await screen.findByText("Ana Alves")).toBeTruthy();
     expect(listProducers).toHaveBeenCalledExactlyOnceWith("community-alfa");
-    expect(screen.getByRole("button", { name: "Novo Agricultor" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Novo agricultor" })).toBeTruthy();
+    // Ações com o nome do registro (prefixo mantido).
+    expect(screen.getByRole("button", { name: "Editar agricultor Ana Alves" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Excluir agricultor Ana Alves" })).toBeTruthy();
   });
 
   it("UNIT-002: usa o nome do agricultor (BR-001), cai para o do usuário e mostra o nome local", async () => {
@@ -201,7 +204,7 @@ describe("CommunityProducersPage — escopo por comunidade", () => {
 
     expect(await screen.findByText("Ana Alves")).toBeTruthy();
     expect(
-      screen.queryByRole("button", { name: "Novo Agricultor" }),
+      screen.queryByRole("button", { name: "Novo agricultor" }),
     ).toBeNull();
   });
 
@@ -264,7 +267,7 @@ describe("CommunityProducersPage — tabela de dados", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await user.type(
-      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou nome local…"),
+      screen.getByPlaceholderText("Buscar por nome, e-mail ou CPF…"),
       "bruno@agro.com",
     );
     await act(async () => {
@@ -298,7 +301,7 @@ describe("CommunityProducersPage — tabela de dados", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await user.type(
-      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou nome local…"),
+      screen.getByPlaceholderText("Buscar por nome, e-mail ou CPF…"),
       "52998224725",
     );
     await act(async () => {
@@ -379,9 +382,115 @@ describe("CommunityProducersPage — ordenação e layout mobile", () => {
     expect(await screen.findByText("Ana Alves")).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.getByText("Em conformidade")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Editar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Editar agricultor/ })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Excluir agricultor" }),
+      screen.getByRole("button", { name: /^Excluir agricultor/ }),
     ).toBeTruthy();
   });
 });
+
+describe("CommunityProducersPage — visual do redesign", () => {
+  it("breadcrumb de 3 níveis acima do h2, CPF tabular e conformidade em Badge", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([
+      PRODUCER_ALFA,
+      {
+        ...PRODUCER_ALFA,
+        id: "producer-2",
+        isCompliant: false,
+        user: { ...PRODUCER_ALFA.user!, id: "user-2", fullName: "Bruno Pendente" },
+      },
+      {
+        ...PRODUCER_ALFA,
+        id: "producer-3",
+        isCompliant: null,
+        cpf: null,
+        user: { ...PRODUCER_ALFA.user!, id: "user-3", fullName: "Caio Sem Dados", cpf: "" },
+      },
+    ]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    const heading = await screen.findByRole("heading", { level: 2, name: "Comunidade Alfa" });
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(nav.textContent).toContain("Organizações");
+    expect(nav.textContent).toContain("Comunidade Alfa");
+    expect(
+      nav.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    await screen.findByText("Bruno Pendente");
+    const ok = screen.getByText("Em conformidade");
+    expect(ok.className).toContain("bg-success-muted");
+    // Status de sucesso leva o ícone (CircleCheck), decorativo.
+    expect(ok.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    const pending = screen.getByText("Pendente");
+    expect(pending.className).toContain("bg-warning-muted");
+    expect(pending.className).not.toMatch(/amber|emerald/);
+
+    const cpf = screen.getAllByText("123.456.789-01", { selector: "td" })[0];
+    expect(cpf.className).toContain("tabular-nums");
+    expect(cpf.className).not.toContain("font-mono");
+    // Sem CPF, sem nome local e sem conformidade: "sem dados" para leitor de tela.
+    const caioRow = screen.getByText("Caio Sem Dados").closest("tr") as HTMLElement;
+    expect(within(caioRow).getAllByText("sem dados")).toHaveLength(3);
+  });
+
+  it("lista vazia: dica e CTA que abre o drawer de cadastro", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    expect(
+      await screen.findByText(
+        "Cadastre o primeiro agricultor desta comunidade com os dados pessoais, o endereço e o acesso dele ao painel.",
+      ),
+    ).toBeTruthy();
+    await userEvent.setup().click(
+      screen.getByRole("button", { name: "Criar primeiro agricultor" }),
+    );
+    expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+});
+
+describe("CommunityProducersPage — diálogo de exclusão (UX-L3-02)", () => {
+  it("avisa da perda de acesso ao painel e que agricultor com planos não pode ser excluído", async () => {
+    loginAs("ADMIN");
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    await userEvent.setup().click(
+      await screen.findByRole("button", { name: "Excluir agricultor Ana Alves" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Ana Alves (CPF 123.456.789-01)");
+    expect(dialog.textContent).toContain("e o acesso dele ao painel");
+    expect(dialog.textContent).toContain(
+      "Agricultores com planos de produção não podem ser excluídos.",
+    );
+  });
+});
+
+describe("CommunityProducersPage — exclusão de agricultor sem login", () => {
+  it("sem usuário vinculado: não fala de acesso ao painel e, sem CPF, não mostra parênteses", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProducers).mockResolvedValue([
+      { ...PRODUCER_ALFA, id: "producer-9", fullName: "Sem Login", cpf: null, user: null },
+    ]);
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    await userEvent.setup().click(
+      await screen.findByRole("button", { name: "Excluir agricultor Sem Login" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Sem Login");
+    expect(dialog.textContent).not.toContain("acesso dele ao painel");
+    expect(dialog.textContent).not.toContain("(CPF");
+    expect(dialog.textContent).toContain(
+      "Agricultores com planos de produção não podem ser excluídos.",
+    );
+  });
+});
+

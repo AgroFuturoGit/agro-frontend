@@ -203,6 +203,15 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     expect(screen.getByText("40.000")).toBeTruthy();
     expect(screen.getByText("Ativo")).toBeTruthy();
     expect(screen.queryByRole("columnheader", { name: /\(t\)/ })).toBeNull();
+    // Status em Badge (token success, sem cor crua) e números tabulares.
+    expect(screen.getByText("Ativo").className).toContain("bg-success-muted");
+    expect(screen.getByText("40.000").closest("td")?.className).toContain("tabular-nums");
+    // Rótulos das ações identificam o plano (cultura + safra).
+    expect(
+      screen.getByRole("button", {
+        name: "Editar plano Milho — BRS 1010 (Safra 2025/2026)",
+      }),
+    ).toBeTruthy();
   });
 
   it("FARMER: acessando o próprio producerId, vê os planos normalmente", async () => {
@@ -226,6 +235,22 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     );
     expect(listProductionPlans).not.toHaveBeenCalled();
     expect(screen.queryByText("Milho — BRS 1010")).toBeNull();
+    // Texto de espera visível, sem role=status (A11Y-L3-2).
+    expect(await screen.findByText("Abrindo os seus planos de produção…")).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("blocos da página separados por gap-section (planos × seções sociais)", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    await screen.findByText("Milho — BRS 1010");
+    const familySection = screen
+      .getByRole("heading", { name: /Composição familiar/ })
+      .closest("section") as HTMLElement;
+    expect(familySection.parentElement?.className.split(" ")).toContain("gap-section");
   });
 });
 
@@ -242,8 +267,8 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
     expect(screen.queryByRole("columnheader", { name: "Ações" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Editar plano" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Excluir plano" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar plano/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir plano/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Novo plano/i })).toBeNull();
   });
 
@@ -263,8 +288,8 @@ describe("ProducerPlansPage — gating das ações de escrita por role", () => {
 
       expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
       expect(screen.getByRole("columnheader", { name: "Ações" })).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Editar plano" })).toBeTruthy();
-      expect(screen.getByRole("button", { name: "Excluir plano" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Editar plano/ })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /^Excluir plano/ })).toBeTruthy();
       expect(screen.getByRole("button", { name: /Novo plano/i })).toBeTruthy();
     },
   );
@@ -323,7 +348,7 @@ describe("ProducerPlansPage — exclusão de plano pelo FARMER", () => {
     renderPage();
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Excluir plano" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Excluir plano/ }));
     expect(
       await screen.findByRole("alertdialog", {
         name: "Excluir plano de produção",
@@ -337,6 +362,10 @@ describe("ProducerPlansPage — exclusão de plano pelo FARMER", () => {
     expect(deleteProductionPlan).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Excluir" })).toBeTruthy();
+    // O diálogo identifica o plano sem ambiguidade (cultura + safra).
+    expect(
+      screen.getByRole("alertdialog").textContent,
+    ).toContain("Milho — BRS 1010 (Safra 2025/2026)");
     // Só os carregamentos iniciais — nenhum refresh disparado ainda.
     expect(vi.mocked(listProductionPlans).mock.calls.length).toBe(1);
   });
@@ -406,9 +435,9 @@ describe("ProducerPlansPage — seções de dados sociais (UNIT-002 / UNIT-007)"
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
     expect(
-      await screen.findByText("Nenhum membro familiar cadastrado"),
+      await screen.findByText("Nenhum membro familiar cadastrado."),
     ).toBeTruthy();
-    expect(await screen.findByText("Nenhum financiamento cadastrado")).toBeTruthy();
+    expect(await screen.findByText("Nenhum financiamento cadastrado.")).toBeTruthy();
     expect(listFamilyMembers).toHaveBeenCalledWith("producer-1");
     expect(listFinancings).toHaveBeenCalledWith("producer-1");
   });
@@ -427,7 +456,7 @@ describe("ProducerPlansPage — seções de dados sociais (UNIT-002 / UNIT-007)"
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
     expect(await screen.findAllByText("Sem assistência nesta comunidade.")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Editar plano" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Editar plano/ })).toBeTruthy();
   });
 
   it("MANAGER: seções aparecem sem nenhuma ação de escrita", async () => {

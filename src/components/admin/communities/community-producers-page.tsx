@@ -17,15 +17,21 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { EmptyValue } from "@/components/admin/empty-value";
+import { PageHeader } from "@/components/admin/page-header";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
 import { formatCpf } from "@/lib/cpf";
@@ -61,19 +67,22 @@ function producersGlobalFilter(
   ].some((value) => value?.toLowerCase().includes(query));
 }
 
+/**
+ * Conformidade (Figma 131:941): status, então `success` (com o ícone
+ * padrão CircleCheck) ou `warning`; o texto é o que comunica.
+ */
 function ComplianceBadge({ isCompliant }: { isCompliant: boolean | null }) {
-  if (isCompliant == null) {
-    return <span className="text-muted-foreground">—</span>;
-  }
+  if (isCompliant == null) return <EmptyValue />;
   return isCompliant ? (
-    <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-400">
-      Em conformidade
-    </span>
+    <Badge variant="success">Em conformidade</Badge>
   ) : (
-    <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-400">
-      Pendente
-    </span>
+    <Badge variant="warning">Pendente</Badge>
   );
+}
+
+function FormattedCpf({ producer }: { producer: Producer }) {
+  const cpf = producerCpf(producer);
+  return cpf ? <>{formatCpf(cpf)}</> : <EmptyValue />;
 }
 
 const columnHelper = createColumnHelper<Producer>();
@@ -170,6 +179,28 @@ export function CommunityProducersPage({ communityId }: Props) {
   const canManage = currentRole === "ADMIN" || currentRole === "MANAGER";
   const orgId = community?.organization.id;
 
+  // Mesmos nomes acessíveis na tabela e no card mobile: prefixo fixo
+  // ("Editar agricultor", "Excluir agricultor") + nome do registro.
+  const rowActions = useCallback(
+    (producer: Producer): DataTableRowAction[] => {
+      const name = producerDisplayName(producer);
+      return [
+        {
+          label: `Editar agricultor ${name}`,
+          icon: Pencil,
+          onClick: () => setEditTarget(producer),
+        },
+        {
+          label: `Excluir agricultor ${name}`,
+          icon: Trash2,
+          tone: "destructive",
+          onClick: () => setDeleteTarget(producer),
+        },
+      ];
+    },
+    [],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor((producer) => producerDisplayName(producer, ""), {
@@ -177,12 +208,13 @@ export function CommunityProducersPage({ communityId }: Props) {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
         ),
+        meta: { cellVariant: "primary" },
         cell: ({ row }) => (
           <Link
             href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${row.original.id}`}
-            className="font-medium text-foreground hover:underline"
+            className="hover:underline"
           >
-            {producerDisplayName(row.original, "—")}
+            {producerDisplayName(row.original, "") || <EmptyValue />}
           </Link>
         ),
       }),
@@ -190,20 +222,15 @@ export function CommunityProducersPage({ communityId }: Props) {
         id: "cpf",
         header: "CPF",
         enableSorting: false,
-        cell: ({ row }) => (
-          <span className="font-mono text-xs text-muted-foreground">
-            {producerCpf(row.original)
-              ? formatCpf(producerCpf(row.original) as string)
-              : "—"}
-          </span>
-        ),
+        // Roboto com algarismos tabulares (Figma 131:941), não fonte mono.
+        meta: { cellVariant: "secondary", cellClassName: "tabular-nums" },
+        cell: ({ row }) => <FormattedCpf producer={row.original} />,
       }),
       columnHelper.accessor("localName", {
         header: "Endereço/Nome local",
         enableSorting: false,
-        cell: (info) => (
-          <span className="text-muted-foreground">{info.getValue() ?? "—"}</span>
-        ),
+        meta: { cellVariant: "secondary" },
+        cell: (info) => info.getValue() || <EmptyValue />,
       }),
       columnHelper.accessor("isCompliant", {
         header: "Conformidade",
@@ -215,36 +242,14 @@ export function CommunityProducersPage({ communityId }: Props) {
     const actionsColumn = columnHelper.display({
       id: "actions",
       header: "Ações",
-      cell: ({ row }) => (
-        <div className="inline-flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Editar agricultor"
-            onClick={() => setEditTarget(row.original)}
-          >
-            <Pencil />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Excluir agricultor"
-            onClick={() => setDeleteTarget(row.original)}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }) => <DataTableRowActions actions={rowActions(row.original)} />,
     });
 
     return (canManage ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
       Producer,
       unknown
     >[];
-  }, [canManage, communityId, loading, orgId]);
+  }, [canManage, communityId, loading, orgId, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -271,55 +276,45 @@ export function CommunityProducersPage({ communityId }: Props) {
               href={`/admin/organizacoes/${orgId}/comunidades/${communityId}/produtores/${producer.id}`}
               className="font-medium text-foreground hover:underline"
             >
-              {producerDisplayName(producer, "—")}
+              {producerDisplayName(producer, "") || <EmptyValue />}
             </Link>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">
-              {producerCpf(producer) ? formatCpf(producerCpf(producer) as string) : "—"}
+            <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+              <FormattedCpf producer={producer} />
             </p>
             <div className="mt-2">
               <ComplianceBadge isCompliant={producer.isCompliant} />
             </div>
           </div>
           {canManage && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setEditTarget(producer)}
-              >
-                <Pencil />
-                Editar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Excluir agricultor"
-                onClick={() => setDeleteTarget(producer)}
-              >
-                <Trash2 />
-              </Button>
-            </div>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(producer)}
+            />
           )}
         </div>
       </Card>
     );
   }
 
+  const description = "Agricultores cadastrados nesta comunidade.";
+
   if (redirecting) {
+    // GESTOR fora da própria organização: nada desta comunidade aparece
+    // enquanto o redirecionamento acontece (só a estrutura da página).
     return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-4 w-64" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+      <div className="flex flex-col gap-section-sm">
+        <PageHeader title="Agricultores" description={description} loading />
+        <Skeleton aria-hidden="true" className="h-40 w-full rounded-xl" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Breadcrumb
-        items={[
+    <div className="flex flex-col gap-section-sm">
+      {/* Figma 131:941: breadcrumb de 3 níveis acima do título. */}
+      <PageHeader
+        breadcrumb={[
           { label: "Organizações", href: "/admin/organizacoes" },
           {
             label: community?.organization.name ?? "Organização",
@@ -327,33 +322,27 @@ export function CommunityProducersPage({ communityId }: Props) {
           },
           { label: community?.name ?? "Comunidade" },
         ]}
+        title={community?.name ?? "Agricultores"}
+        description={description}
+        loading={loading && !community}
+        actions={
+          canManage ? (
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => setRegisterOpen(true)}
+              disabled={community === null}
+            >
+              <Plus aria-hidden="true" />
+              Novo agricultor
+            </Button>
+          ) : undefined
+        }
       />
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {community?.name ?? "Agricultores"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Agricultores cadastrados nesta comunidade.
-          </p>
-        </div>
-        {canManage && (
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setRegisterOpen(true)}
-            disabled={community === null}
-          >
-            <Plus />
-            Novo Agricultor
-          </Button>
-        )}
-      </div>
 
       <DataTableToolbar
         table={table}
-        searchPlaceholder="Buscar por nome, e-mail, CPF ou nome local…"
+        searchPlaceholder="Buscar por nome, e-mail ou CPF…"
       />
 
       <DataTable
@@ -362,10 +351,17 @@ export function CommunityProducersPage({ communityId }: Props) {
         isLoading={loading}
         hasError={Boolean(error)}
         onRetry={refresh}
-        errorHint={error ?? undefined}
+        errorHint={userFacingErrorHint(error)}
         hasActiveFilters={Boolean(table.getState().globalFilter)}
         onClearFilters={() => table.setGlobalFilter("")}
         emptyTitle="Nenhum agricultor cadastrado nesta comunidade ainda."
+        emptyHint={
+          canManage
+            ? "Cadastre o primeiro agricultor desta comunidade com os dados pessoais, o endereço e o acesso dele ao painel."
+            : "Os agricultores desta comunidade aparecem aqui assim que são cadastrados."
+        }
+        emptyActionLabel={canManage && community ? "Criar primeiro agricultor" : undefined}
+        onEmptyAction={canManage && community ? () => setRegisterOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />
 

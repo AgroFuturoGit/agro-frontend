@@ -17,15 +17,19 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { PageHeader } from "@/components/admin/page-header";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { Breadcrumb } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
@@ -162,11 +166,22 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
     setDialogOpen(true);
   }
 
-  function openEditDialog(community: Community) {
-    setDialogMode("edit");
-    setDialogCommunity(community);
-    setDialogOpen(true);
-  }
+  // Mesmo nome acessível na tabela e no card mobile: prefixo fixo
+  // ("Editar comunidade", que os testes casam) + nome do registro.
+  const rowActions = useCallback(
+    (community: Community): DataTableRowAction[] => [
+      {
+        label: `Editar comunidade ${community.name}`,
+        icon: Pencil,
+        onClick: () => {
+          setDialogMode("edit");
+          setDialogCommunity(community);
+          setDialogOpen(true);
+        },
+      },
+    ],
+    [],
+  );
 
   const columns = useMemo(() => {
     const baseColumns = [
@@ -174,10 +189,11 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
         ),
+        meta: { cellVariant: "primary" },
         cell: ({ row }) => (
           <Link
             href={`/admin/organizacoes/${orgId}/comunidades/${row.original.id}`}
-            className="font-medium text-foreground hover:underline"
+            className="hover:underline"
           >
             {row.original.name}
           </Link>
@@ -188,24 +204,14 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
     const actionsColumn = columnHelper.display({
       id: "actions",
       header: "Ações",
-      cell: ({ row }) => (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Editar comunidade"
-          onClick={() => openEditDialog(row.original)}
-        >
-          <Pencil />
-        </Button>
-      ),
+      cell: ({ row }) => <DataTableRowActions actions={rowActions(row.original)} />,
     });
 
     return (canManage ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
       Community,
       unknown
     >[];
-  }, [canManage, loading, orgId]);
+  }, [canManage, loading, orgId, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -234,55 +240,51 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
             {community.name}
           </Link>
           {canManage && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => openEditDialog(community)}
-            >
-              <Pencil />
-              Editar
-            </Button>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(community)}
+            />
           )}
         </div>
       </Card>
     );
   }
 
+  const breadcrumb = [
+    { label: "Organizações", href: "/admin/organizacoes" },
+    { label: organization?.name ?? "Organização" },
+  ];
+  const description = "Comunidades cadastradas nesta organização.";
+
   if (redirecting) {
+    // GESTOR fora da própria organização: nada desta organização aparece
+    // enquanto o redirecionamento acontece (só a estrutura da página).
     return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-4 w-64" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+      <div className="flex flex-col gap-section-sm">
+        <PageHeader title="Comunidades" description={description} loading />
+        <Skeleton aria-hidden="true" className="h-40 w-full rounded-xl" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <Breadcrumb
-        items={[
-          { label: "Organizações", href: "/admin/organizacoes" },
-          { label: organization?.name ?? "Organização" },
-        ]}
+    <div className="flex flex-col gap-section-sm">
+      {/* Figma 131:1110: breadcrumb acima do título (nome da organização). */}
+      <PageHeader
+        breadcrumb={breadcrumb}
+        title={organization?.name ?? "Comunidades"}
+        description={description}
+        loading={loading && !organization}
+        actions={
+          canManage ? (
+            <Button type="button" size="lg" onClick={openCreateDialog}>
+              <Plus aria-hidden="true" />
+              Nova comunidade
+            </Button>
+          ) : undefined
+        }
       />
-
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {organization?.name ?? "Comunidades"}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Comunidades cadastradas nesta organização.
-          </p>
-        </div>
-        {canManage && (
-          <Button type="button" size="sm" onClick={openCreateDialog}>
-            <Plus />
-            Nova Comunidade
-          </Button>
-        )}
-      </div>
 
       <DataTableToolbar table={table} searchPlaceholder="Buscar por nome…" />
 
@@ -292,10 +294,17 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         isLoading={loading}
         hasError={Boolean(error)}
         onRetry={refresh}
-        errorHint={error ?? undefined}
+        errorHint={userFacingErrorHint(error)}
         hasActiveFilters={Boolean(table.getState().globalFilter)}
         onClearFilters={() => table.setGlobalFilter("")}
         emptyTitle="Nenhuma comunidade cadastrada nesta organização ainda."
+        emptyHint={
+          canManage
+            ? "Cadastre a primeira comunidade desta organização informando o nome dela."
+            : "As comunidades aparecem aqui quando um administrador ou gestor as cadastra."
+        }
+        emptyActionLabel={canManage ? "Criar primeira comunidade" : undefined}
+        onEmptyAction={canManage ? openCreateDialog : undefined}
         renderMobileCard={renderMobileCard}
       />
 

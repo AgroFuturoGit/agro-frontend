@@ -204,3 +204,32 @@ describe("CommunityFormDrawer — erro de servidor com campo específico (gap #5
     expect(parseCommunityFieldErrors).toHaveBeenCalledWith(errorPayload);
   });
 });
+
+function expectLinkedError(control: HTMLElement, message: string) {
+  expect(control.getAttribute("aria-invalid")).toBe("true");
+  const errorId = control.getAttribute("aria-describedby");
+  expect(errorId).toBeTruthy();
+  expect(document.getElementById(errorId as string)?.textContent).toBe(message);
+}
+
+describe("CommunityFormDrawer — erros ligados aos campos (A11Y-L3-1)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("ADMIN sem organização: SelectTrigger e nome apontam para as mensagens", async () => {
+    renderDialog({ role: "ADMIN" });
+    await screen.findByRole("combobox");
+    await waitFor(() => expect(listOrganizations).toHaveBeenCalled());
+    fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+
+    await screen.findByText("Selecione a organização", { selector: "p" });
+    expectLinkedError(screen.getByLabelText("Organização"), "Selecione a organização");
+    expectLinkedError(
+      screen.getByLabelText("Nome da comunidade"),
+      "Informe o nome da comunidade",
+    );
+  });
+});
+

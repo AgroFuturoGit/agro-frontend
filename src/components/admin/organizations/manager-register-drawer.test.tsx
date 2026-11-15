@@ -186,4 +186,39 @@ describe("ManagerRegisterDrawer — erro de servidor com campo específico (gap 
       errorPayload,
     );
   });
+
+  it("sucesso: um único status (InlineAlert success) com o nome do gestor", async () => {
+    vi.mocked(registerManager).mockResolvedValue(REGISTERED_MANAGER);
+
+    renderDialog();
+
+    await screen.findByLabelText("Nome completo");
+    fillValidForm();
+    fireEvent.change(screen.getByLabelText("Senha"), {
+      target: { value: "supersecreta" },
+    });
+    submitForm();
+
+    const status = await screen.findByRole("status");
+    expect(status.getAttribute("data-variant")).toBe("success");
+    expect(status.textContent).toContain(
+      "João Silva foi cadastrado(a) como gestor(a) desta organização.",
+    );
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    // O foco vai para o título da visão de sucesso (A11Y-L3-3).
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe("Gestor cadastrado"),
+    );
+  });
+
+  it("erro de campo fica ligado ao input por aria-describedby", async () => {
+    renderDialog();
+
+    await screen.findByLabelText("Nome completo");
+    submitForm();
+
+    const input = screen.getByLabelText("Nome completo");
+    const error = await screen.findByText("Informe o nome completo");
+    expect(input.getAttribute("aria-describedby")).toBe(error.id);
+  });
 });

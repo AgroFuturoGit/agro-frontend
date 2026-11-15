@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -13,8 +13,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError } from "@/lib/api";
-import { deleteProductionPlan, type ProductionPlan } from "@/lib/production";
+import {
+  deleteProductionPlan,
+  planDisplayName,
+  type ProductionPlan,
+} from "@/lib/production";
 
 type Props = {
   plan: ProductionPlan | null;
@@ -69,21 +74,13 @@ export function DeletePlanDialog({
           <AlertDialogDescription>
             Esta ação removerá o plano{" "}
             <span className="font-medium text-foreground">
-              {plan?.crop ? `${plan.crop.name} — ${plan.crop.variety}` : ""}
+              {plan ? planDisplayName(plan) : ""}
             </span>{" "}
             e todos os apontamentos vinculados. Não é possível desfazer.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        {error && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          >
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <InlineAlert variant="destructive">{error}</InlineAlert>}
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={submitting}>Cancelar</AlertDialogCancel>
@@ -94,7 +91,7 @@ export function DeletePlanDialog({
           >
             {submitting ? (
               <>
-                <Loader2 className="animate-spin" />
+                <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                 Excluindo…
               </>
             ) : (

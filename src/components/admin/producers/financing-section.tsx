@@ -9,7 +9,7 @@ import {
   type PaginationState,
   type Row,
 } from "@tanstack/react-table";
-import { AlertCircle, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Inbox, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -21,6 +21,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EmptyValue } from "@/components/admin/empty-value";
+import { EmptyState } from "@/components/admin/empty-state";
+import { SectionHeader } from "@/components/admin/section-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -32,11 +36,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable } from "@/components/data-table/data-table";
-import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTablePagination,
+  needsPagination,
+} from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import {
   FINANCING_STATUSES,
   FINANCING_STATUS_LABELS,
@@ -50,6 +62,7 @@ import {
   type Financing,
   type FinancingStatus,
 } from "@/lib/farmer-social";
+import { FINANCING_STATUS_VARIANT } from "@/lib/status-variants";
 import { DIGITS, LIMITS, digitsMessage, exceedsDigits } from "@/lib/validation";
 
 type Props = {
@@ -62,15 +75,6 @@ type FormValues = { description: string; status: string; amount: string };
 
 const EMPTY: FormValues = { description: "", status: "", amount: "" };
 const MAX_DESCRIPTION = LIMITS.FINANCING_DESCRIPTION;
-
-const STATUS_STYLES: Record<FinancingStatus, string> = {
-  PENDING: "bg-amber-500/15 text-amber-800 dark:text-amber-300",
-  IN_ANALYSIS: "bg-sky-500/15 text-sky-800 dark:text-sky-300",
-  APPROVED: "bg-primary/10 text-primary",
-  REJECTED: "bg-destructive/10 text-destructive",
-  CANCELED: "bg-muted text-muted-foreground",
-  PAID: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
-};
 
 function validate(values: FormValues): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -89,27 +93,13 @@ function validate(values: FormValues): Record<string, string> {
   return errors;
 }
 
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-    >
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  );
-}
-
+/** Situação do financiamento: Badge semântico por status (sem cor crua). */
 function StatusBadge({ status }: { status: FinancingStatus | null }) {
-  if (!status) return <span className="text-muted-foreground">—</span>;
+  if (!status) return <EmptyValue />;
   return (
-    <span
-      data-status={status}
-      className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}
-    >
+    <Badge data-status={status} variant={FINANCING_STATUS_VARIANT[status]}>
       {FINANCING_STATUS_LABELS[status]}
-    </span>
+    </Badge>
   );
 }
 
@@ -243,44 +233,32 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
     }
   }
 
-  function actions(item: Financing, compact: boolean) {
-    if (!canWrite) return null;
-    return (
-      <div className="inline-flex items-center gap-1">
-        <Button
-          type="button"
-          variant={compact ? "outline" : "ghost"}
-          size={compact ? "sm" : "icon-sm"}
-          aria-label={`Editar ${item.description}`}
-          onClick={() => openEdit(item)}
-        >
-          <Pencil />
-          {compact && "Editar"}
-        </Button>
-        <Button
-          type="button"
-          variant={compact ? "outline" : "ghost"}
-          size="icon-sm"
-          aria-label={`Excluir ${item.description}`}
-          onClick={() => {
-            setDeleteError(null);
-            setDeleteTarget(item);
-          }}
-          className="text-destructive hover:text-destructive"
-        >
-          <Trash2 />
-        </Button>
-      </div>
-    );
+  // Nomes acessíveis "Editar {descrição}" / "Excluir {descrição}" (iguais
+  // na tabela e no card mobile; os e2e procuram exatamente esses rótulos).
+  function rowActions(item: Financing): DataTableRowAction[] {
+    return [
+      {
+        label: `Editar ${item.description}`,
+        icon: Pencil,
+        onClick: () => openEdit(item),
+      },
+      {
+        label: `Excluir ${item.description}`,
+        icon: Trash2,
+        tone: "destructive",
+        onClick: () => {
+          setDeleteError(null);
+          setDeleteTarget(item);
+        },
+      },
+    ];
   }
 
   const columns: ColumnDef<Financing>[] = [
     {
       accessorKey: "description",
       header: "Descrição",
-      cell: ({ row }) => (
-        <span className="font-medium">{row.original.description}</span>
-      ),
+      meta: { cellVariant: "primary" },
     },
     {
       accessorKey: "status",
@@ -289,19 +267,18 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
     },
     {
       accessorKey: "amount",
-      header: () => <div className="text-right">Valor</div>,
-      cell: ({ row }) => (
-        <div className="text-right tabular-nums">
-          {formatCurrency(row.original.amount)}
-        </div>
-      ),
+      header: "Valor",
+      meta: { numeric: true, cellVariant: "primary" },
+      cell: ({ row }) => formatCurrency(row.original.amount),
     },
     ...(canWrite
       ? [
           {
             id: "actions",
             header: "Ações",
-            cell: ({ row }: { row: Row<Financing> }) => actions(row.original, false),
+            cell: ({ row }: { row: Row<Financing> }) => (
+              <DataTableRowActions actions={rowActions(row.original)} />
+            ),
           } satisfies ColumnDef<Financing>,
         ]
       : []),
@@ -323,7 +300,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
       <Card key={item.id} className="p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-medium">{item.description}</p>
+            <p className="font-medium text-foreground">{item.description}</p>
             <p className="mt-1 text-sm tabular-nums text-muted-foreground">
               {formatCurrency(item.amount)}
             </p>
@@ -331,46 +308,15 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
               <StatusBadge status={item.status} />
             </div>
           </div>
-          {actions(item, true)}
+          {canWrite && (
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(item)}
+            />
+          )}
         </div>
       </Card>
-    );
-  }
-
-  function renderBody() {
-    if (loading) return <Skeleton className="h-24 w-full rounded-xl" />;
-    if (error) {
-      return (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={refresh}>
-            Tentar novamente
-          </Button>
-        </div>
-      );
-    }
-    if (items.length === 0) {
-      return (
-        <p className="rounded-lg border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhum financiamento cadastrado
-        </p>
-      );
-    }
-    return (
-      <>
-        <DataTable
-          table={table}
-          columns={columns}
-          renderMobileCard={renderMobileCard}
-        />
-        <DataTablePagination table={table} />
-      </>
     );
   }
 
@@ -381,28 +327,68 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
   const showTotal = !loading && !error && items.length > 0;
 
   return (
-    <section aria-labelledby="financing-title" className="flex flex-col gap-3">
-      <div className="flex items-end justify-between gap-3">
-        <h3 id="financing-title" className="text-lg font-semibold tracking-tight">
-          Financiamentos
-          {showTotal && (
-            <span
-              data-testid="financing-total"
-              className="ml-2 text-sm font-normal text-muted-foreground"
-            >
-              Total financiado: {formatCurrency(total)}
-            </span>
-          )}
-        </h3>
-        {canWrite && (
-          <Button type="button" size="sm" variant="outline" onClick={openCreate}>
-            <Plus />
-            Adicionar financiamento
-          </Button>
-        )}
-      </div>
+    <section aria-labelledby="financing-title" className="flex flex-col gap-section-sm">
+      <SectionHeader
+        id="financing-title"
+        title={
+          <>
+            Financiamentos
+            {showTotal && (
+              <span
+                data-testid="financing-total"
+                className="ml-2 text-base font-normal text-muted-foreground tabular-nums"
+              >
+                Total financiado: {formatCurrency(total)}
+              </span>
+            )}
+          </>
+        }
+        actions={
+          canWrite ? (
+            <Button type="button" variant="outline" onClick={openCreate}>
+              <Plus aria-hidden="true" />
+              Adicionar financiamento
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {renderBody()}
+      {/* Carregando, erro (InlineAlert + "Tentar novamente") vêm do DataTable.
+          O vazio fica fora da tabela (sem cabeçalhos de coluna vazios). */}
+      {!loading && !error && items.length === 0 ? (
+        <EmptyState
+          variant="card"
+          icon={Inbox}
+          title="Nenhum financiamento cadastrado."
+          hint={
+            canWrite
+              ? "Registre os financiamentos do agricultor com descrição, situação e valor."
+              : "Os financiamentos aparecem aqui quando forem cadastrados."
+          }
+          action={
+            canWrite
+              ? {
+                  label: "Adicionar primeiro financiamento",
+                  onClick: openCreate,
+                  variant: "outline",
+                }
+              : undefined
+          }
+        />
+      ) : (
+        <DataTable
+          table={table}
+          columns={columns}
+          isLoading={loading}
+          hasError={Boolean(error)}
+          onRetry={refresh}
+          errorHint={userFacingErrorHint(error)}
+          renderMobileCard={renderMobileCard}
+        />
+      )}
+      {/* Paginação só acima do menor tamanho de página (10), como na lista
+          do técnico: as seções raramente passam disso. */}
+      {showTotal && needsPagination(items.length) ? <DataTablePagination table={table} /> : null}
 
       {canWrite && (
         <>
@@ -417,9 +403,8 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                 </DialogDescription>
               </DialogHeader>
               <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <div aria-live="polite">
-                  {formError && <ErrorBox message={formError} />}
-                </div>
+                {/* role="alert" do InlineAlert já anuncia (sem aria-live em volta). */}
+                {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="financing-description">Descrição</Label>
                   <Input
@@ -430,30 +415,40 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                     disabled={submitting}
                     placeholder="Ex.: PRONAF Custeio 2026"
                     aria-invalid={Boolean(fieldErrors.description)}
+                    aria-describedby={fieldErrors.description ? "financing-description-error" : undefined}
                   />
                   {fieldErrors.description && (
-                    <p className="text-sm text-destructive">{fieldErrors.description}</p>
+                    <p id="financing-description-error" className="text-sm text-destructive">
+                      {fieldErrors.description}
+                    </p>
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="financing-status">Situação</Label>
-                  <select
+                  {/* <select> nativo (NativeSelect): mantém fireEvent.change e
+                      selectOption("Situação") dos testes. */}
+                  <NativeSelect
                     id="financing-status"
+                    className="w-full"
                     value={values.status}
                     onChange={(e) => update("status", e.target.value)}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.status)}
-                    className="h-8 w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-1 text-base outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50 aria-invalid:border-destructive md:text-sm dark:bg-input/30"
+                    aria-describedby={
+                      fieldErrors.status ? "financing-status-error" : undefined
+                    }
                   >
-                    <option value="">Selecione…</option>
+                    <NativeSelectOption value="">Selecione…</NativeSelectOption>
                     {FINANCING_STATUSES.map((status) => (
-                      <option key={status} value={status}>
+                      <NativeSelectOption key={status} value={status}>
                         {FINANCING_STATUS_LABELS[status]}
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </select>
+                  </NativeSelect>
                   {fieldErrors.status && (
-                    <p className="text-sm text-destructive">{fieldErrors.status}</p>
+                    <p id="financing-status-error" className="text-sm text-destructive">
+                      {fieldErrors.status}
+                    </p>
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
@@ -466,9 +461,12 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                     disabled={submitting}
                     placeholder="Ex.: 25.000,00"
                     aria-invalid={Boolean(fieldErrors.amount)}
+                    aria-describedby={fieldErrors.amount ? "financing-amount-error" : undefined}
                   />
                   {fieldErrors.amount && (
-                    <p className="text-sm text-destructive">{fieldErrors.amount}</p>
+                    <p id="financing-amount-error" className="text-sm text-destructive">
+                      {fieldErrors.amount}
+                    </p>
                   )}
                 </div>
                 <DialogFooter>
@@ -483,7 +481,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                   <Button type="submit" disabled={submitting}>
                     {submitting ? (
                       <>
-                        <Loader2 className="animate-spin" />
+                        <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                         Salvando…
                       </>
                     ) : (
@@ -512,7 +510,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                   . Não é possível desfazer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              {deleteError && <ErrorBox message={deleteError} />}
+              {deleteError && <InlineAlert variant="destructive">{deleteError}</InlineAlert>}
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
@@ -522,7 +520,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                 >
                   {deleting ? (
                     <>
-                      <Loader2 className="animate-spin" />
+                      <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                       Excluindo…
                     </>
                   ) : (

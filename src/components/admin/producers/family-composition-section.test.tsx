@@ -71,7 +71,7 @@ describe("FamilyCompositionSection — leitura (UNIT-002)", () => {
   it("mostra o estado vazio", async () => {
     vi.mocked(listFamilyMembers).mockResolvedValue([]);
     render(<FamilyCompositionSection farmerId="f-1" canWrite />);
-    expect(await screen.findByText("Nenhum membro familiar cadastrado")).toBeInTheDocument();
+    expect(await screen.findByText("Nenhum membro familiar cadastrado.")).toBeInTheDocument();
     expect(screen.getByText("(0 membros)")).toBeInTheDocument();
   });
 
@@ -270,9 +270,70 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
       await waitFor(() => expect(deleteFamilyMember).toHaveBeenCalledWith("m-11"));
       expect(await screen.findByText("Membro 01")).toBeInTheDocument();
-      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
-        "Exibindo 1–10 de 10",
-      );
+      expect(screen.getByText("Membro 10")).toBeInTheDocument();
+      // Com 10 itens (o menor tamanho de página) a paginação some (UX-L3-06).
+      expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
     });
   });
 });
+
+describe("FamilyCompositionSection — visual do redesign", () => {
+  it("vazio com escrita: dica e CTA que abre o formulário, sem tabela", async () => {
+    vi.mocked(listFamilyMembers).mockResolvedValue([]);
+    render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+    expect(
+      await screen.findByText(
+        "Cadastre as pessoas da família do agricultor com nome, parentesco e idade.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    // BP-L3-01: CTA de seção com o mesmo peso (outline) do botão do cabeçalho.
+    const cta = screen.getByRole("button", { name: "Adicionar primeiro membro" });
+    expect(cta.className).toContain("border-border");
+    expect(cta.className).not.toContain("bg-primary");
+    fireEvent.click(cta);
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Novo membro familiar");
+  });
+
+  it("vazio somente leitura: só a dica, sem botão", async () => {
+    vi.mocked(listFamilyMembers).mockResolvedValue([]);
+    render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+    expect(
+      await screen.findByText("Os membros da família aparecem aqui quando forem cadastrados."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("erro de campo fica ligado ao input por aria-describedby", async () => {
+    render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+    await screen.findByText("Maria da Silva");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar membro" }));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    const error = await screen.findByText("O nome é obrigatório");
+    expect(screen.getByLabelText("Nome").getAttribute("aria-describedby")).toBe(error.id);
+  });
+});
+
+describe("FamilyCompositionSection — paginação e erro (UX-L3-05/06)", () => {
+  it("com 10 ou menos membros não mostra a paginação", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      ...MARIA,
+      id: `m-${i + 1}`,
+      name: `Membro ${String(i + 1).padStart(2, "0")}`,
+    }));
+    vi.mocked(listFamilyMembers).mockResolvedValue(ten);
+    render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+    await screen.findByText("Membro 10");
+    expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
+  });
+
+  it("erro sem mensagem de domínio (Erro 500) mostra o texto padrão, não o código", async () => {
+    vi.mocked(listFamilyMembers).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Tente novamente em alguns instantes.");
+    expect(alert.textContent).not.toContain("Erro 500");
+  });
+});
+

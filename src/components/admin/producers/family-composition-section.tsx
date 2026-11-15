@@ -9,7 +9,7 @@ import {
   type PaginationState,
   type Row,
 } from "@tanstack/react-table";
-import { AlertCircle, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Inbox, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -21,6 +21,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/admin/empty-state";
+import { SectionHeader } from "@/components/admin/section-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -32,11 +34,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DataTable } from "@/components/data-table/data-table";
-import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTablePagination,
+  needsPagination,
+} from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import {
   createFamilyMember,
   deleteFamilyMember,
@@ -73,18 +82,6 @@ function validate(values: FormValues): Record<string, string> {
   else if (Number(values.age.trim()) > LIMITS.MAX_AGE)
     errors.age = `A idade deve ser no máximo ${LIMITS.MAX_AGE}`;
   return errors;
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-    >
-      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-      <span>{message}</span>
-    </div>
-  );
 }
 
 export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
@@ -212,64 +209,51 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
     }
   }
 
-  function actions(member: FamilyMember, compact: boolean) {
-    if (!canWrite) return null;
-    return (
-      <div className="inline-flex items-center gap-1">
-        <Button
-          type="button"
-          variant={compact ? "outline" : "ghost"}
-          size={compact ? "sm" : "icon-sm"}
-          aria-label={`Editar ${member.name}`}
-          onClick={() => openEdit(member)}
-        >
-          <Pencil />
-          {compact && "Editar"}
-        </Button>
-        <Button
-          type="button"
-          variant={compact ? "outline" : "ghost"}
-          size="icon-sm"
-          aria-label={`Excluir ${member.name}`}
-          onClick={() => {
-            setDeleteError(null);
-            setDeleteTarget(member);
-          }}
-          className="text-destructive hover:text-destructive"
-        >
-          <Trash2 />
-        </Button>
-      </div>
-    );
+  // Nomes acessíveis "Editar {nome}" / "Excluir {nome}" (iguais na tabela
+  // e no card mobile; os e2e procuram exatamente esses rótulos).
+  function rowActions(member: FamilyMember): DataTableRowAction[] {
+    return [
+      {
+        label: `Editar ${member.name}`,
+        icon: Pencil,
+        onClick: () => openEdit(member),
+      },
+      {
+        label: `Excluir ${member.name}`,
+        icon: Trash2,
+        tone: "destructive",
+        onClick: () => {
+          setDeleteError(null);
+          setDeleteTarget(member);
+        },
+      },
+    ];
   }
 
   const columns: ColumnDef<FamilyMember>[] = [
     {
       accessorKey: "name",
       header: "Nome",
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      meta: { cellVariant: "primary" },
     },
     {
       accessorKey: "kinship",
       header: "Parentesco",
-      cell: ({ row }) => (
-        <span className="text-muted-foreground">{row.original.kinship}</span>
-      ),
+      meta: { cellVariant: "secondary" },
     },
     {
       accessorKey: "age",
-      header: () => <div className="text-right">Idade</div>,
-      cell: ({ row }) => (
-        <div className="text-right tabular-nums">{row.original.age}</div>
-      ),
+      header: "Idade",
+      meta: { numeric: true },
     },
     ...(canWrite
       ? [
           {
             id: "actions",
             header: "Ações",
-            cell: ({ row }: { row: Row<FamilyMember> }) =>
-              actions(row.original, false),
+            cell: ({ row }: { row: Row<FamilyMember> }) => (
+              <DataTableRowActions actions={rowActions(row.original)} />
+            ),
           } satisfies ColumnDef<FamilyMember>,
         ]
       : []),
@@ -291,81 +275,85 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
       <Card key={member.id} className="p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="font-medium">{member.name}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">{member.name}</p>
+            <p className="text-sm text-muted-foreground tabular-nums">
               {member.kinship} · {member.age} {member.age === 1 ? "ano" : "anos"}
             </p>
           </div>
-          {actions(member, true)}
+          {canWrite && (
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(member)}
+            />
+          )}
         </div>
       </Card>
-    );
-  }
-
-  function renderBody() {
-    if (loading) return <Skeleton className="h-24 w-full rounded-xl" />;
-    if (error) {
-      return (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={refresh}>
-            Tentar novamente
-          </Button>
-        </div>
-      );
-    }
-    if (members.length === 0) {
-      return (
-        <p className="rounded-lg border bg-card px-4 py-6 text-center text-sm text-muted-foreground">
-          Nenhum membro familiar cadastrado
-        </p>
-      );
-    }
-    return (
-      <>
-        <DataTable
-          table={table}
-          columns={columns}
-          renderMobileCard={renderMobileCard}
-        />
-        <DataTablePagination table={table} />
-      </>
     );
   }
 
   const showCount = !loading && !error;
 
   return (
-    <section aria-labelledby="family-composition-title" className="flex flex-col gap-3">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h3
-            id="family-composition-title"
-            className="text-lg font-semibold tracking-tight"
-          >
+    <section aria-labelledby="family-composition-title" className="flex flex-col gap-section-sm">
+      <SectionHeader
+        id="family-composition-title"
+        title={
+          <>
             Composição familiar
             {showCount && (
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
+              <span className="ml-2 text-base font-normal text-muted-foreground">
                 ({members.length} {members.length === 1 ? "membro" : "membros"})
               </span>
             )}
-          </h3>
-        </div>
-        {canWrite && (
-          <Button type="button" size="sm" variant="outline" onClick={openCreate}>
-            <Plus />
-            Adicionar membro
-          </Button>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          canWrite ? (
+            <Button type="button" variant="outline" onClick={openCreate}>
+              <Plus aria-hidden="true" />
+              Adicionar membro
+            </Button>
+          ) : undefined
+        }
+      />
 
-      {renderBody()}
+      {/* Carregando, erro (InlineAlert + "Tentar novamente") vêm do DataTable.
+          O vazio fica fora da tabela (sem cabeçalhos de coluna vazios). */}
+      {!loading && !error && members.length === 0 ? (
+        <EmptyState
+          variant="card"
+          icon={Inbox}
+          title="Nenhum membro familiar cadastrado."
+          hint={
+            canWrite
+              ? "Cadastre as pessoas da família do agricultor com nome, parentesco e idade."
+              : "Os membros da família aparecem aqui quando forem cadastrados."
+          }
+          action={
+            canWrite
+              ? {
+                  label: "Adicionar primeiro membro",
+                  onClick: openCreate,
+                  variant: "outline",
+                }
+              : undefined
+          }
+        />
+      ) : (
+        <DataTable
+          table={table}
+          columns={columns}
+          isLoading={loading}
+          hasError={Boolean(error)}
+          onRetry={refresh}
+          errorHint={userFacingErrorHint(error)}
+          renderMobileCard={renderMobileCard}
+        />
+      )}
+      {/* Paginação só acima do menor tamanho de página (10), como na lista
+          do técnico: as seções raramente passam disso. */}
+      {showCount && needsPagination(members.length) ? <DataTablePagination table={table} /> : null}
 
       {canWrite && (
         <>
@@ -380,9 +368,8 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                 </DialogDescription>
               </DialogHeader>
               <form noValidate onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <div aria-live="polite">
-                  {formError && <ErrorBox message={formError} />}
-                </div>
+                {/* role="alert" do InlineAlert já anuncia (sem aria-live em volta). */}
+                {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="family-name">Nome</Label>
                   <Input
@@ -392,9 +379,12 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                     onChange={(e) => update("name", e.target.value)}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.name)}
+                    aria-describedby={fieldErrors.name ? "family-name-error" : undefined}
                   />
                   {fieldErrors.name && (
-                    <p className="text-sm text-destructive">{fieldErrors.name}</p>
+                    <p id="family-name-error" className="text-sm text-destructive">
+                      {fieldErrors.name}
+                    </p>
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
@@ -407,9 +397,12 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                     disabled={submitting}
                     placeholder="Ex.: Esposa, Filho"
                     aria-invalid={Boolean(fieldErrors.kinship)}
+                    aria-describedby={fieldErrors.kinship ? "family-kinship-error" : undefined}
                   />
                   {fieldErrors.kinship && (
-                    <p className="text-sm text-destructive">{fieldErrors.kinship}</p>
+                    <p id="family-kinship-error" className="text-sm text-destructive">
+                      {fieldErrors.kinship}
+                    </p>
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
@@ -425,9 +418,12 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                     onChange={(e) => update("age", e.target.value)}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.age)}
+                    aria-describedby={fieldErrors.age ? "family-age-error" : undefined}
                   />
                   {fieldErrors.age && (
-                    <p className="text-sm text-destructive">{fieldErrors.age}</p>
+                    <p id="family-age-error" className="text-sm text-destructive">
+                      {fieldErrors.age}
+                    </p>
                   )}
                 </div>
                 <DialogFooter>
@@ -442,7 +438,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                   <Button type="submit" disabled={submitting}>
                     {submitting ? (
                       <>
-                        <Loader2 className="animate-spin" />
+                        <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                         Salvando…
                       </>
                     ) : (
@@ -471,7 +467,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                   da composição familiar. Não é possível desfazer.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              {deleteError && <ErrorBox message={deleteError} />}
+              {deleteError && <InlineAlert variant="destructive">{deleteError}</InlineAlert>}
               <AlertDialogFooter>
                 <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
                 <AlertDialogAction
@@ -481,7 +477,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                 >
                   {deleting ? (
                     <>
-                      <Loader2 className="animate-spin" />
+                      <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                       Excluindo…
                     </>
                   ) : (

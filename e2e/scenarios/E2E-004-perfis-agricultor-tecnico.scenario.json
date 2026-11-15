@@ -194,7 +194,7 @@
           "target": {
             "by": "role",
             "value": "button",
-            "name": "Novo Agricultor"
+            "name": "Novo agricultor"
           }
         },
         {
@@ -321,7 +321,7 @@
           "action": "click",
           "target": {
             "by": "css",
-            "value": "tr:has-text('${env:E2E_FARMER_NAME}') button[aria-label='Editar agricultor']"
+            "value": "tr:has-text('${env:E2E_FARMER_NAME}') button[aria-label^='Editar agricultor']"
           }
         },
         {

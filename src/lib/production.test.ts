@@ -6,6 +6,8 @@ import {
   getProductionDashboard,
   getProductionPlan,
   listProductionExecutions,
+  planCropLabel,
+  planDisplayName,
   rejectProductionExecution,
   validateProductionExecution,
   updateProductionExecution,
@@ -319,5 +321,23 @@ describe("getProductionDashboard (UNIT-001)", () => {
     const dashboard = await getProductionDashboard();
     expect(dashboard.communities).toEqual([]);
     expect(dashboard.expectedYield).toBe(0);
+  });
+});
+
+describe("planCropLabel / planDisplayName", () => {
+  const crop = { name: "Café", variety: "Catuaí" } as never;
+  const harvest = { id: "h-1", label: "Safra 2026", startDate: null, endDate: null };
+
+  it("cultura com variedade e safra entre parênteses", () => {
+    expect(planCropLabel({ crop })).toBe("Café — Catuaí");
+    expect(planDisplayName({ crop, harvest })).toBe("Café — Catuaí (Safra 2026)");
+  });
+
+  it("sem variedade, sem safra e sem cultura", () => {
+    const noVariety = { name: "Milho", variety: "" } as never;
+    expect(planCropLabel({ crop: noVariety })).toBe("Milho");
+    expect(planDisplayName({ crop: noVariety, harvest: null })).toBe("Milho");
+    expect(planCropLabel({ crop: null })).toBe("");
+    expect(planDisplayName({ crop: null, harvest })).toBe("Plano sem cultura (Safra 2026)");
   });
 });

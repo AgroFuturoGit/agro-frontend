@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator } from "@/lib/api";
+import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator, userFacingErrorHint } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -380,5 +380,14 @@ describe("apiUpload (UNIT-001)", () => {
     await expect(apiUpload("/x", form())).rejects.toMatchObject({ status: 401 });
     expect(readTokenFromCookie()).toBeNull();
     expect(goToLogin).toHaveBeenCalledWith("/admin");
+  });
+});
+
+describe("userFacingErrorHint", () => {
+  it("mostra a mensagem de domínio e esconde o fallback técnico", () => {
+    expect(userFacingErrorHint("Agricultor não encontrado.")).toBe("Agricultor não encontrado.");
+    expect(userFacingErrorHint("Erro 500")).toBeUndefined();
+    expect(userFacingErrorHint(null)).toBeUndefined();
+    expect(userFacingErrorHint("")).toBeUndefined();
   });
 });

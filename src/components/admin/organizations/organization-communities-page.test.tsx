@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { OrganizationCommunitiesPage } from "@/components/admin/organizations/organization-communities-page";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager, type Manager } from "@/lib/managers";
@@ -96,7 +97,10 @@ describe("OrganizationCommunitiesPage — listagem", () => {
 
     expect(bodyNames()).toEqual(["Baixa Grande", "Serra Azul", "Vale Verde"]);
     expect(listCommunities).toHaveBeenCalledWith("org-a");
-    expect(screen.getAllByRole("button", { name: "Editar comunidade" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Editar comunidade/ })).toHaveLength(3);
+    expect(
+      screen.getByRole("button", { name: "Editar comunidade Serra Azul" }),
+    ).toBeTruthy();
   });
 
   it("filtra por nome após o debounce", async () => {
@@ -142,6 +146,66 @@ describe("OrganizationCommunitiesPage — listagem", () => {
 
     expect(await screen.findByText("Baixa Grande")).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.getAllByRole("button", { name: "Editar" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Editar comunidade/ })).toHaveLength(3);
+  });
+
+  it("breadcrumb acima do título com o nome da organização e CTA 'Nova comunidade'", async () => {
+    loginAs("ADMIN");
+
+    render(<OrganizationCommunitiesPage orgId="org-a" />);
+
+    const heading = await screen.findByRole("heading", {
+      level: 2,
+      name: "Cooperativa Alfa",
+    });
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(nav.textContent).toContain("Organizações");
+    expect(nav.textContent).toContain("Cooperativa Alfa");
+    // O breadcrumb vem antes do título no documento.
+    expect(
+      nav.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Nova comunidade" })).toBeTruthy();
+  });
+
+  it("lista vazia: dica e CTA que abre o drawer de criação", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listCommunities).mockResolvedValueOnce([]);
+
+    render(<OrganizationCommunitiesPage orgId="org-a" />);
+
+    expect(
+      await screen.findByText("Nenhuma comunidade cadastrada nesta organização ainda."),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Cadastre a primeira comunidade desta organização informando o nome dela.",
+      ),
+    ).toBeTruthy();
+
+    await userEvent.setup().click(
+      screen.getByRole("button", { name: "Criar primeira comunidade" }),
+    );
+    expect(await screen.findByRole("dialog", { name: "Nova comunidade" })).toBeTruthy();
+  });
+
+  it("erro de carregamento mostra a mensagem da API e 'Tentar novamente'", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listCommunities).mockRejectedValueOnce(
+      new ApiError(500, "Falha ao listar comunidades", null),
+    );
+
+    render(<OrganizationCommunitiesPage orgId="org-a" />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Falha ao listar comunidades");
+    expect(
+      screen.queryByText("Nenhuma comunidade cadastrada nesta organização ainda."),
+    ).toBeNull();
+
+    await userEvent.setup().click(
+      screen.getByRole("button", { name: "Tentar novamente" }),
+    );
+    expect(await screen.findByText("Baixa Grande")).toBeTruthy();
   });
 });

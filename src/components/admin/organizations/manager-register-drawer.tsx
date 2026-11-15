@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import {
   Sheet,
   SheetContent,
@@ -102,6 +103,14 @@ export function ManagerRegisterDrawer({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [registeredName, setRegisteredName] = useState<string | null>(null);
+  // Na troca para a visão de sucesso, o botão "Cadastrar" (focado) some:
+  // o foco vai para o título "Gestor cadastrado", que é lido junto com a
+  // descrição (A11Y-L3-3).
+  const successTitleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (registeredName) successTitleRef.current?.focus();
+  }, [registeredName]);
 
   useEffect(() => {
     if (!open) return;
@@ -175,7 +184,13 @@ export function ManagerRegisterDrawer({
         {registeredName ? (
           <>
             <SheetHeader>
-              <SheetTitle>Gestor cadastrado</SheetTitle>
+              <SheetTitle
+                ref={successTitleRef}
+                tabIndex={-1}
+                className="outline-none"
+              >
+                Gestor cadastrado
+              </SheetTitle>
               <SheetDescription>
                 O gestor foi vinculado à organização &quot;{organizationName}
                 &quot;.
@@ -183,16 +198,11 @@ export function ManagerRegisterDrawer({
             </SheetHeader>
 
             <div className="flex flex-1 flex-col px-4 pb-4">
-              <div
-                role="status"
-                className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm text-emerald-700 dark:text-emerald-400"
-              >
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-                <span>
-                  <strong>{registeredName}</strong> foi cadastrado(a) como
-                  gestor(a) desta organização.
-                </span>
-              </div>
+              {/* Sucesso: InlineAlert success (role=status, o e2e lê esse nó). */}
+              <InlineAlert variant="success">
+                <strong>{registeredName}</strong> foi cadastrado(a) como
+                gestor(a) desta organização.
+              </InlineAlert>
             </div>
 
             <SheetFooter>
@@ -216,17 +226,11 @@ export function ManagerRegisterDrawer({
               className="flex flex-1 flex-col overflow-y-auto"
             >
               <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
-                <div aria-live="polite">
-                  {formError && (
-                    <div
-                      role="alert"
-                      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-                    >
-                      <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                      <span>{formError}</span>
-                    </div>
-                  )}
-                </div>
+                {/* O role="alert" do InlineAlert já anuncia: sem aria-live em
+                    volta (evita anúncio duplicado). */}
+                {formError && (
+                  <InlineAlert variant="destructive">{formError}</InlineAlert>
+                )}
 
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="manager-full-name">Nome completo</Label>
@@ -240,9 +244,12 @@ export function ManagerRegisterDrawer({
                     disabled={submitting}
                     autoComplete="name"
                     aria-invalid={Boolean(fieldErrors.fullName)}
+                    aria-describedby={
+                      fieldErrors.fullName ? "manager-full-name-error" : undefined
+                    }
                   />
                   {fieldErrors.fullName && (
-                    <p className="text-sm text-destructive">
+                    <p id="manager-full-name-error" className="text-sm text-destructive">
                       {fieldErrors.fullName}
                     </p>
                   )}
@@ -261,9 +268,12 @@ export function ManagerRegisterDrawer({
                     disabled={submitting}
                     autoComplete="email"
                     aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={
+                      fieldErrors.email ? "manager-email-error" : undefined
+                    }
                   />
                   {fieldErrors.email && (
-                    <p className="text-sm text-destructive">
+                    <p id="manager-email-error" className="text-sm text-destructive">
                       {fieldErrors.email}
                     </p>
                   )}
@@ -283,9 +293,12 @@ export function ManagerRegisterDrawer({
                     disabled={submitting}
                     autoComplete="new-password"
                     aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={
+                      fieldErrors.password ? "manager-password-error" : undefined
+                    }
                   />
                   {fieldErrors.password && (
-                    <p className="text-sm text-destructive">
+                    <p id="manager-password-error" className="text-sm text-destructive">
                       {fieldErrors.password}
                     </p>
                   )}
@@ -304,9 +317,12 @@ export function ManagerRegisterDrawer({
                     placeholder="000.000.000-00"
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.cpf)}
+                    aria-describedby={
+                      fieldErrors.cpf ? "manager-cpf-error" : undefined
+                    }
                   />
                   {fieldErrors.cpf && (
-                    <p className="text-sm text-destructive">
+                    <p id="manager-cpf-error" className="text-sm text-destructive">
                       {fieldErrors.cpf}
                     </p>
                   )}
@@ -325,9 +341,12 @@ export function ManagerRegisterDrawer({
                     required
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.dateOfBirth)}
+                    aria-describedby={
+                      fieldErrors.dateOfBirth ? "manager-date-of-birth-error" : undefined
+                    }
                   />
                   {fieldErrors.dateOfBirth && (
-                    <p className="text-sm text-destructive">
+                    <p id="manager-date-of-birth-error" className="text-sm text-destructive">
                       {fieldErrors.dateOfBirth}
                     </p>
                   )}
@@ -346,7 +365,7 @@ export function ManagerRegisterDrawer({
                 <Button type="submit" disabled={submitting}>
                   {submitting ? (
                     <>
-                      <Loader2 className="animate-spin" />
+                      <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                       Cadastrando…
                     </>
                   ) : (

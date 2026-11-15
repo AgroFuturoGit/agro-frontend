@@ -96,7 +96,7 @@ describe("FinancingSection — leitura (UNIT-003)", () => {
   it("mostra o estado vazio, sem total", async () => {
     vi.mocked(listFinancings).mockResolvedValue([]);
     render(<FinancingSection farmerId="f-1" canWrite />);
-    expect(await screen.findByText("Nenhum financiamento cadastrado")).toBeInTheDocument();
+    expect(await screen.findByText("Nenhum financiamento cadastrado.")).toBeInTheDocument();
     expect(screen.queryByTestId("financing-total")).toBeNull();
   });
 
@@ -279,9 +279,80 @@ describe("FinancingSection — formulário (UNIT-005)", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
       await waitFor(() => expect(deleteFinancing).toHaveBeenCalledWith("fin-11"));
       expect(await screen.findByText("Financiamento 01")).toBeInTheDocument();
-      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
-        "Exibindo 1–10 de 10",
-      );
+      expect(screen.getByText("Financiamento 10")).toBeInTheDocument();
+      // Com 10 itens (o menor tamanho de página) a paginação some (UX-L3-06).
+      expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
     });
   });
 });
+
+describe("FinancingSection — visual do redesign", () => {
+  it("situação em Badge semântico (sem cor crua), com data-status", async () => {
+    render(<FinancingSection farmerId="f-1" canWrite={false} />);
+    await screen.findByText("PRONAF Custeio");
+    const approved = screen.getByText("Aprovado");
+    expect(approved.getAttribute("data-status")).toBe("APPROVED");
+    expect(approved.className).toContain("bg-success-muted");
+    expect(screen.getByText("Em análise").className).toContain("bg-info-muted");
+    expect(screen.getByRole("heading", { level: 3, name: /Financiamentos/ })).toBeInTheDocument();
+  });
+
+  it("Situação é um <select> nativo com a altura de controle", async () => {
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    await screen.findByText("PRONAF Custeio");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar financiamento" }));
+    const select = await screen.findByLabelText("Situação");
+    expect(select.tagName).toBe("SELECT");
+    expect(select.className).toContain("h-control");
+  });
+
+  it("vazio com escrita: dica e CTA que abre o formulário", async () => {
+    vi.mocked(listFinancings).mockResolvedValue([]);
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    expect(
+      await screen.findByText(
+        "Registre os financiamentos do agricultor com descrição, situação e valor.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    // BP-L3-01: CTA de seção com o mesmo peso (outline) do botão do cabeçalho.
+    const cta = screen.getByRole("button", { name: "Adicionar primeiro financiamento" });
+    expect(cta.className).toContain("border-border");
+    expect(cta.className).not.toContain("bg-primary");
+    fireEvent.click(cta);
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Novo financiamento");
+  });
+});
+
+describe("FinancingSection — erros ligados aos campos (A11Y-L3-1)", () => {
+  it("'Situação' vazia: o select nativo aponta para a mensagem de erro", async () => {
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    await screen.findByText("PRONAF Custeio");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar financiamento" }));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+
+    const error = await screen.findByText("A situação é obrigatória");
+    const select = screen.getByLabelText("Situação");
+    expect(select.getAttribute("aria-invalid")).toBe("true");
+    expect(select.getAttribute("aria-describedby")).toBe("financing-status-error");
+    expect(error.id).toBe("financing-status-error");
+    const description = screen.getByLabelText("Descrição");
+    expect(description.getAttribute("aria-describedby")).toBe(
+      screen.getByText("A descrição é obrigatória").id,
+    );
+  });
+
+  it("com 10 ou menos financiamentos não mostra a paginação", async () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({
+      ...PRONAF,
+      id: `fin-${i + 1}`,
+      description: `Financiamento ${String(i + 1).padStart(2, "0")}`,
+    }));
+    vi.mocked(listFinancings).mockResolvedValue(ten);
+    render(<FinancingSection farmerId="f-1" canWrite={false} />);
+    await screen.findByText("Financiamento 10");
+    expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
+  });
+});
+

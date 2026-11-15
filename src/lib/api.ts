@@ -22,6 +22,19 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Dica de erro para a tela: a mensagem de domínio do back (ex.: "Agricultor
+ * não encontrado.") é mostrada; o fallback técnico "Erro NNN" (resposta sem
+ * `message`) não, para cair no texto padrão "Tente novamente em alguns
+ * instantes." do `DataTable`.
+ */
+export function userFacingErrorHint(
+  message: string | null | undefined,
+): string | undefined {
+  if (!message || /^Erro \d{3}$/.test(message.trim())) return undefined;
+  return message;
+}
+
 /** 409 de edição simultânea: o back devolve o registro atual em `current`. */
 export function isConcurrencyConflict(err: ApiError): boolean {
   const payload = err.payload;

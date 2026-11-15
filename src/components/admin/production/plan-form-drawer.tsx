@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import {
   Sheet,
   SheetContent,
@@ -30,6 +31,7 @@ import {
   createProductionPlan,
   formatNumber,
   formatPlanDate,
+  planCropLabel,
   updateProductionPlan,
   type PlanStatus,
   type ProductionPlan,
@@ -320,17 +322,9 @@ export function PlanFormDrawer({
           className="flex flex-1 flex-col overflow-y-auto"
         >
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
-            <div aria-live="polite">
-              {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-                >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-            </div>
+            {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta
+                (evita anúncio duplicado). */}
+            {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
 
             {isCreate ? (
               <>
@@ -341,7 +335,12 @@ export function PlanFormDrawer({
                     onValueChange={(v) => update("harvestId", v ?? "")}
                     disabled={submitting || loadingOptions}
                   >
-                    <SelectTrigger id="plan-harvest" className="w-full">
+                    <SelectTrigger
+                      id="plan-harvest"
+                      className="w-full"
+                      aria-invalid={Boolean(fieldErrors.harvestId)}
+                      aria-describedby={fieldErrors.harvestId ? "plan-harvest-error" : undefined}
+                    >
                       <SelectValue
                         placeholder={
                           loadingOptions ? "Carregando…" : "Selecione a safra"
@@ -362,7 +361,7 @@ export function PlanFormDrawer({
                     </SelectContent>
                   </Select>
                   {fieldErrors.harvestId && (
-                    <p className="text-sm text-destructive">
+                    <p id="plan-harvest-error" className="text-sm text-destructive">
                       {fieldErrors.harvestId}
                     </p>
                   )}
@@ -375,7 +374,12 @@ export function PlanFormDrawer({
                     onValueChange={(v) => update("cropId", v ?? "")}
                     disabled={submitting || loadingOptions}
                   >
-                    <SelectTrigger id="plan-crop" className="w-full">
+                    <SelectTrigger
+                      id="plan-crop"
+                      className="w-full"
+                      aria-invalid={Boolean(fieldErrors.cropId)}
+                      aria-describedby={fieldErrors.cropId ? "plan-crop-error" : undefined}
+                    >
                       <SelectValue
                         placeholder={
                           loadingOptions ? "Carregando…" : "Selecione o cultivo"
@@ -398,17 +402,15 @@ export function PlanFormDrawer({
                     </SelectContent>
                   </Select>
                   {fieldErrors.cropId && (
-                    <p className="text-sm text-destructive">{fieldErrors.cropId}</p>
+                    <p id="plan-crop-error" className="text-sm text-destructive">{fieldErrors.cropId}</p>
                   )}
                 </div>
               </>
             ) : (
               plan && (
-                <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-sm">
+                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
                   <p className="font-medium text-foreground">
-                    {plan.crop
-                      ? `${plan.crop.name} — ${plan.crop.variety}`
-                      : "Cultivo"}
+                    {planCropLabel(plan) || "Cultivo"}
                   </p>
                   <p className="text-muted-foreground">
                     Safra: {plan.harvest?.label ?? "—"}
@@ -429,9 +431,10 @@ export function PlanFormDrawer({
                   required
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.plantedArea)}
+                  aria-describedby={fieldErrors.plantedArea ? "plan-area-error" : undefined}
                 />
                 {fieldErrors.plantedArea && (
-                  <p className="text-sm text-destructive">
+                  <p id="plan-area-error" className="text-sm text-destructive">
                     {fieldErrors.plantedArea}
                   </p>
                 )}
@@ -439,16 +442,10 @@ export function PlanFormDrawer({
             </div>
 
             {cropWithoutProductivity && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
-              >
-                <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                <span>
-                  Esta cultura não tem produtividade esperada. Complete o
-                  cadastro da cultura antes de criar o plano.
-                </span>
-              </div>
+              <InlineAlert variant="warning">
+                Esta cultura não tem produtividade esperada. Complete o
+                cadastro da cultura antes de criar o plano.
+              </InlineAlert>
             )}
 
             <div className="flex flex-col gap-2">
@@ -506,9 +503,10 @@ export function PlanFormDrawer({
                   onChange={(e) => update("expectedHarvestStart", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.expectedHarvestStart)}
+                  aria-describedby={fieldErrors.expectedHarvestStart ? "plan-harvest-start-error" : undefined}
                 />
                 {fieldErrors.expectedHarvestStart && (
-                  <p className="text-sm text-destructive">
+                  <p id="plan-harvest-start-error" className="text-sm text-destructive">
                     {fieldErrors.expectedHarvestStart}
                   </p>
                 )}
@@ -522,9 +520,10 @@ export function PlanFormDrawer({
                   onChange={(e) => update("expectedHarvestEnd", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.expectedHarvestEnd)}
+                  aria-describedby={fieldErrors.expectedHarvestEnd ? "plan-harvest-end-error" : undefined}
                 />
                 {fieldErrors.expectedHarvestEnd && (
-                  <p className="text-sm text-destructive">
+                  <p id="plan-harvest-end-error" className="text-sm text-destructive">
                     {fieldErrors.expectedHarvestEnd}
                   </p>
                 )}
@@ -540,9 +539,10 @@ export function PlanFormDrawer({
                 onChange={(e) => update("plannedPlantingDate", e.target.value)}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.plannedPlantingDate)}
+                aria-describedby={fieldErrors.plannedPlantingDate ? "plan-planting-date-error" : undefined}
               />
               {fieldErrors.plannedPlantingDate && (
-                <p className="text-sm text-destructive">
+                <p id="plan-planting-date-error" className="text-sm text-destructive">
                   {fieldErrors.plannedPlantingDate}
                 </p>
               )}
@@ -564,7 +564,7 @@ export function PlanFormDrawer({
             >
               {submitting ? (
                 <>
-                  <Loader2 className="animate-spin" />
+                  <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                   Salvando…
                 </>
               ) : isCreate ? (

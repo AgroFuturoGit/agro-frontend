@@ -256,10 +256,24 @@ describe("ProducerFormDrawer — cadastro por comunidade (spec.md §5)", () => {
 
     submitForm();
 
-    expect(
-      await screen.findByText("Selecione a comunidade do agricultor"),
-    ).toBeTruthy();
+    const error = await screen.findByText("Selecione a comunidade do agricultor");
     expect(registerProducer).not.toHaveBeenCalled();
+    // O seletor de comunidade aponta para o erro (A11Y-L3-1).
+    const trigger = screen.getByLabelText("Comunidade");
+    expect(trigger.getAttribute("aria-invalid")).toBe("true");
+    expect(trigger.getAttribute("aria-describedby")).toBe(error.id);
+  });
+
+  it("erro de campo de texto fica ligado ao input por aria-describedby", async () => {
+    renderDialog();
+
+    await screen.findByLabelText("Nome completo");
+    submitForm();
+
+    const input = screen.getByLabelText("Nome completo");
+    await waitFor(() => expect(input.getAttribute("aria-invalid")).toBe("true"));
+    const errorId = input.getAttribute("aria-describedby") as string;
+    expect(document.getElementById(errorId)?.textContent).toBeTruthy();
   });
 
   it("senha com menos de 8 caracteres bloqueia o submit client-side", async () => {
