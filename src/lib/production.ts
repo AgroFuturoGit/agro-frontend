@@ -1,5 +1,5 @@
 import { apiRequest } from "@/lib/api";
-import { mapCrop, type Crop } from "@/lib/crops";
+import { cropDisplayName, mapCrop, type Crop } from "@/lib/crops";
 
 // ----- Tipos de domínio (front) -----
 
@@ -424,4 +424,22 @@ export function formatPlanDate(value: string | null | undefined): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("pt-BR");
+}
+
+/** Cultura do plano ("Café — Catuaí", ou só o nome sem variedade); "" sem cultura. */
+export function planCropLabel(plan: Pick<ProductionPlan, "crop">): string {
+  return plan.crop ? cropDisplayName(plan.crop) : "";
+}
+
+/**
+ * Identificação do plano para rótulos de ação e diálogos: cultura + safra
+ * ("Café — Catuaí (Safra 2026)"), porque o mesmo agricultor pode ter a
+ * mesma cultura em safras diferentes.
+ */
+export function planDisplayName(
+  plan: Pick<ProductionPlan, "crop" | "harvest">,
+): string {
+  const crop = planCropLabel(plan) || "Plano sem cultura";
+  const harvest = plan.harvest?.label?.trim();
+  return harvest ? `${crop} (${harvest})` : crop;
 }

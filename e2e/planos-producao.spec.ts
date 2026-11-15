@@ -265,12 +265,12 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     // "Novo plano" é hasRole('FARMER', 'ADMIN', 'TECHNICIAN') no backend —
     // TECHNICIAN escreve, então o botão aparece (não-regressão RN da
     // migração). O delete tem exatamente as mesmas 3 roles.
-    await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
+    await expect(page.getByRole("cell", { name: /^Café — Catuaí/ })).toBeVisible();
     // Dados sociais do agricultor aparecem na mesma página, sem afetar os planos.
     await expect(page.getByRole("heading", { name: /Composição familiar/ })).toBeVisible();
     await expect(page.getByRole("cell", { name: "Maria da Silva", exact: true })).toBeVisible();
     await expect(page.getByRole("cell", { name: "PRONAF Custeio", exact: true })).toBeVisible();
-    await expect(page.getByRole("cell", { name: "Safra 2026" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Safra 2026", exact: true })).toBeVisible();
 
     // Sem seletor de produtor — o escopo vem inteiramente da URL.
     await expect(
@@ -349,7 +349,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     );
 
     await expect(
-      page.getByRole("cell", { name: /Milho — Catuaí/ }),
+      page.getByRole("cell", { name: /^Milho — Catuaí/ }),
     ).toBeVisible();
 
     // Proibição explícita: o FARMER não vê seletor de produtor nem lista
@@ -434,7 +434,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
 
     // Pré-condição: há uma linha em tela, logo a ação de linha é alcançável.
     await expect(
-      page.getByRole("cell", { name: /Milho — Catuaí/ }),
+      page.getByRole("cell", { name: /^Milho — Catuaí/ }),
     ).toBeVisible();
 
     const deleteButton = page.getByRole("button", { name: "Excluir plano" });
@@ -459,7 +459,7 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     await expect(
       page.getByText("Nenhum plano de produção cadastrado ainda."),
     ).toBeVisible();
-    await expect(page.getByRole("cell", { name: /Milho — Catuaí/ })).toHaveCount(
+    await expect(page.getByRole("cell", { name: /^Milho — Catuaí/ })).toHaveCount(
       0,
     );
     expect(planListRequests.length).toBeGreaterThanOrEqual(2);

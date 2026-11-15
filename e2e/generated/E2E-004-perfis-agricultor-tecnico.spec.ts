@@ -60,7 +60,7 @@ test.describe('E2E-004 Perfis de técnico e agricultor alinhados ao contrato da 
     // aguarda o redirecionamento pós-login
     await page.waitForURL(new RegExp(escapeRegExp('/admin')));
     await page.goto(env('E2E_COMMUNITY_PATH'));
-    await page.getByRole('button', { name: 'Novo Agricultor' }).click();
+    await page.getByRole('button', { name: 'Novo agricultor' }).click();
     await page.getByRole('combobox', { name: 'Comunidade' }).click();
     await page.getByRole('option', { name: env('E2E_COMMUNITY_NAME') }).click();
     await page.getByLabel('Nome completo', { exact: true }).fill(env('E2E_FARMER_NAME'));
@@ -76,7 +76,7 @@ test.describe('E2E-004 Perfis de técnico e agricultor alinhados ao contrato da 
     await page.getByLabel('Latitude').fill('-9.66');
     await page.getByLabel('Longitude').fill('-35.73');
     await page.getByRole('button', { name: 'Cadastrar' }).click();
-    await page.locator(`tr:has-text('${env('E2E_FARMER_NAME')}') button[aria-label='Editar agricultor']`).click();
+    await page.locator(`tr:has-text('${env('E2E_FARMER_NAME')}') button[aria-label^='Editar agricultor']`).click();
     await page.getByLabel('Endereço/Nome local').fill('Sítio Editado E2E');
     await page.getByRole('button', { name: 'Salvar alterações' }).click();
     await expect(page.getByText('Sítio Editado E2E')).toBeVisible();

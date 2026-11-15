@@ -515,7 +515,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
         `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY.id}/produtores/${PRODUCER.id}$`,
       ),
     );
-    await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
+    await expect(page.getByRole("cell", { name: /^Café — Catuaí/ })).toBeVisible();
   });
 
   test("FARMER acessando /admin/organizacoes cai direto nos próprios planos, com breadcrumb real", async ({
@@ -533,7 +533,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
         `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY.id}/produtores/${PRODUCER.id}$`,
       ),
     );
-    await expect(page.getByRole("cell", { name: /Café — Catuaí/ })).toBeVisible();
+    await expect(page.getByRole("cell", { name: /^Café — Catuaí/ })).toBeVisible();
 
     await expectBreadcrumbContains(page, [
       "Organizações",

@@ -285,3 +285,37 @@ describe("FinancingSection — formulário (UNIT-005)", () => {
     });
   });
 });
+
+describe("FinancingSection — visual do redesign", () => {
+  it("situação em Badge semântico (sem cor crua), com data-status", async () => {
+    render(<FinancingSection farmerId="f-1" canWrite={false} />);
+    await screen.findByText("PRONAF Custeio");
+    const approved = screen.getByText("Aprovado");
+    expect(approved.getAttribute("data-status")).toBe("APPROVED");
+    expect(approved.className).toContain("bg-success-muted");
+    expect(screen.getByText("Em análise").className).toContain("bg-info-muted");
+    expect(screen.getByRole("heading", { level: 3, name: /Financiamentos/ })).toBeInTheDocument();
+  });
+
+  it("Situação é um <select> nativo com a altura de controle", async () => {
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    await screen.findByText("PRONAF Custeio");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar financiamento" }));
+    const select = await screen.findByLabelText("Situação");
+    expect(select.tagName).toBe("SELECT");
+    expect(select.className).toContain("h-control");
+  });
+
+  it("vazio com escrita: dica e CTA que abre o formulário", async () => {
+    vi.mocked(listFinancings).mockResolvedValue([]);
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    expect(
+      await screen.findByText(
+        "Registre os financiamentos do agricultor com descrição, situação e valor.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar primeiro financiamento" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Novo financiamento");
+  });
+});

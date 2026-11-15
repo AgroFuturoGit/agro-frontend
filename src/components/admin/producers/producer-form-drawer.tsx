@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Sheet,
@@ -453,17 +454,9 @@ export function ProducerFormDrawer({
           className="flex flex-1 flex-col overflow-y-auto"
         >
           <div className="flex flex-1 flex-col gap-6 px-4 pb-6">
-            <div aria-live="polite">
-              {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-                >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-            </div>
+            {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta
+                (evita anúncio duplicado). */}
+            {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
 
             <Section title="Comunidade">
               {isCreate ? (
@@ -814,7 +807,7 @@ export function ProducerFormDrawer({
             <Button type="submit" disabled={submitting || !isDirty}>
               {submitting ? (
                 <>
-                  <Loader2 className="animate-spin" />
+                  <Loader2 aria-hidden="true" className="animate-spin motion-reduce:animate-none" />
                   Salvando…
                 </>
               ) : isCreate ? (

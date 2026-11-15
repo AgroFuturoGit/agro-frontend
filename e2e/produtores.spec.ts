@@ -248,7 +248,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
       page.getByText("Nenhum agricultor cadastrado nesta comunidade ainda."),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Novo Agricultor" }).click();
+    await page.getByRole("button", { name: "Novo agricultor" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -287,7 +287,7 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     });
     expect(registerBody).not.toHaveProperty("aliasName");
 
-    await expect(page.getByRole("cell", { name: producerName })).toBeVisible();
+    await expect(page.getByRole("cell", { name: producerName, exact: true })).toBeVisible();
   });
 
   test("comunidades diferentes mostram produtores diferentes — o escopo agora vem da rota, sem filtro em tela", async ({
@@ -362,9 +362,9 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
 
     await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}`);
 
-    await expect(page.getByRole("cell", { name: "Ana Serrana" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Ana Serrana", exact: true })).toBeVisible();
     await expect(
-      page.getByRole("cell", { name: "Bruno do Vale" }),
+      page.getByRole("cell", { name: "Bruno do Vale", exact: true }),
     ).toBeHidden();
     // Não existe mais seletor de comunidade nesta tela — o escopo é a URL.
     // (O único combobox da página é o "itens por página" da paginação.)
@@ -374,9 +374,9 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
 
     await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_B.id}`);
 
-    await expect(page.getByRole("cell", { name: "Bruno do Vale" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Bruno do Vale", exact: true })).toBeVisible();
     await expect(
-      page.getByRole("cell", { name: "Ana Serrana" }),
+      page.getByRole("cell", { name: "Ana Serrana", exact: true }),
     ).toBeHidden();
   });
 });

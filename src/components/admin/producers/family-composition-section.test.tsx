@@ -276,3 +276,37 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
     });
   });
 });
+
+describe("FamilyCompositionSection — visual do redesign", () => {
+  it("vazio com escrita: dica e CTA que abre o formulário, sem tabela", async () => {
+    vi.mocked(listFamilyMembers).mockResolvedValue([]);
+    render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+    expect(
+      await screen.findByText(
+        "Cadastre as pessoas da família do agricultor com nome, parentesco e idade.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("table")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Cadastrar primeiro membro" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Novo membro familiar");
+  });
+
+  it("vazio somente leitura: só a dica, sem botão", async () => {
+    vi.mocked(listFamilyMembers).mockResolvedValue([]);
+    render(<FamilyCompositionSection farmerId="f-1" canWrite={false} />);
+    expect(
+      await screen.findByText("Os membros da família aparecem aqui quando forem cadastrados."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("erro de campo fica ligado ao input por aria-describedby", async () => {
+    render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+    await screen.findByText("Maria da Silva");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar membro" }));
+    await screen.findByRole("dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    const error = await screen.findByText("O nome é obrigatório");
+    expect(screen.getByLabelText("Nome").getAttribute("aria-describedby")).toBe(error.id);
+  });
+});
