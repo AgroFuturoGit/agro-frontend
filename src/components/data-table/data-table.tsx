@@ -133,10 +133,14 @@ export function DataTable<TData, TValue>({
   if (useCardLayout) {
     return (
       <div className="flex flex-col gap-3" aria-busy={isLoading ? true : undefined}>
+        <span aria-live="polite" className="sr-only">
+          {isLoading ? "Carregando…" : ""}
+        </span>
         {isLoading ? (
           Array.from({ length: SKELETON_CARDS }).map((_, idx) => (
             <div
               key={`skeleton-card-${idx}`}
+              aria-hidden="true"
               className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4"
             >
               <Skeleton className="h-5 w-3/4" />
@@ -158,8 +162,12 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className={SURFACE}>
-      {/* aria-busy enquanto carrega: o leitor de tela não lê os skeletons
-          como conteúdo (A11Y-L2-5). */}
+      {/* aria-busy enquanto carrega e um status só para leitor de tela: os
+          skeletons ficam ocultos e o carregamento é anunciado (A11Y-L2-5,
+          A11Y-L2-R2-1). A região fica sempre montada para o anúncio ocorrer. */}
+      <span aria-live="polite" className="sr-only">
+        {isLoading ? "Carregando…" : ""}
+      </span>
       <Table aria-busy={isLoading ? true : undefined}>
         <TableHeader className="bg-card">
           {table.getHeaderGroups().map((headerGroup) => (
@@ -195,7 +203,7 @@ export function DataTable<TData, TValue>({
         <TableBody>
           {isLoading ? (
             Array.from({ length: SKELETON_ROWS }).map((_, rowIndex) => (
-              <TableRow key={`skeleton-${rowIndex}`} className="h-12">
+              <TableRow key={`skeleton-${rowIndex}`} className="h-12" aria-hidden="true">
                 {columns.map((__, cellIndex) => (
                   <TableCell
                     key={`skeleton-${rowIndex}-${cellIndex}`}

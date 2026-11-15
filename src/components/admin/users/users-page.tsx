@@ -259,7 +259,7 @@ export function UsersPage() {
         emptyTitle="Nenhum usuário cadastrado ainda."
         emptyHint={
           canManage
-            ? "Cadastre os usuários que vão acessar o painel: técnicos, gestores e administradores."
+            ? "Cadastre aqui os administradores e técnicos que vão acessar o painel."
             : "Os usuários aparecem aqui quando um administrador os cadastra."
         }
         emptyActionLabel={canManage ? "Criar primeiro usuário" : undefined}

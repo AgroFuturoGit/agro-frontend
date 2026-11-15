@@ -188,6 +188,21 @@ describe("DataTable — estado de carregamento", () => {
     );
     expect(screen.queryByText("Carlos")).toBeNull();
   });
+
+  it("anuncia 'Carregando…' numa região aria-live e esconde os skeletons do leitor de tela", () => {
+    const { container, rerender } = render(<TestHost isLoading />);
+
+    const live = container.querySelector('[aria-live="polite"].sr-only');
+    expect(live).toHaveTextContent("Carregando…");
+    expect(container.querySelector("table")).toHaveAttribute("aria-busy", "true");
+    container.querySelectorAll('[data-slot="skeleton"]').forEach((skeleton) => {
+      expect(skeleton.closest('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    rerender(<TestHost />);
+    expect(live).toHaveTextContent("");
+    expect(container.querySelector("table")).not.toHaveAttribute("aria-busy");
+  });
 });
 
 describe("DataTable — os três estados de DataTableStatus", () => {
