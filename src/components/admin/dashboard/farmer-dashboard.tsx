@@ -2,9 +2,31 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Sprout } from "lucide-react";
+import {
+  ArrowRight,
+  CircleAlert,
+  ClipboardList,
+  Clock,
+  Fence,
+  Hourglass,
+  LandPlot,
+  Sprout,
+  Target,
+  TrendingUp,
+  TriangleAlert,
+  Wheat,
+  type LucideIcon,
+} from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import {
+  DashboardToolbar,
+  FilterSelect,
+} from "@/components/admin/dashboard/dashboard-toolbar";
+import { ExportMenu } from "@/components/admin/dashboard/export-menu";
+import { EmptyState } from "@/components/admin/empty-state";
+import { KpiCard, KpiGrid } from "@/components/admin/kpi-card";
+import { SectionHeader } from "@/components/admin/section-header";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -12,16 +34,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ExportMenu } from "@/components/admin/dashboard/export-menu";
 import {
   exportFarmerSummary,
   getFarmerSummary,
@@ -29,7 +44,7 @@ import {
   type FarmerSummary,
   type ProgressStatus,
 } from "@/lib/analytics";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { getMyProducer } from "@/lib/producers";
 import {
@@ -37,8 +52,13 @@ import {
   formatPlanDate,
   PLAN_STATUS_LABELS,
 } from "@/lib/production";
+import {
+  PROGRESS_STATUS_BADGE_VARIANT,
+  PROGRESS_STATUS_VARIANT,
+} from "@/lib/status-variants";
 
 const CURRENT = "__current__";
+const LOAD_ERROR = "Não foi possível carregar o resumo da sua safra.";
 
 export const PROGRESS_LABELS: Record<ProgressStatus, string> = {
   GOAL_REACHED: "Meta atingida",
@@ -48,21 +68,28 @@ export const PROGRESS_LABELS: Record<ProgressStatus, string> = {
   NOT_STARTED: "Não iniciado",
 };
 
-const PROGRESS_BAR: Record<ProgressStatus, string> = {
-  GOAL_REACHED: "bg-green-600",
-  ON_TRACK: "bg-green-600",
-  BELOW_EXPECTED: "bg-yellow-500",
-  DELAYED: "bg-red-600",
-  NOT_STARTED: "bg-gray-400",
+// Ícone por status (a cor não é o único sinal). `undefined` = padrão do
+// Badge (CircleCheck no `success`).
+const PROGRESS_ICON: Record<ProgressStatus, LucideIcon | undefined> = {
+  GOAL_REACHED: undefined,
+  ON_TRACK: undefined,
+  BELOW_EXPECTED: TriangleAlert,
+  DELAYED: CircleAlert,
+  NOT_STARTED: Clock,
 };
 
-const PROGRESS_BADGE: Record<ProgressStatus, string> = {
-  GOAL_REACHED: "bg-green-100 text-green-800",
-  ON_TRACK: "bg-green-100 text-green-800",
-  BELOW_EXPECTED: "bg-yellow-100 text-yellow-900",
-  DELAYED: "bg-red-100 text-red-800",
-  NOT_STARTED: "bg-gray-100 text-gray-700",
+/** Ícone decorativo de cada indicador (o rótulo é o que comunica). */
+const KPI_ICONS: Record<string, LucideIcon> = {
+  "Planos de produção": ClipboardList,
+  "Talhões ativos": Fence,
+  "Área plantada": LandPlot,
+  Meta: Target,
+  "Realizado (validado)": Wheat,
+  "Pendente de validação": Hourglass,
+  Conclusão: TrendingUp,
 };
+const KPI_LABELS = Object.keys(KPI_ICONS);
+const HIGHLIGHT_KPI = "Conclusão";
 
 type Paths = { farmerId: string; org: string; community: string } | null;
 
@@ -71,11 +98,12 @@ function planHref(paths: Paths, planId: string): string | null {
   return `/admin/organizacoes/${paths.org}/comunidades/${paths.community}/produtores/${paths.farmerId}/planos/${planId}`;
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/** Par rótulo/valor dentro do cartão do plano (não é um card de KPI). */
+function MetaItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium tabular-nums">{value}</span>
+      <dt className="text-sm text-muted-foreground">{label}</dt>
+      <dd className="text-base font-medium text-foreground tabular-nums">{value}</dd>
     </div>
   );
 }
@@ -86,55 +114,55 @@ function PlanCard({ card, href }: { card: FarmerPlanCard; href: string | null })
     ? `${card.cropName} · ${card.cropVariety}`
     : card.cropName;
   return (
-    <Card data-testid="farmer-plan-card" data-progress={card.progressStatus}>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-        <CardDescription>
+    <Card
+      data-testid="farmer-plan-card"
+      data-progress={card.progressStatus}
+      className="gap-4 py-6"
+    >
+      <CardHeader className="px-6">
+        <CardTitle className="text-base font-semibold">{title}</CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">
           {card.locationDescription ? `${card.locationDescription} · ` : ""}
           {PLAN_STATUS_LABELS[card.status] ?? card.status}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${PROGRESS_BADGE[card.progressStatus]}`}
-          >
-            {PROGRESS_LABELS[card.progressStatus]}
-          </span>
-          <span className="text-sm font-semibold tabular-nums">
-            {formatNumber(card.completionPct)}%
-          </span>
-        </div>
-        <div
-          role="progressbar"
-          aria-label={`Progresso de ${title}`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(clamped)}
-          className="h-2 w-full overflow-hidden rounded-full bg-muted"
-        >
-          <div
-            data-testid="progress-fill"
-            className={`h-full rounded-full ${PROGRESS_BAR[card.progressStatus]}`}
-            style={{ width: `${clamped}%` }}
+      <CardContent className="flex flex-1 flex-col gap-4 px-6">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <Badge
+              variant={PROGRESS_STATUS_BADGE_VARIANT[card.progressStatus]}
+              icon={PROGRESS_ICON[card.progressStatus]}
+            >
+              {PROGRESS_LABELS[card.progressStatus]}
+            </Badge>
+            <span className="text-base font-semibold text-foreground tabular-nums">
+              {formatNumber(card.completionPct)}%
+            </span>
+          </div>
+          <Progress
+            value={clamped}
+            variant={PROGRESS_STATUS_VARIANT[card.progressStatus]}
+            aria-label={`Progresso de ${title}`}
+            indicatorProps={{ "data-testid": "progress-fill" }}
           />
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <Stat label="Área" value={`${formatNumber(card.plantedAreaHa)} ha`} />
-          <Stat label="Meta" value={`${formatNumber(card.targetKg)} kg`} />
-          <Stat label="Realizado" value={`${formatNumber(card.realizedKg)} kg`} />
-          <Stat label="Pendente" value={`${formatNumber(card.pendingKg)} kg`} />
-        </div>
-        <p className="text-xs text-muted-foreground">
+        <dl className="grid grid-cols-2 gap-3">
+          <MetaItem label="Área" value={`${formatNumber(card.plantedAreaHa)} ha`} />
+          <MetaItem label="Meta" value={`${formatNumber(card.targetKg)} kg`} />
+          <MetaItem label="Realizado" value={`${formatNumber(card.realizedKg)} kg`} />
+          <MetaItem label="Pendente" value={`${formatNumber(card.pendingKg)} kg`} />
+        </dl>
+        <p className="text-sm text-muted-foreground">
           Último apontamento: {formatPlanDate(card.lastExecutionDate)}
         </p>
         {href && (
           <Link
             href={href}
-            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+            className="mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             Ver plano
             <span className="sr-only"> de {title}</span>
+            <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         )}
       </CardContent>
@@ -196,9 +224,8 @@ export function FarmerDashboard() {
       if (seq !== requestSeq.current) return;
       setSummary(null);
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar o resumo da sua safra.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          LOAD_ERROR,
       );
     } finally {
       if (seq === requestSeq.current) setLoading(false);
@@ -211,71 +238,55 @@ export function FarmerDashboard() {
   }, [load, harvestId]);
 
   const selector = (
-    <div className="flex items-center gap-2">
-      <Label htmlFor="farmer-harvest" className="font-normal text-muted-foreground">
-        Safra
-      </Label>
-      <Select
-        value={harvestId}
-        onValueChange={(v) => setHarvestId(v ?? CURRENT)}
-      >
-        <SelectTrigger id="farmer-harvest" className="min-w-44">
-          <SelectValue>
-            {(v) =>
-              v === CURRENT || !v
-                ? "Safra vigente"
-                : (harvests.find((h) => h.id === v)?.label ?? "Safra vigente")
-            }
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={CURRENT}>Safra vigente</SelectItem>
-          {harvests.map((h) => (
-            <SelectItem key={h.id} value={h.id}>
-              {h.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <FilterSelect
+      id="farmer-harvest"
+      label="Safra"
+      value={harvestId}
+      onChange={setHarvestId}
+      options={[
+        { value: CURRENT, label: "Safra vigente" },
+        ...harvests.map((h) => ({ value: h.id, label: h.label })),
+      ]}
+    />
   );
 
   let body: React.ReactNode;
   if (loading) {
     body = (
       <div
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-8"
         aria-busy="true"
         aria-label="Carregando painel"
       >
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-24 rounded-xl" />
-          <Skeleton className="h-24 rounded-xl" />
+        <KpiGrid>
+          {KPI_LABELS.map((label) => (
+            <KpiCard
+              key={label}
+              label={label}
+              value={null}
+              icon={KPI_ICONS[label]}
+              highlight={label === HIGHLIGHT_KPI}
+              loading
+            />
+          ))}
+        </KpiGrid>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-7 w-48" />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Skeleton className="h-72 rounded-xl" />
+            <Skeleton className="h-72 rounded-xl" />
+            <Skeleton className="h-72 rounded-xl" />
+          </div>
         </div>
-        <Skeleton className="h-40 w-full rounded-xl" />
       </div>
     );
   } else if (error) {
     body = (
-      <div
-        role="alert"
-        className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+      <InlineAlert
+        action={{ label: "Tentar novamente", onClick: () => load(harvestId) }}
       >
-        <div className="flex items-start gap-2">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => load(harvestId)}
-        >
-          Tentar novamente
-        </Button>
-      </div>
+        {error}
+      </InlineAlert>
     );
   } else if (summary) {
     const plansHref = paths
@@ -283,27 +294,17 @@ export function FarmerDashboard() {
       : null;
     if (summary.isEmpty) {
       body = (
-        <Card className="border-dashed bg-transparent ring-0 shadow-none">
-          <CardHeader className="items-center text-center">
-            <Sprout className="size-6 text-muted-foreground" aria-hidden />
-            <CardTitle className="text-base">
-              Você ainda não tem planos de produção nesta safra
-            </CardTitle>
-            <CardDescription>
-              Cadastre o seu primeiro plano de produção ou fale com o seu
-              técnico para planejar a safra. Depois dos apontamentos validados,
-              o progresso aparece aqui.
-            </CardDescription>
-            {plansHref && (
-              <Link
-                href={plansHref}
-                className="mt-2 text-sm font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Ir para os meus planos
-              </Link>
-            )}
-          </CardHeader>
-        </Card>
+        <EmptyState
+          variant="dashed"
+          icon={Sprout}
+          title="Você ainda não tem planos de produção nesta safra"
+          hint="Cadastre o seu primeiro plano de produção ou fale com o seu técnico para planejar a safra. Depois dos apontamentos validados, o progresso aparece aqui."
+          action={
+            plansHref
+              ? { label: "Ir para os meus planos", href: plansHref, variant: "default" }
+              : undefined
+          }
+        />
       );
     } else {
       const totals: [string, string][] = [
@@ -316,32 +317,36 @@ export function FarmerDashboard() {
         ["Conclusão", `${formatNumber(summary.overallCompletionPct)}%`],
       ];
       body = (
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {totals.map(([label, value]) => (
-              <Card key={label}>
-                <CardHeader>
-                  <CardDescription>{label}</CardDescription>
-                  <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
-                    {value}
-                  </CardTitle>
-                </CardHeader>
-              </Card>
-            ))}
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <KpiGrid>
+              {totals.map(([label, value]) => (
+                <KpiCard
+                  key={label}
+                  label={label}
+                  value={value}
+                  icon={KPI_ICONS[label]}
+                  highlight={label === HIGHLIGHT_KPI}
+                />
+              ))}
+            </KpiGrid>
+            <p className="text-sm text-muted-foreground">
+              O realizado conta apenas apontamentos validados; o pendente são
+              apontamentos que aguardam validação.
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            O realizado conta apenas apontamentos validados; o pendente são
-            apontamentos que aguardam validação.
-          </p>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {summary.plans.map((card) => (
-              <PlanCard
-                key={card.planId}
-                card={card}
-                href={planHref(paths, card.planId)}
-              />
-            ))}
-          </div>
+          <section className="flex min-w-0 flex-col gap-4" aria-labelledby="farmer-plans">
+            <SectionHeader id="farmer-plans" title="Meus planos de produção" />
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {summary.plans.map((card) => (
+                <PlanCard
+                  key={card.planId}
+                  card={card}
+                  href={planHref(paths, card.planId)}
+                />
+              ))}
+            </div>
+          </section>
         </div>
       );
     }
@@ -349,25 +354,29 @@ export function FarmerDashboard() {
     body = null;
   }
 
+  const heading =
+    loading && !summary ? (
+      <Skeleton aria-hidden="true" className="h-6 w-40" />
+    ) : summary?.currentHarvest ? (
+      <p className="text-base font-medium text-foreground">
+        {`Safra: ${summary.currentHarvest.label}`}
+      </p>
+    ) : null;
+
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
-          {summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : ""}
-        </p>
-        <div className="flex flex-wrap items-start gap-3">
-          {selector}
-          <ExportMenu
-            disabled={loading || error !== null}
-            onExport={(format) =>
-              exportFarmerSummary(
-                format,
-                harvestId === CURRENT ? undefined : harvestId,
-              )
-            }
-          />
-        </div>
-      </div>
+    <div className="flex min-w-0 flex-col gap-6">
+      <DashboardToolbar heading={heading}>
+        {selector}
+        <ExportMenu
+          disabled={loading || error !== null}
+          onExport={(format) =>
+            exportFarmerSummary(
+              format,
+              harvestId === CURRENT ? undefined : harvestId,
+            )
+          }
+        />
+      </DashboardToolbar>
       {body}
     </div>
   );

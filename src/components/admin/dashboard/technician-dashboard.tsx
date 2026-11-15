@@ -111,57 +111,71 @@ function ComplianceBadge({ compliant }: { compliant: boolean }) {
   );
 }
 
+// 11 colunas precisam caber em 1440px sem rolagem: cabeçalhos longos
+// quebram linha e nomes quebram dentro de uma largura mínima.
+const WRAP_HEADER = "whitespace-normal leading-tight";
+const TEXT_CELL = "min-w-28 whitespace-normal";
+const NUMERIC = { numeric: true, headerClassName: WRAP_HEADER } as const;
+
 const farmerColumns: ColumnDef<TechnicianFarmerSummary>[] = [
   {
     accessorKey: "farmerName",
     header: "Agricultor",
-    cell: ({ row }) => (
-      <span className="font-medium">{row.original.farmerName}</span>
-    ),
+    meta: { cellVariant: "primary", cellClassName: TEXT_CELL },
+    cell: ({ row }) => row.original.farmerName,
   },
   {
     accessorKey: "communityName",
     header: "Comunidade",
+    meta: { cellClassName: TEXT_CELL },
     cell: ({ row }) => row.original.communityName ?? "—",
   },
   {
     id: "plans",
+    meta: NUMERIC,
     header: "Planos (ativos)",
     cell: ({ row }) =>
       `${formatNumber(row.original.plansCount)} (${formatNumber(row.original.activePlansCount)})`,
   },
   {
     id: "area",
+    meta: NUMERIC,
     header: "Área (ha)",
     cell: ({ row }) => formatNumber(row.original.plantedAreaHa),
   },
   {
     id: "target",
+    meta: NUMERIC,
     header: "Meta (kg)",
     cell: ({ row }) => formatNumber(row.original.targetKg),
   },
   {
     id: "realized",
+    meta: NUMERIC,
     header: "Realizado (kg)",
     cell: ({ row }) => formatNumber(row.original.realizedKg),
   },
   {
     id: "pending",
+    meta: NUMERIC,
     header: "Pendente (kg)",
     cell: ({ row }) => formatNumber(row.original.pendingKg),
   },
   {
     id: "completion",
+    meta: NUMERIC,
     header: "% conclusão",
     cell: ({ row }) => `${formatNumber(row.original.completionPct)}%`,
   },
   {
     id: "last",
+    meta: { headerClassName: WRAP_HEADER },
     header: "Último apontamento",
     cell: ({ row }) => formatPlanDate(row.original.lastExecutionDate),
   },
   {
     id: "warnings",
+    meta: NUMERIC,
     header: "Alertas",
     cell: ({ row }) => formatNumber(row.original.warningsCount),
   },

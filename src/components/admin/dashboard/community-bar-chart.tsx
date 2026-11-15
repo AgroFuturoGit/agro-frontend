@@ -8,6 +8,7 @@ import type { TechnicianCommunitySummary } from "@/lib/analytics";
 import {
   CHART_HEIGHT,
   escapeHtml,
+  formatAxisNumber,
   kg,
   useEchart,
   type ChartColors,
@@ -88,7 +89,7 @@ export function buildCommunityChartOption(
       type: "value",
       name: "kg",
       nameTextStyle: { color: colors.text },
-      axisLabel: { color: colors.text },
+      axisLabel: { color: colors.text, formatter: formatAxisNumber },
       splitLine: { lineStyle: { color: colors.grid } },
     },
     series: [

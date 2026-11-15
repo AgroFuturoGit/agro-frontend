@@ -9,6 +9,7 @@ import { formatNumber } from "@/lib/production";
 import {
   CHART_HEIGHT,
   escapeHtml,
+  formatAxisNumber,
   kg,
   useEchart,
   type ChartColors,
@@ -87,7 +88,7 @@ export function buildCommunityTargetOption(
       type: "value",
       name: "kg",
       nameTextStyle: { color: colors.text },
-      axisLabel: { color: colors.text },
+      axisLabel: { color: colors.text, formatter: formatAxisNumber },
       splitLine: { lineStyle: { color: colors.grid } },
     },
     series: [

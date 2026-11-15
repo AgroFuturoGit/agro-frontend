@@ -20,7 +20,12 @@ import { formatNumber } from "@/lib/production";
 
 import { readChartFontFamily, readToken, toRgb } from "./chart-tokens";
 
-export { readChartFontFamily, readToken, toRgb } from "./chart-tokens";
+export {
+  formatAxisNumber,
+  readChartFontFamily,
+  readToken,
+  toRgb,
+} from "./chart-tokens";
 
 registerEcharts([
   BarChart,

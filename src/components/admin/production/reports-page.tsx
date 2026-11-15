@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowRight } from "lucide-react";
+import { ArrowRight, ClipboardList, Info } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/admin/empty-state";
+import { PageHeader } from "@/components/admin/page-header";
+import { SectionHeader } from "@/components/admin/section-header";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -12,8 +15,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { InlineAlert } from "@/components/ui/inline-alert";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { getMyProducer, type Producer } from "@/lib/producers";
 import {
   formatNumber,
@@ -24,6 +30,11 @@ import {
 } from "@/lib/production";
 
 import { ComparisonSummary } from "./comparison-summary";
+
+const LOAD_ERROR = "Não foi possível carregar os relatórios.";
+
+const planTitle = (plan: ProductionPlan) =>
+  plan.crop ? `${plan.crop.name} — ${plan.crop.variety}` : "Plano";
 
 type PlanReport = {
   plan: ProductionPlan;
@@ -65,9 +76,8 @@ export function ReportsPage() {
       setReports(data);
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar os relatórios.",
+        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+          LOAD_ERROR,
       );
     } finally {
       setLoading(false);
@@ -122,165 +132,146 @@ export function ReportsPage() {
     [withComparison],
   );
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">Relatórios</h2>
-        <p className="text-sm text-muted-foreground">
-          Comparativo de previsto vs realizado (em kg) por plano de produção. Somente apontamentos validados contam no realizado.
-        </p>
-      </div>
+  const producerBase = producer?.community?.organization
+    ? `/admin/organizacoes/${producer.community.organization.id}/comunidades/${producer.community.id}/produtores/${producer.id}`
+    : null;
 
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-        >
-          <div className="flex items-start gap-2">
-            <AlertCircle className="mt-0.5 size-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => refresh()}
-          >
-            Tentar novamente
-          </Button>
+  let body: React.ReactNode;
+  if (loading) {
+    body = (
+      <div className="flex flex-col gap-8" aria-busy="true" aria-label="Carregando relatórios">
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-7 w-40" />
+          <ComparisonSummary comparison={null} loading />
         </div>
-      )}
+        <Skeleton className="h-56 w-full rounded-xl" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-64 w-full rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  } else if (reports.length === 0) {
+    // Com erro na primeira carga, o alerta basta: não mostrar um vazio falso.
+    body = error ? null : (
+      <EmptyState
+        variant="dashed"
+        icon={ClipboardList}
+        title="Nenhum plano de produção para exibir"
+        hint="Cadastre um plano de produção para começar. O comparativo de previsto e realizado aparece aqui."
+        action={
+          producerBase
+            ? { label: "Ir para os meus planos", href: producerBase, variant: "default" }
+            : undefined
+        }
+      />
+    );
+  } else {
+    body = (
+      <div className="flex flex-col gap-8">
+        {totals && (
+          <section className="flex flex-col gap-4" aria-labelledby="reports-total">
+            <SectionHeader
+              id="reports-total"
+              title="Consolidado"
+              description={`Soma de ${withComparison.length} ${
+                withComparison.length === 1 ? "plano" : "planos"
+              } de produção.`}
+            />
+            <ComparisonSummary comparison={totals} />
+          </section>
+        )}
 
-      {loading ? (
-        <>
-          <Skeleton className="h-40 w-full rounded-xl" />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, idx) => (
-              <Skeleton key={idx} className="h-44 w-full rounded-xl" />
-            ))}
-          </div>
-        </>
-      ) : reports.length === 0 ? (
-        <Card className="border-dashed bg-transparent ring-0 shadow-none">
-          <CardHeader className="items-center text-center">
-            <CardDescription>
-              Nenhum plano de produção para exibir. Cadastre um plano de
-              produção para começar.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <>
-          {totals && (
-            <section className="flex flex-col gap-3">
-              <h3 className="text-lg font-semibold tracking-tight">
-                Consolidado
-              </h3>
-              <p className="-mt-1 text-sm text-muted-foreground">
-                Soma de {withComparison.length}{" "}
-                {withComparison.length === 1 ? "plano" : "planos"} de produção.
-              </p>
-              <ComparisonSummary comparison={totals} />
-            </section>
-          )}
+        {withComparison.length > 0 && (
+          <section className="flex flex-col gap-4" aria-labelledby="reports-chart">
+            <SectionHeader
+              id="reports-chart"
+              title="Previsto vs Realizado por plano"
+              description="Comparação da colheita prevista e realizada de cada cultivo."
+            />
+            <Card className="gap-4 p-6">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="size-3 rounded-sm bg-primary/15 ring-1 ring-primary/30"
+                  />
+                  Previsto
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <span aria-hidden="true" className="size-3 rounded-sm bg-primary" />
+                  Realizado
+                </span>
+              </div>
 
-          {withComparison.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Previsto vs Realizado por plano</CardTitle>
-                <CardDescription>
-                  Comparação da colheita prevista e realizada de cada cultivo.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-sm bg-primary/15 ring-1 ring-primary/30" />
-                    Previsto
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-sm bg-primary" />
-                    Realizado
-                  </span>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                  {withComparison.map(({ plan, comparison }) => (
-                    <div key={plan.id} className="flex flex-col gap-1">
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {plan.crop
-                            ? `${plan.crop.name} — ${plan.crop.variety}`
-                            : "Plano"}
-                        </span>
-                        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {formatNumber(comparison.totalActualYield)} /{" "}
-                          {formatNumber(comparison.expectedYield)} kg
-                        </span>
-                      </div>
-                      <div className="relative h-7 w-full overflow-hidden rounded-md bg-muted">
-                        <div
-                          className="absolute inset-y-0 left-0 rounded-md bg-primary/15 ring-1 ring-inset ring-primary/25"
-                          style={{
-                            width: `${(comparison.expectedYield / chartMax) * 100}%`,
-                          }}
-                        />
-                        <div
-                          className="absolute inset-y-1 left-0 rounded-sm bg-primary transition-all"
-                          style={{
-                            width: `${(comparison.totalActualYield / chartMax) * 100}%`,
-                          }}
-                        />
-                      </div>
+              <ul className="flex flex-col gap-4">
+                {withComparison.map(({ plan, comparison }) => (
+                  <li key={plan.id} className="flex flex-col gap-1">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {planTitle(plan)}
+                      </span>
+                      <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
+                        {formatNumber(comparison.totalActualYield)} /{" "}
+                        {formatNumber(comparison.expectedYield)} kg
+                      </span>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
+                    <div aria-hidden="true" className="relative h-7 w-full overflow-hidden rounded-md bg-muted">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-md bg-primary/15 ring-1 ring-inset ring-primary/25"
+                        style={{
+                          width: `${(comparison.expectedYield / chartMax) * 100}%`,
+                        }}
+                      />
+                      <div
+                        className="absolute inset-y-1 left-0 rounded-sm bg-primary transition-all motion-reduce:transition-none"
+                        style={{
+                          width: `${(comparison.totalActualYield / chartMax) * 100}%`,
+                        }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </Card>
-          )}
+          </section>
+        )}
 
+        <section className="flex flex-col gap-4" aria-labelledby="reports-plans">
+          <SectionHeader id="reports-plans" title="Por plano de produção" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {reports.map(({ plan, comparison }) => {
               const percentage = comparison?.percentageRealized ?? 0;
               return (
-                <Card key={plan.id}>
-                  <CardHeader>
-                    <CardTitle className="truncate">
-                      {plan.crop
-                        ? `${plan.crop.name} — ${plan.crop.variety}`
-                        : "Plano"}
+                <Card key={plan.id} className="gap-4 py-6">
+                  <CardHeader className="px-6">
+                    <CardTitle className="truncate text-base font-semibold">
+                      {planTitle(plan)}
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="text-sm text-muted-foreground">
                       Safra {plan.harvest?.label ?? "—"}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex flex-col gap-3">
+                  <CardContent className="flex flex-1 flex-col gap-4 px-6">
                     {comparison ? (
                       <>
-                        <div className="flex items-baseline justify-between">
-                          <span className="text-3xl font-semibold tabular-nums text-primary">
-                            {formatNumber(percentage)}%
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            da meta
-                          </span>
-                        </div>
-                        <div
-                          className="h-2 w-full overflow-hidden rounded-full bg-muted"
-                          role="progressbar"
-                          aria-label="Progresso da produção em relação à meta"
-                          aria-valuenow={Math.round(percentage)}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                        >
-                          <div
-                            className="h-full rounded-full bg-primary transition-all"
-                            style={{
-                              width: `${Math.max(0, Math.min(100, percentage))}%`,
-                            }}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-kpi font-bold text-foreground tabular-nums">
+                              {formatNumber(percentage)}%
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              da meta
+                            </span>
+                          </div>
+                          <Progress
+                            value={Math.max(0, Math.min(100, percentage))}
+                            variant="primary"
+                            aria-label="Progresso da produção em relação à meta"
                           />
                         </div>
-                        <div className="flex justify-between text-sm text-muted-foreground">
+                        <div className="flex justify-between gap-2 text-sm text-muted-foreground">
                           <span>
                             Realizado{" "}
                             <span className="font-medium text-foreground tabular-nums">
@@ -296,35 +287,48 @@ export function ReportsPage() {
                         </div>
                       </>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Info aria-hidden="true" className="size-4 shrink-0" />
                         Comparativo indisponível.
                       </p>
                     )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      nativeButton={false}
-                      className="mt-1 self-start"
-                      render={
-                        <Link
-                          href={
-                            producer?.community?.organization
-                              ? `/admin/organizacoes/${producer.community.organization.id}/comunidades/${producer.community.id}/produtores/${producer.id}/planos/${plan.id}`
-                              : "/admin/organizacoes"
-                          }
-                        >
-                          Ver detalhes
-                          <ArrowRight />
-                        </Link>
+                    {/* Link de verdade (role=link) com o visual do botão outline. */}
+                    <Link
+                      href={
+                        producerBase
+                          ? `${producerBase}/planos/${plan.id}`
+                          : "/admin/organizacoes"
                       }
-                    />
+                      className={cn(buttonVariants({ variant: "outline" }), "mt-auto self-start")}
+                    >
+                      Ver detalhes
+                      <span className="sr-only"> de {planTitle(plan)}</span>
+                      <ArrowRight aria-hidden="true" />
+                    </Link>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
-        </>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Relatórios"
+        description="Comparativo de previsto vs realizado (em kg) por plano de produção. Somente apontamentos validados contam no realizado."
+      />
+
+      {error && (
+        <InlineAlert action={{ label: "Tentar novamente", onClick: () => refresh() }}>
+          {error}
+        </InlineAlert>
       )}
+
+      {body}
     </div>
   );
 }

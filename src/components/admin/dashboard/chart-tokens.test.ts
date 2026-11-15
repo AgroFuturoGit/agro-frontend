@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  formatAxisNumber,
   readChartFontFamily,
   readToken,
   toRgb,
@@ -62,5 +63,13 @@ describe("chart-tokens", () => {
     expect(utils.toRgb).toBe(toRgb);
     expect(utils.readToken).toBe(readToken);
     expect(utils.readChartFontFamily).toBe(readChartFontFamily);
+  });
+});
+
+describe("formatAxisNumber", () => {
+  it("usa o separador pt-BR (30.000; 2,5)", () => {
+    expect(formatAxisNumber(30000)).toBe("30.000");
+    expect(formatAxisNumber(2.5)).toBe("2,5");
+    expect(formatAxisNumber(0)).toBe("0");
   });
 });

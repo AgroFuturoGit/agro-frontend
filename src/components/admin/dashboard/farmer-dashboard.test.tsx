@@ -130,16 +130,16 @@ describe("FarmerDashboard (UNIT-003..006)", () => {
     const cards = await screen.findAllByTestId("farmer-plan-card");
     expect(cards).toHaveLength(5);
     const expected: [string, string, string][] = [
-      ["ON_TRACK", "No ritmo", "bg-green-600"],
-      ["GOAL_REACHED", "Meta atingida", "bg-green-600"],
-      ["BELOW_EXPECTED", "Abaixo do esperado", "bg-yellow-500"],
-      ["DELAYED", "Atrasado", "bg-red-600"],
-      ["NOT_STARTED", "Não iniciado", "bg-gray-400"],
+      ["ON_TRACK", "No ritmo", "success"],
+      ["GOAL_REACHED", "Meta atingida", "success"],
+      ["BELOW_EXPECTED", "Abaixo do esperado", "warning"],
+      ["DELAYED", "Atrasado", "destructive"],
+      ["NOT_STARTED", "Não iniciado", "muted"],
     ];
     cards.forEach((el, i) => {
       expect(el.getAttribute("data-progress")).toBe(expected[i][0]);
       expect(el.textContent).toContain(expected[i][1]);
-      expect(el.querySelector('[data-testid="progress-fill"]')!.className).toContain(expected[i][2]);
+      expect(el.querySelector('[data-testid="progress-fill"]')!.getAttribute("data-variant")).toBe(expected[i][2]);
     });
     // 112%: número real, barra em 100%.
     expect(cards[1].textContent).toContain("112%");
