@@ -36,3 +36,25 @@ export function readChartFontFamily(): string | undefined {
   if (typeof document === "undefined" || !document.body) return undefined;
   return getComputedStyle(document.body).fontFamily || undefined;
 }
+
+/**
+ * Rótulo numérico dos eixos no formato pt-BR (30.000; 2,5). O ECharts usa
+ * o separador en por padrão.
+ */
+export function formatAxisNumber(value: number): string {
+  return value.toLocaleString("pt-BR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * `textStyle` do ECharts com a cor e, quando houver, a fonte do sistema.
+ * Ponto único da regra de fonte dos gráficos (raiz e tooltip).
+ */
+export function chartTextStyle(
+  color: string,
+  fontFamily?: string,
+): { color: string; fontFamily?: string } {
+  return fontFamily ? { color, fontFamily } : { color };
+}

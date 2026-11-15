@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { harvestText } from "@/lib/harvest-label";
 import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
 import { readUserFromStorage, type Role } from "@/lib/auth";
@@ -120,13 +121,6 @@ function canDecideExecution(role: Role | null, execution: ProductionExecution) {
 function canWriteEvidence(role: Role | null, execution: ProductionExecution | null) {
   if (role === "FARMER") return execution?.status !== "VALIDATED";
   return role === "ADMIN" || role === "TECHNICIAN";
-}
-
-/** Rótulos de safra costumam já começar com "Safra": evita "Safra Safra 2026". */
-function harvestText(label: string | null | undefined): string {
-  const value = label?.trim();
-  if (!value) return "Safra —";
-  return /^safra\b/i.test(value) ? value : `Safra ${value}`;
 }
 
 /**

@@ -10,28 +10,39 @@ import {
   type Row,
   type Table as ReactTableInstance,
 } from "@tanstack/react-table";
-import { AlertCircle, Sprout } from "lucide-react";
+import {
+  Building2,
+  ClipboardList,
+  LandPlot,
+  MapPin,
+  Sprout,
+  Target,
+  TrendingUp,
+  Users,
+  Wheat,
+  type LucideIcon,
+} from "lucide-react";
 
 import { CommunityTargetChart } from "@/components/admin/dashboard/community-target-chart";
 import { CropShareChart } from "@/components/admin/dashboard/crop-share-chart";
+import {
+  DashboardToolbar,
+  FilterSelect,
+  type FilterOption,
+} from "@/components/admin/dashboard/dashboard-toolbar";
+import {
+  NAME_CELL,
+  NUMERIC,
+  WRAP_HEADER,
+} from "@/components/admin/dashboard/table-meta";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { ExportMenu } from "@/components/admin/dashboard/export-menu";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { EmptyState } from "@/components/admin/empty-state";
+import { KpiCard, KpiGrid } from "@/components/admin/kpi-card";
+import { SectionHeader } from "@/components/admin/section-header";
+import { Card } from "@/components/ui/card";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   exportGlobalSummary,
@@ -43,7 +54,7 @@ import {
   type ManagementSummary,
   type ManagementOrganizationSummary,
 } from "@/lib/analytics";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { listCommunities } from "@/lib/communities";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { listOrganizations, type Organization } from "@/lib/organizations";
@@ -51,52 +62,24 @@ import { formatNumber, formatPlanDate } from "@/lib/production";
 
 const ALL = "__all__";
 const CURRENT = "__current__";
+const LOAD_ERROR = "Não foi possível carregar o painel de gestão.";
 
-type Option = { value: string; label: string };
-
-function FilterSelect({
-  id,
-  label,
-  value,
-  onChange,
-  options,
-  disabled,
-}: {
-  id: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: Option[];
-  disabled?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <Label htmlFor={id} className="font-normal text-muted-foreground">
-        {label}
-      </Label>
-      <Select
-        value={value}
-        disabled={disabled}
-        onValueChange={(v) => onChange(v ?? options[0].value)}
-      >
-        <SelectTrigger id={id} className="min-w-40">
-          <SelectValue>
-            {(v) => options.find((o) => o.value === v)?.label ?? options[0].label}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
 
 const pct = (value: number) => `${formatNumber(value)}%`;
+
+/** Ícone decorativo de cada indicador (o rótulo é o que comunica). */
+const KPI_ICONS = {
+  "Organizações": Building2,
+  "Volume previsto": Target,
+  "Volume colhido (validado)": Wheat,
+  "Taxa de conversão": TrendingUp,
+  "Comunidades ativas": MapPin,
+  "Agricultores": Users,
+  "Planos de produção": ClipboardList,
+  "Área plantada": LandPlot,
+} as const satisfies Record<string, LucideIcon>;
+type KpiLabel = keyof typeof KPI_ICONS;
+const HIGHLIGHT_KPI = "Taxa de conversão";
 
 function Section({
   id,
@@ -108,10 +91,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={id}>
-      <h3 id={id} className="text-lg font-semibold tracking-tight">
-        {title}
-      </h3>
+    <section className="flex min-w-0 flex-col gap-4" aria-labelledby={id}>
+      <SectionHeader id={id} title={title} />
       {children}
     </section>
   );
@@ -154,7 +135,7 @@ function MobileCard({
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
         {items.map(([label, value]) => (
           <div key={label} className="flex flex-col">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dt className="text-sm text-muted-foreground">{label}</dt>
             <dd>{value}</dd>
           </div>
         ))}
@@ -190,18 +171,19 @@ const cropName = (c: ManagementCropRankingItem) =>
   `${c.cropName}${c.cropVariety ? ` (${c.cropVariety})` : ""}`;
 
 const cropColumns: ColumnDef<ManagementCropRankingItem>[] = [
-  { id: "rank", header: "#", cell: ({ row }) => row.original.rankPosition },
+  { id: "rank", meta: NUMERIC, header: "#", cell: ({ row }) => row.original.rankPosition },
   {
     id: "crop",
+    meta: NAME_CELL,
     header: "Cultura",
     cell: ({ row }) => <span className="font-medium">{cropName(row.original)}</span>,
   },
-  { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
-  { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
-  { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
-  { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
-  { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
-  { id: "share", header: "Participação", cell: ({ row }) => pct(row.original.productionSharePct) },
+  { id: "plans", meta: NUMERIC, header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+  { id: "area", meta: NUMERIC, header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+  { id: "target", meta: NUMERIC, header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+  { id: "realized", meta: NUMERIC, header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+  { id: "conversion", meta: NUMERIC, header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+  { id: "share", meta: NUMERIC, header: "Participação", cell: ({ row }) => pct(row.original.productionSharePct) },
 ];
 
 function CropRankingTable({ summary }: { summary: ManagementSummary }) {
@@ -241,6 +223,7 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
     () => [
       {
         id: "community",
+        meta: NAME_CELL,
         header: "Comunidade",
         cell: ({ row }) => <span className="font-medium">{row.original.communityName}</span>,
       },
@@ -248,20 +231,21 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
         ? [
             {
               id: "organization",
+              meta: NAME_CELL,
               header: "Organização",
               cell: ({ row }: { row: Row<ManagementCommunityPerformance> }) =>
                 row.original.organizationName ?? "—",
             },
           ]
         : []),
-      { id: "farmers", header: "Agricultores ativos", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
-      { id: "compliance", header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
-      { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
-      { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
-      { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
-      { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
-      { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
-      { id: "last", header: "Último apontamento", cell: ({ row }) => formatPlanDate(row.original.lastExecutionDate) },
+      { id: "farmers", meta: NUMERIC, header: "Agricultores ativos", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
+      { id: "compliance", meta: NUMERIC, header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
+      { id: "plans", meta: NUMERIC, header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+      { id: "area", meta: NUMERIC, header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+      { id: "target", meta: NUMERIC, header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+      { id: "realized", meta: NUMERIC, header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+      { id: "conversion", meta: NUMERIC, header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+      { id: "last", meta: { headerClassName: WRAP_HEADER }, header: "Último apontamento", cell: ({ row }) => formatPlanDate(row.original.lastExecutionDate) },
     ],
     [global],
   );
@@ -297,17 +281,18 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
 const organizationColumns: ColumnDef<ManagementOrganizationSummary>[] = [
   {
     id: "organization",
+    meta: NAME_CELL,
     header: "Organização",
     cell: ({ row }) => <span className="font-medium">{row.original.organizationName}</span>,
   },
-  { id: "communities", header: "Comunidades", cell: ({ row }) => formatNumber(row.original.communitiesCount) },
-  { id: "farmers", header: "Agricultores", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
-  { id: "compliance", header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
-  { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
-  { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
-  { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
-  { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
-  { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+  { id: "communities", meta: NUMERIC, header: "Comunidades", cell: ({ row }) => formatNumber(row.original.communitiesCount) },
+  { id: "farmers", meta: NUMERIC, header: "Agricultores", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
+  { id: "compliance", meta: NUMERIC, header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
+  { id: "plans", meta: NUMERIC, header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+  { id: "area", meta: NUMERIC, header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+  { id: "target", meta: NUMERIC, header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+  { id: "realized", meta: NUMERIC, header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+  { id: "conversion", meta: NUMERIC, header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
 ];
 
 function OrganizationsTable({ summary }: { summary: ManagementSummary }) {
@@ -352,7 +337,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
   const [error, setError] = useState<{ message: string; status: number | null } | null>(null);
   const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [communityOptions, setCommunityOptions] = useState<Option[]>([]);
+  const [communityOptions, setCommunityOptions] = useState<FilterOption[]>([]);
   const [managerOrgId, setManagerOrgId] = useState<string | null>(null);
   const [harvestId, setHarvestId] = useState(CURRENT);
   const [organizationId, setOrganizationId] = useState(ALL);
@@ -424,9 +409,8 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
         setSummary(null);
         setError({
           message:
-            err instanceof ApiError
-              ? err.message
-              : "Não foi possível carregar o painel de gestão.",
+            (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+            LOAD_ERROR,
           status: err instanceof ApiError ? err.status : null,
         });
       } finally {
@@ -455,7 +439,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
   };
 
   const filters = (
-    <div className="flex flex-wrap items-center gap-3">
+    <>
       <FilterSelect
         id="mgmt-harvest"
         label="Safra"
@@ -501,81 +485,87 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
             : exportManagerSummary(format, params);
         }}
       />
-    </div>
+    </>
   );
+
+  // Rótulos dos indicadores na ordem em que aparecem (o skeleton usa os mesmos).
+  const showOrgCount = isAdmin && organizationId === ALL;
+  const kpiLabels: KpiLabel[] = [
+    ...(showOrgCount ? (["Organizações"] as const) : []),
+    "Volume previsto",
+    "Volume colhido (validado)",
+    "Taxa de conversão",
+    "Comunidades ativas",
+    "Agricultores",
+    "Planos de produção",
+    "Área plantada",
+  ];
 
   let body: React.ReactNode = null;
   if (loading) {
     body = (
-      <div className="flex flex-col gap-4" aria-busy="true" aria-label="Carregando painel">
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
+      <div
+        className="flex flex-col gap-8"
+        role="region"
+        aria-busy="true"
+        aria-label="Carregando painel"
+      >
+        <KpiGrid>
+          {kpiLabels.map((label) => (
+            <KpiCard
+              key={label}
+              label={label}
+              value={null}
+              reserveHint={label === "Agricultores"}
+              icon={KPI_ICONS[label]}
+              highlight={label === HIGHLIGHT_KPI}
+              loading
+            />
           ))}
+        </KpiGrid>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
-        <Skeleton className="h-40 w-full rounded-xl" />
       </div>
     );
   } else if (error) {
     body = (
-      <div
-        role="alert"
-        className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+      <InlineAlert
+        actions={[
+          ...(hasFilters ? [{ label: "Limpar filtros", onClick: clearFilters }] : []),
+          {
+            label: "Tentar novamente",
+            onClick: () => load(harvestId, organizationId, communityId),
+          },
+        ]}
       >
-        <div className="flex items-start gap-2">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          <span>{error.message}</span>
-        </div>
-        <div className="flex gap-2">
-          {hasFilters && (
-            <Button type="button" variant="outline" size="sm" onClick={clearFilters}>
-              Limpar filtros
-            </Button>
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => load(harvestId, organizationId, communityId)}
-          >
-            Tentar novamente
-          </Button>
-        </div>
-      </div>
+        {error.message}
+      </InlineAlert>
     );
   } else if (summary) {
     // O back devolve `isEmpty: false` mesmo sem planos na safra: sem planos também é vazio.
     if (summary.isEmpty || summary.totalPlansCount === 0) {
       body = (
-        <Card className="border-dashed bg-transparent ring-0 shadow-none">
-          <CardHeader className="items-center text-center">
-            <Sprout className="size-6 text-muted-foreground" aria-hidden />
-            <CardTitle className="text-base">
-              Nenhum plano de produção para este recorte
-            </CardTitle>
-            <CardDescription>
-              Quando houver planos de produção com apontamentos validados, os
-              indicadores aparecem aqui.
-            </CardDescription>
-            {hasFilters && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mt-2"
-                onClick={clearFilters}
-              >
-                Limpar filtros
-              </Button>
-            )}
-          </CardHeader>
-        </Card>
+        <EmptyState
+          variant="dashed"
+          icon={Sprout}
+          title="Nenhum plano de produção para este recorte"
+          hint={
+            hasFilters
+              ? "Quando houver planos de produção com apontamentos validados, os indicadores aparecem aqui. Tente outro recorte ou limpe os filtros."
+              : "Quando houver planos de produção com apontamentos validados, os indicadores aparecem aqui."
+          }
+          action={
+            hasFilters ? { label: "Limpar filtros", onClick: clearFilters } : undefined
+          }
+        />
       );
     } else {
-      const showOrgCount = summary.scope === "GLOBAL" && organizationId === ALL;
-      const totals: [string, string, string?][] = [
-        ...(showOrgCount
-          ? ([["Organizações", formatNumber(summary.totalOrganizationsCount)]] as [string, string][])
+      const showOrgs = summary.scope === "GLOBAL" && organizationId === ALL;
+      const totals: [KpiLabel, string, string?][] = [
+        ...(showOrgs
+          ? ([["Organizações", formatNumber(summary.totalOrganizationsCount)]] as [KpiLabel, string][])
           : []),
         ["Volume previsto", `${formatNumber(summary.totalTargetKg)} kg`],
         ["Volume colhido (validado)", `${formatNumber(summary.totalRealizedKg)} kg`],
@@ -590,22 +580,24 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
         ["Área plantada", `${formatNumber(summary.totalPlantedAreaHa)} ha`],
       ];
       body = (
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {totals.map(([label, value, hint]) => (
-              <Card
-                key={label}
-                className={label === "Taxa de conversão" ? "border-primary/40 bg-primary/5" : undefined}
-              >
-                <CardHeader>
-                  <CardDescription>{label}</CardDescription>
-                  <CardTitle className="text-2xl font-semibold tracking-tight tabular-nums">
-                    {value}
-                  </CardTitle>
-                  {hint && <CardDescription>{hint}</CardDescription>}
-                </CardHeader>
-              </Card>
-            ))}
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <KpiGrid>
+              {totals.map(([label, value, hint]) => (
+                <KpiCard
+                  key={label}
+                  label={label}
+                  value={value}
+                  hint={hint}
+                  icon={KPI_ICONS[label]}
+                  highlight={label === HIGHLIGHT_KPI}
+                />
+              ))}
+            </KpiGrid>
+            <p className="text-sm text-muted-foreground">
+              Os números são atualizados periodicamente: um apontamento validado
+              pode levar alguns minutos para aparecer aqui.
+            </p>
           </div>
 
           {summary.cropRanking.length > 0 && (
@@ -614,7 +606,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
                 <CropRankingTable summary={summary} />
               </Section>
               <Section id="mgmt-share" title="Participação por cultura">
-                <Card className="p-4">
+                <Card className="p-6">
                   <CropShareChart ranking={summary.cropRanking} />
                 </Card>
               </Section>
@@ -623,7 +615,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
 
           {summary.communities.length > 0 && (
             <Section id="mgmt-communities" title="Comparativo entre comunidades">
-              <Card className="p-4">
+              <Card className="p-6">
                 <CommunityTargetChart communities={summary.communities} />
               </Card>
               <CommunitiesTable summary={summary} />
@@ -647,25 +639,17 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
     : "";
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          {title && (
-            <p className="text-base font-semibold" data-testid="mgmt-scope-title">
-              {title}
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            {summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : ""}
-          </p>
-        </div>
+    <div className="flex min-w-0 flex-col gap-6">
+      <DashboardToolbar
+        loading={loading && !summary}
+        title={title ? <span data-testid="mgmt-scope-title">{title}</span> : undefined}
+        description={
+          summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : undefined
+        }
+      >
         {filters}
-      </div>
+      </DashboardToolbar>
       {body}
-      <p className="text-xs text-muted-foreground">
-        Os números são atualizados periodicamente: um apontamento validado pode
-        levar alguns minutos para aparecer aqui.
-      </p>
     </div>
   );
 }

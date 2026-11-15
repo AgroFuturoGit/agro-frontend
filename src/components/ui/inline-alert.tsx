@@ -48,6 +48,11 @@ type InlineAlertProps = Omit<React.ComponentProps<"div">, "role" | "children"> &
   icon?: LucideIcon | false
   /** Botão outline compacto à direita (ex.: "Tentar novamente"). */
   action?: InlineAlertAction
+  /**
+   * Vários botões à direita, na mesma forma do `action` (ex.: "Limpar
+   * filtros" + "Tentar novamente"). Renderizados depois do `action`.
+   */
+  actions?: InlineAlertAction[]
   children: React.ReactNode
 }
 
@@ -56,10 +61,12 @@ function InlineAlert({
   role,
   icon,
   action,
+  actions,
   className,
   children,
   ...props
 }: InlineAlertProps) {
+  const allActions = [...(action ? [action] : []), ...(actions ?? [])]
   const Icon = icon === false ? null : (icon ?? defaultIcons[variant])
   return (
     <div
@@ -77,17 +84,22 @@ function InlineAlert({
         <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
       ) : null}
       <div className="min-w-0 flex-1">{children}</div>
-      {action ? (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 self-center text-foreground"
-          onClick={action.onClick}
-          disabled={action.disabled}
-        >
-          {action.label}
-        </Button>
+      {allActions.length > 0 ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
+          {allActions.map((a, i) => (
+            <Button
+              key={`${i}-${a.label}`}
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-foreground"
+              onClick={a.onClick}
+              disabled={a.disabled}
+            >
+              {a.label}
+            </Button>
+          ))}
+        </div>
       ) : null}
     </div>
   )

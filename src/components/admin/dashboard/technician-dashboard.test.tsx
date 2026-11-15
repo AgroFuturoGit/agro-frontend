@@ -718,3 +718,83 @@ describe("TechnicianDashboard — exportação (AC-005)", () => {
     );
   });
 });
+
+describe("TechnicianDashboard — revisão r1 do lote 5", () => {
+  it("A11Y-L5-1: 'Ver plano' do alerta com anel de foco opaco e offset", async () => {
+    render(<TechnicianDashboard />);
+    const [link] = await screen.findAllByRole("link", { name: /Ver plano/ });
+    expect(link).toHaveClass("focus-visible:ring-ring", "focus-visible:ring-offset-2");
+    expect(link.className).not.toMatch(/ring-ring\/50/);
+  });
+
+  it("UX-L5-04: 'Pendências' (warning) usa TriangleAlert, como os outros avisos", async () => {
+    render(<TechnicianDashboard />);
+    const rows = await screen.findAllByRole("row");
+    const second = rows.find((r) => r.textContent?.includes("Agricultor f-2")) as HTMLElement;
+    const badge = within(second).getByText("Pendências");
+    expect(badge.querySelector("svg")?.getAttribute("class")).toMatch(/triangle-alert/);
+  });
+
+  it("UX-L5-08: no erro, 'Tentar novamente' fica nas ações do alerta", async () => {
+    vi.mocked(getTechnicianSummary).mockRejectedValue(new ApiError(500, "Falhou", null));
+    render(<TechnicianDashboard />);
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByRole("button", { name: "Tentar novamente" })).toBeTruthy();
+  });
+
+  it("'Erro 500' cru vira a mensagem padrão do painel", async () => {
+    vi.mocked(getTechnicianSummary).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(<TechnicianDashboard />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.textContent).toContain("Não foi possível carregar o resumo da carteira.");
+  });
+
+  it("UX-L5-01: tabela de agricultores com colunas numéricas à direita e cabeçalho que quebra", async () => {
+    render(<TechnicianDashboard />);
+    const header = await screen.findByRole("columnheader", { name: "Agricultor" });
+    const table = header.closest("table") as HTMLElement;
+    const headers = within(table).getAllByRole("columnheader");
+    const numeric = headers.filter((h) => h.className.includes("text-right"));
+    expect(numeric.map((h) => h.textContent)).toEqual([
+      "Planos (ativos)",
+      "Área (ha)",
+      "Meta (kg)",
+      "Realizado (kg)",
+      "Pendente (kg)",
+      "% conclusão",
+      "Alertas",
+    ]);
+    numeric.forEach((h) => expect(h.className).toContain("whitespace-normal"));
+    const [row] = within(table).getAllByRole("row").slice(1);
+    const cells = within(row).getAllByRole("cell");
+    expect(cells[0].className).toContain("whitespace-normal");
+    expect(cells[headers.indexOf(numeric[2])].className).toContain("tabular-nums");
+  });
+
+  it("UX-L5-05: barra com 'Minha carteira' e a safra em texto secundário", async () => {
+    render(<TechnicianDashboard />);
+    await screen.findByText("Comunidades atendidas");
+    const bar = screen.getByTestId("dashboard-toolbar");
+    expect(within(bar).getByText("Minha carteira").className).toContain("text-lg");
+    expect(within(bar).getByText(/^Safra: /).className).toContain("text-muted-foreground");
+  });
+
+  it("A11Y-L5-5: o skeleton do painel é uma região nomeada e ocupada", () => {
+    vi.mocked(getTechnicianSummary).mockReturnValue(new Promise(() => {}));
+    render(<TechnicianDashboard />);
+    expect(
+      screen.getByRole("region", { name: "Carregando painel" }).getAttribute("aria-busy"),
+    ).toBe("true");
+  });
+
+  it("WarningCard: Alta usa CircleAlert e Média usa TriangleAlert; tipos numa lista rotulada", async () => {
+    render(<TechnicianDashboard />);
+    const high = await screen.findAllByText("Severidade Alta");
+    expect(high[0].querySelector("svg")?.getAttribute("class")).toMatch(/circle-alert/);
+    expect(
+      screen.getAllByText("Severidade Média")[0].querySelector("svg")?.getAttribute("class"),
+    ).toMatch(/triangle-alert/);
+    expect(screen.getAllByRole("list", { name: "Tipos de alerta" }).length).toBeGreaterThan(0);
+  });
+});

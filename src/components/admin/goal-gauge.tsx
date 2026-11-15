@@ -53,8 +53,8 @@ function Arc({ value }: { value: number | null }) {
 }
 
 /**
- * Escala: % 24 → "meta alcançada" 16 → frase final 12 (no máximo 2 degraus
- * entre vizinhos).
+ * Escala: % 24 → "meta alcançada" 16 → frase final 14 (no máximo 2 degraus
+ * entre vizinhos; a frase é informação principal, não nota).
  *
  * Gauge em semicírculo da meta de colheita. O nome acessível
  * ("X% da meta alcançada") fica no `role="img"`; o número e a legenda
@@ -119,12 +119,12 @@ export function GoalGauge({
         </span>
       </div>
       {reached ? (
-        <p className="mt-2 inline-flex items-center gap-1 text-caption font-medium text-success">
+        <p className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-success">
           <CircleCheck aria-hidden="true" className="size-4 shrink-0" />
           Meta de colheita atingida
         </p>
       ) : remainingLabel ? (
-        <p className="mt-2 text-caption font-medium text-subtle-foreground">
+        <p className="mt-2 text-sm font-medium text-subtle-foreground">
           {remainingLabel}
         </p>
       ) : null}

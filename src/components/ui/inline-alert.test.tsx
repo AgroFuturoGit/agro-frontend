@@ -70,3 +70,51 @@ describe("InlineAlert", () => {
     expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeDisabled();
   });
 });
+
+describe("InlineAlert — actions (UX-L5-08)", () => {
+  afterEach(cleanup);
+
+  it("renderiza vários botões na ordem, com o mesmo formato do action", async () => {
+    const clear = vi.fn();
+    const retry = vi.fn();
+    render(
+      <InlineAlert
+        actions={[
+          { label: "Limpar filtros", onClick: clear },
+          { label: "Tentar novamente", onClick: retry },
+        ]}
+      >
+        Falhou
+      </InlineAlert>,
+    );
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual(["Limpar filtros", "Tentar novamente"]);
+    buttons.forEach((b) => expect(b.getAttribute("data-slot")).toBe("button"));
+    await userEvent.click(buttons[1]);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(clear).not.toHaveBeenCalled();
+  });
+});
+
+describe("InlineAlert — action e actions juntos", () => {
+  afterEach(cleanup);
+
+  it("action primeiro; disabled vale dentro de actions; rótulos repetidos não colidem", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <InlineAlert
+        action={{ label: "A", onClick: vi.fn() }}
+        actions={[
+          { label: "B", onClick: vi.fn(), disabled: true },
+          { label: "A", onClick: vi.fn() },
+        ]}
+      >
+        Falhou
+      </InlineAlert>,
+    );
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["A", "B", "A"]);
+    expect(screen.getByRole("button", { name: "B" })).toBeDisabled();
+    expect(errors.mock.calls.some((c) => String(c[0]).includes("same key"))).toBe(false);
+    errors.mockRestore();
+  });
+});

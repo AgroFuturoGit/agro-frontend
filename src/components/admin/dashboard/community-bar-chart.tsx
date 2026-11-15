@@ -7,7 +7,9 @@ import type { TechnicianCommunitySummary } from "@/lib/analytics";
 
 import {
   CHART_HEIGHT,
+  chartTextStyle,
   escapeHtml,
+  formatAxisNumber,
   kg,
   useEchart,
   type ChartColors,
@@ -42,7 +44,7 @@ export function buildCommunityChartOption(
   return {
     animation: false,
     aria: { enabled: true, label: { description: ariaLabel } },
-    textStyle: { color: colors.text },
+    textStyle: chartTextStyle(colors.text, colors.fontFamily),
     legend: {
       data: ["Meta", "Realizado", "Pendente"],
       top: 0,
@@ -54,7 +56,7 @@ export function buildCommunityChartOption(
       axisPointer: { type: "shadow" },
       backgroundColor: colors.popover,
       borderColor: colors.grid,
-      textStyle: { color: colors.popoverText },
+      textStyle: chartTextStyle(colors.popoverText, colors.fontFamily),
       formatter: (params: unknown) => {
         const items = (Array.isArray(params) ? params : [params]) as {
           dataIndex: number;
@@ -82,7 +84,7 @@ export function buildCommunityChartOption(
       type: "value",
       name: "kg",
       nameTextStyle: { color: colors.text },
-      axisLabel: { color: colors.text },
+      axisLabel: { color: colors.text, formatter: formatAxisNumber },
       splitLine: { lineStyle: { color: colors.grid } },
     },
     series: [

@@ -156,3 +156,17 @@ describe("ComparisonSummary — loading e null (lote 4)", () => {
     expect(container).toBeEmptyDOMElement();
   });
 });
+
+describe("GoalGauge — frase final em 14px (UX-L5-02)", () => {
+  afterEach(cleanup);
+
+  it("'Faltam …' e 'Meta de colheita atingida' em text-sm", () => {
+    render(<GoalGauge percentage={50} remainingLabel="Faltam 3.000 kg para bater a meta" />);
+    expect(screen.getByText("Faltam 3.000 kg para bater a meta").className).toContain("text-sm");
+    cleanup();
+    render(<GoalGauge percentage={100} reached />);
+    const done = screen.getByText("Meta de colheita atingida");
+    expect(done.className).toContain("text-sm");
+    expect(done.className).not.toContain("text-caption");
+  });
+});

@@ -82,3 +82,19 @@ describe("CommunityTargetChart (UNIT-006)", () => {
     expect(screen.queryByTestId("management-community-chart")).toBeNull();
   });
 });
+
+describe("buildCommunityTargetOption — eixo pt-BR e fonte do sistema", () => {
+  it("eixo Y em pt-BR e fonte no textStyle e no tooltip", () => {
+    const option = buildCommunityTargetOption([community("c1", "Serra")], {
+      ...COLORS,
+      fontFamily: "Roboto",
+    }) as {
+      yAxis: { axisLabel: { formatter: (v: number) => string } };
+      textStyle: { fontFamily?: string };
+      tooltip: { textStyle: { fontFamily?: string } };
+    };
+    expect(option.yAxis.axisLabel.formatter(30000)).toBe("30.000");
+    expect(option.textStyle.fontFamily).toBe("Roboto");
+    expect(option.tooltip.textStyle.fontFamily).toBe("Roboto");
+  });
+});

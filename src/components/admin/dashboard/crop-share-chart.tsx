@@ -2,12 +2,16 @@
 
 import { useMemo } from "react";
 import type { EChartsCoreOption } from "echarts/core";
+import { Wheat } from "lucide-react";
+
+import { EmptyState } from "@/components/admin/empty-state";
 
 import type { ManagementCropRankingItem } from "@/lib/analytics";
 import { formatNumber } from "@/lib/production";
 
 import {
   CHART_HEIGHT,
+  chartTextStyle,
   escapeHtml,
   kg,
   useEchart,
@@ -46,7 +50,7 @@ export function buildCropShareOption(
     animation: false,
     aria: { enabled: true, label: { description: ariaLabel } },
     color: colors.palette,
-    textStyle: { color: colors.text },
+    textStyle: chartTextStyle(colors.text, colors.fontFamily),
     legend: {
       type: "scroll",
       orient: "vertical",
@@ -59,7 +63,7 @@ export function buildCropShareOption(
       trigger: "item",
       backgroundColor: colors.popover,
       borderColor: colors.grid,
-      textStyle: { color: colors.popoverText },
+      textStyle: chartTextStyle(colors.popoverText, colors.fontFamily),
       formatter: (params: unknown) => {
         const item = items[(params as { dataIndex: number }).dataIndex];
         if (!item) return "";
@@ -98,12 +102,15 @@ export function CropShareChart({ ranking }: { ranking: ManagementCropRankingItem
 
   if (!hasData) {
     return (
-      <p
-        data-testid="crop-share-empty"
-        className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground"
-      >
-        Ainda não há colheita validada nesta safra
-      </p>
+      // Dentro do card do gráfico (sem contorno próprio), na mesma altura dele.
+      <div data-testid="crop-share-empty" style={{ minHeight: CHART_HEIGHT }} className="flex">
+        <EmptyState
+          icon={Wheat}
+          title="Ainda não há colheita validada nesta safra"
+          hint="A participação de cada cultura aparece aqui depois que os apontamentos de colheita forem validados."
+          className="w-full"
+        />
+      </div>
     );
   }
 

@@ -65,3 +65,14 @@ describe("EmptyState", () => {
     expect(screen.getByRole("status")).toHaveClass(cls);
   });
 });
+
+describe("EmptyState — CTA-link default com o foco do A11Y-L5-2", () => {
+  afterEach(cleanup);
+
+  it("anel opaco com offset, sem o halo da base", () => {
+    render(<EmptyState title="Vazio" action={{ label: "Ir", href: "/x", variant: "default" }} />);
+    const link = screen.getByRole("link", { name: "Ir" });
+    expect(link).toHaveClass("focus-visible:ring-offset-2", "focus-visible:ring-offset-background");
+    expect(link.className).not.toMatch(/ring-ring\/50|focus-visible:ring-3/);
+  });
+});

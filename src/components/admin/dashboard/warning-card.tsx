@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { ArrowRight, CircleAlert, TriangleAlert } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -13,7 +14,13 @@ import type {
   WarningSeverity,
   WarningType,
 } from "@/lib/analytics";
+import { FOCUS_RING_LINK } from "@/lib/focus";
 import { formatNumber, formatPlanDate } from "@/lib/production";
+import {
+  CATEGORY_BADGE_VARIANT,
+  SEVERITY_VARIANT,
+} from "@/lib/status-variants";
+import { cn } from "@/lib/utils";
 
 export const WARNING_TYPE_LABELS: Record<WarningType, string> = {
   INACTIVE_EXECUTIONS: "Sem apontamentos recentes",
@@ -26,10 +33,11 @@ const SEVERITY_LABELS: Record<WarningSeverity, string> = {
   MEDIUM: "Média",
 };
 
-const SEVERITY_BADGE: Record<WarningSeverity, string> = {
-  HIGH: "bg-red-100 text-red-800",
-  MEDIUM: "bg-yellow-100 text-yellow-900",
-};
+// Ícone diferente por severidade: a cor não é o único sinal.
+const SEVERITY_ICON = {
+  HIGH: CircleAlert,
+  MEDIUM: TriangleAlert,
+} satisfies Record<WarningSeverity, unknown>;
 
 /** Cartão de um alerta da carteira; `href` leva ao plano (ausente = sem link). */
 export function WarningCard({
@@ -44,35 +52,38 @@ export function WarningCard({
     : warning.cropName;
   const farmer = warning.farmerName ?? "Agricultor";
   return (
-    <Card data-testid="warning-card" data-severity={warning.severity}>
-      <CardHeader>
+    <Card
+      data-testid="warning-card"
+      data-severity={warning.severity}
+      className="gap-4 py-6"
+    >
+      <CardHeader className="px-6">
         <div className="flex items-start justify-between gap-2">
-          <CardTitle className="text-base">{farmer}</CardTitle>
-          <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${SEVERITY_BADGE[warning.severity]}`}
+          <CardTitle className="text-base font-semibold">{farmer}</CardTitle>
+          <Badge
+            variant={SEVERITY_VARIANT[warning.severity]}
+            icon={SEVERITY_ICON[warning.severity]}
           >
-            <AlertTriangle className="size-3" aria-hidden />
-            Severidade {SEVERITY_LABELS[warning.severity]}
-          </span>
+            {`Severidade ${SEVERITY_LABELS[warning.severity]}`}
+          </Badge>
         </div>
-        <CardDescription>
+        <CardDescription className="text-sm text-muted-foreground">
           {warning.communityName ? `${warning.communityName} · ` : ""}
           {crop}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-2">
-        <ul className="flex flex-wrap gap-1">
+      <CardContent className="flex flex-1 flex-col gap-3 px-6">
+        <ul className="flex flex-wrap gap-2" aria-label="Tipos de alerta">
           {warning.warningTypes.map((type) => (
-            <li
-              key={type}
-              className="rounded-md border px-2 py-0.5 text-xs font-medium"
-            >
-              {WARNING_TYPE_LABELS[type]}
+            <li key={type}>
+              <Badge variant={CATEGORY_BADGE_VARIANT}>
+                {WARNING_TYPE_LABELS[type]}
+              </Badge>
             </li>
           ))}
         </ul>
         {warning.message && <p className="text-sm">{warning.message}</p>}
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {warning.daysWithoutExecution !== null
             ? `${formatNumber(warning.daysWithoutExecution)} dias sem apontamento`
             : `Último apontamento: ${formatPlanDate(warning.lastExecutionDate)}`}
@@ -82,13 +93,17 @@ export function WarningCard({
         {href && (
           <Link
             href={href}
-            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+            className={cn(
+              "mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline",
+              FOCUS_RING_LINK,
+            )}
           >
             Ver plano
             <span className="sr-only">
               {" "}
               de {farmer} ({crop})
             </span>
+            <ArrowRight aria-hidden="true" className="size-4" />
           </Link>
         )}
       </CardContent>

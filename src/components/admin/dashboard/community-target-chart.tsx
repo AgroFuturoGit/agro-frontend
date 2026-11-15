@@ -8,7 +8,9 @@ import { formatNumber } from "@/lib/production";
 
 import {
   CHART_HEIGHT,
+  chartTextStyle,
   escapeHtml,
+  formatAxisNumber,
   kg,
   useEchart,
   type ChartColors,
@@ -45,7 +47,7 @@ export function buildCommunityTargetOption(
   return {
     animation: false,
     aria: { enabled: true, label: { description: ariaLabel } },
-    textStyle: { color: colors.text },
+    textStyle: chartTextStyle(colors.text, colors.fontFamily),
     legend: { data: ["Meta", "Colhido"], top: 0, textStyle: { color: colors.text } },
     grid: { left: 8, right: 16, top: 40, bottom: 8, containLabel: true },
     tooltip: {
@@ -53,7 +55,7 @@ export function buildCommunityTargetOption(
       axisPointer: { type: "shadow" },
       backgroundColor: colors.popover,
       borderColor: colors.grid,
-      textStyle: { color: colors.popoverText },
+      textStyle: chartTextStyle(colors.popoverText, colors.fontFamily),
       formatter: (params: unknown) => {
         const entries = (Array.isArray(params) ? params : [params]) as {
           dataIndex: number;
@@ -81,7 +83,7 @@ export function buildCommunityTargetOption(
       type: "value",
       name: "kg",
       nameTextStyle: { color: colors.text },
-      axisLabel: { color: colors.text },
+      axisLabel: { color: colors.text, formatter: formatAxisNumber },
       splitLine: { lineStyle: { color: colors.grid } },
     },
     series: [

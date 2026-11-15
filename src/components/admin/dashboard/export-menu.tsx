@@ -76,7 +76,7 @@ export function ExportMenu({
           render={<Button type="button" variant="outline" />}
         >
           {busy ? (
-            <Loader2 className="animate-spin" aria-hidden />
+            <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
           ) : (
             <Download aria-hidden />
           )}

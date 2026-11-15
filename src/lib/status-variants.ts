@@ -4,6 +4,8 @@
 // continua sendo o que comunica; a cor só reforça. O verde da marca é o
 // mesmo de sucesso (waiver de marca): por isso status `success` ganha o ícone
 // `CircleCheck` (padrão do Badge) e categorias nunca usam variante colorida.
+// Ícone por tom (o mesmo do InlineAlert): success = CircleCheck,
+// warning = TriangleAlert, destructive = CircleAlert.
 import type { BadgeVariant } from "@/components/ui/badge";
 import type { ProgressVariant } from "@/components/ui/progress";
 import type { ProgressStatus, WarningSeverity } from "@/lib/analytics";
