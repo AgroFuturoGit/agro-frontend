@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import NotFound from "./not-found";
+import NotFound, { metadata } from "./not-found";
 
 describe("página 404", () => {
   afterEach(cleanup);
@@ -43,11 +43,10 @@ describe("página 404", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("define o título da aba", () => {
+  it("define o título da aba pelo metadata (um <title> só no head; o e2e confere no navegador)", () => {
+    expect(metadata.title).toBe("Página não encontrada · ProduPlan");
     const { container } = render(<NotFound />);
-
-    const title = document.querySelector("title") ?? container.querySelector("title");
-    expect(title?.textContent).toBe("Página não encontrada · ProduPlan");
+    expect(container.querySelector("title")).toBeNull();
   });
 
   it("um único heading na página (só o h1)", () => {
