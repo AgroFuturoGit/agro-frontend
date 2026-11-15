@@ -340,3 +340,31 @@ describe("UsersPage — cartões no celular", () => {
     expect(await screen.findByDisplayValue("Bruno Lima")).toBeTruthy();
   });
 });
+
+describe("UsersPage — visual do Figma (lote 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("título em PageHeader (h2) e CTA 'Novo usuário' no tamanho padrão", async () => {
+    await mockRole("ADMIN");
+    await mockUsers(USERS);
+    await renderUsersPage();
+
+    expect(screen.getByRole("heading", { level: 2, name: "Usuários" })).toBeTruthy();
+    const cta = screen.getByRole("button", { name: "Novo usuário" });
+    // Altura de controle padrão (36px), não a compacta (`size="sm"`).
+    expect(cta.className).toMatch(/(^|\s)h-control(\s|$)/);
+  });
+
+  it("CPF usa algarismos tabulares (Roboto), não fonte mono", async () => {
+    await mockRole("ADMIN");
+    await mockUsers(USERS);
+    await renderUsersPage();
+
+    const cell = screen.getByText("111.222.333-44").closest("td");
+    expect(cell?.className).toMatch(/\btabular-nums\b/);
+    expect(cell?.innerHTML).not.toMatch(/font-mono/);
+  });
+});

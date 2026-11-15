@@ -439,3 +439,42 @@ describe("CropsPage — integração com DeleteCropDialog", () => {
     expect(screen.queryByRole("button", { name: "Excluir cultura" })).toBeNull();
   });
 });
+
+describe("CropsPage — visual do Figma (lote 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("'Somente prioritárias' fica dentro do card da toolbar, junto da busca", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    const checkbox = screen.getByRole("checkbox", { name: /Somente prioritárias/ });
+    const search = screen.getByRole("searchbox");
+    const toolbarCard = search.closest(".rounded-xl");
+    expect(toolbarCard).toBeTruthy();
+    expect(toolbarCard?.contains(checkbox)).toBe(true);
+  });
+
+  it("título em PageHeader (h2) e badge 'Prioritária' outline", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Culturas Agrícolas" }),
+    ).toBeTruthy();
+    // "Prioritária" também é o cabeçalho da coluna: busca o badge da linha.
+    const badge = screen
+      .getAllByText("Prioritária")
+      .find((el) => el.getAttribute("data-slot") === "badge");
+    expect(badge).toBeTruthy();
+    expect(badge?.className).toMatch(/\bborder-border\b/);
+  });
+});

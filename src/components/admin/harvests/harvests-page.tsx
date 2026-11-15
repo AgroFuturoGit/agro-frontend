@@ -16,11 +16,16 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { PageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
@@ -90,35 +95,42 @@ export function HarvestsPage() {
     refresh();
   }, [refresh]);
 
+  // Mesmos nomes acessíveis na tabela e nos cards mobile (e2e/unit).
+  const rowActions = useCallback(
+    (harvest: Harvest): DataTableRowAction[] => [
+      { label: "Editar safra", icon: Pencil, onClick: () => setEditTarget(harvest) },
+      {
+        label: "Excluir safra",
+        icon: Trash2,
+        tone: "destructive",
+        onClick: () => setDeleteTarget(harvest),
+      },
+    ],
+    [],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor("label", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Rótulo" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="font-medium text-foreground">{info.getValue()}</span>
-        ),
+        meta: { cellVariant: "primary" },
+        cell: (info) => info.getValue(),
       }),
       columnHelper.accessor("startDate", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Início" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="text-muted-foreground">
-            {formatHarvestDate(info.getValue())}
-          </span>
-        ),
+        meta: { cellVariant: "secondary", cellClassName: "tabular-nums" },
+        cell: (info) => formatHarvestDate(info.getValue()),
       }),
       columnHelper.accessor("endDate", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Término" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="text-muted-foreground">
-            {formatHarvestDate(info.getValue())}
-          </span>
-        ),
+        meta: { cellVariant: "secondary", cellClassName: "tabular-nums" },
+        cell: (info) => formatHarvestDate(info.getValue()),
       }),
     ];
 
@@ -126,30 +138,7 @@ export function HarvestsPage() {
       id: "actions",
       header: "Ações",
       cell: ({ row }) => {
-        const harvest = row.original;
-        return (
-          <div className="inline-flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Editar safra"
-              onClick={() => setEditTarget(harvest)}
-            >
-              <Pencil />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Excluir safra"
-              onClick={() => setDeleteTarget(harvest)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        );
+        return <DataTableRowActions actions={rowActions(row.original)} />;
       },
     });
 
@@ -160,7 +149,7 @@ export function HarvestsPage() {
       Harvest,
       unknown
     >[];
-  }, [canManage, loading]);
+  }, [canManage, loading, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -185,32 +174,19 @@ export function HarvestsPage() {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="font-medium text-foreground">{harvest.label}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {formatHarvestDate(harvest.startDate)} —{" "}
               {formatHarvestDate(harvest.endDate)}
             </p>
           </div>
+          {/* Ações como filhas diretas do mesmo container do rótulo (e2e
+              sobe dois níveis a partir do rótulo para achá-las). */}
           {canManage && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Editar safra"
-                onClick={() => setEditTarget(harvest)}
-              >
-                <Pencil />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Excluir safra"
-                onClick={() => setDeleteTarget(harvest)}
-              >
-                <Trash2 />
-              </Button>
-            </div>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(harvest)}
+            />
           )}
         </div>
       </Card>
@@ -218,21 +194,19 @@ export function HarvestsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Safras</h2>
-          <p className="text-sm text-muted-foreground">
-            Gerencie as safras cadastradas no sistema.
-          </p>
-        </div>
-        {canManage && (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Nova safra
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-col gap-section-sm">
+      <PageHeader
+        title="Safras"
+        description="Gerencie as safras cadastradas no sistema."
+        actions={
+          canManage ? (
+            <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden="true" />
+              Nova safra
+            </Button>
+          ) : undefined
+        }
+      />
 
       <DataTableToolbar table={table} searchPlaceholder="Buscar por rótulo…" />
 
