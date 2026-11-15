@@ -336,6 +336,23 @@ describe("ContinuousHarvestChart — revisão r1 do lote 4", () => {
     render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
     const skeleton = screen.getByLabelText("Carregando gráfico");
     expect(skeleton.getAttribute("data-slot")).toBe("card");
-    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(4);
+    // A11Y-L6-5: o título real já aparece (alvo estável do foco); o gráfico
+    // e a legenda seguem como skeleton.
+    expect(skeleton).toContainElement(
+      screen.getByRole("heading", { level: 3, name: "Previsto × realizado" }),
+    );
+    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(2);
+  });
+
+  it("A11Y-L6-5: 'Tentar novamente' leva o foco ao título do card, que fica montado", async () => {
+    vi.mocked(getHarvestTimeline)
+      .mockRejectedValueOnce(new Error("rede"))
+      .mockReturnValue(new Promise(() => {}));
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tentar novamente" }));
+    const title = screen.getByRole("heading", { level: 3, name: "Previsto × realizado" });
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(document.activeElement).toBe(title);
+    expect(title).toBeInTheDocument();
   });
 });

@@ -115,6 +115,12 @@ describe("ReportsPage", () => {
     // A11Y-L5-R2-1: o alerta desmonta; o foco vai para o título da página.
     expect(document.activeElement).not.toBe(document.body);
     expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Relatórios" }));
+    // A11Y-L6-6: anel de foco opaco, só no teclado.
+    expect(document.activeElement).toHaveClass(
+      "outline-none",
+      "focus-visible:ring-2",
+      "focus-visible:ring-ring",
+    );
   });
 
   it("carregando: região nomeada com o skeleton do consolidado, sem vazio nem alerta", () => {

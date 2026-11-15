@@ -107,14 +107,20 @@ export function DataTableToolbar<TData>({
     searchRef.current?.focus();
   }
 
-  // A linha de chips some com o último filtro (e com "Limpar"): o foco vai
-  // para a busca em vez de cair no <body> (A11Y-L2-R2-2).
+  // O chip removido desmonta: antes, o foco vai para o chip seguinte (ou o
+  // anterior, se era o último da linha); sem outro chip, para a busca. Nunca
+  // cai no <body> (A11Y-L2-R2-2, A11Y-L6-4, UX-L6-03).
   const searchRef = useRef<HTMLInputElement>(null);
-  const activeChipCount =
-    (appliedSearch ? 1 : 0) + activeColumnFilters.length + (extraFilterActive ? 1 : 0);
-  function removeChip(remove: () => void) {
+  function removeChip(event: React.MouseEvent<HTMLButtonElement>, remove: () => void) {
+    const current = event.currentTarget;
+    const chips = Array.from(
+      current.parentElement?.querySelectorAll<HTMLButtonElement>("[data-filter-chip]") ?? [],
+    );
+    const index = chips.indexOf(current);
+    const neighbor = chips[index + 1] ?? chips[index - 1];
+    if (neighbor && neighbor !== current) neighbor.focus();
+    else searchRef.current?.focus();
     remove();
-    if (activeChipCount <= 1) searchRef.current?.focus();
   }
 
   return (
@@ -163,7 +169,8 @@ export function DataTableToolbar<TData>({
           {appliedSearch && (
             <button
               type="button"
-              onClick={() => removeChip(clearSearch)}
+              data-filter-chip=""
+              onClick={(event) => removeChip(event, clearSearch)}
               // O nome diz a ação (remover) e contém o texto visível do chip.
               aria-label={`Remover filtro Busca: ${appliedSearch}`}
               className={CHIP_CLASS}
@@ -178,8 +185,9 @@ export function DataTableToolbar<TData>({
               <button
                 key={filter.columnId}
                 type="button"
-                onClick={() =>
-                  removeChip(() =>
+                data-filter-chip=""
+                onClick={(event) =>
+                  removeChip(event, () =>
                     table.getColumn(filter.columnId)?.setFilterValue(undefined),
                   )
                 }
@@ -194,7 +202,8 @@ export function DataTableToolbar<TData>({
           {extraFilterActive && extraFilter && (
             <button
               type="button"
-              onClick={() => removeChip(extraFilter.onClear)}
+              data-filter-chip=""
+              onClick={(event) => removeChip(event, extraFilter.onClear)}
               aria-label={`Remover filtro ${extraFilter.label}`}
               className={CHIP_CLASS}
             >

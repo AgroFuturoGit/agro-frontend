@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator, userFacingErrorHint, apiErrorMessage, withRetryHint } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -393,22 +393,39 @@ describe("userFacingErrorHint", () => {
 });
 
 describe("apiErrorMessage", () => {
-  it("usa a mensagem de domínio do ApiError", () => {
+  const FALLBACK = "Falhou. Tente novamente em alguns instantes.";
+
+  it("usa a mensagem de domínio do ApiError, sem acrescentar nada", () => {
     expect(apiErrorMessage(new ApiError(409, "Safra já existe.", null), "Falhou.")).toBe(
       "Safra já existe.",
     );
   });
 
-  it("cai no fallback para o 'Erro NNN' cru e mensagem vazia", () => {
-    expect(apiErrorMessage(new ApiError(500, "Erro 500", null), "Falhou.")).toBe("Falhou.");
-    expect(apiErrorMessage(new ApiError(502, " Erro 502 ", null), "Falhou.")).toBe("Falhou.");
-    expect(apiErrorMessage(new ApiError(400, "", null), "Falhou.")).toBe("Falhou.");
+  it("cai no fallback com o próximo passo para o 'Erro NNN' cru e mensagem vazia", () => {
+    expect(apiErrorMessage(new ApiError(500, "Erro 500", null), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(502, " Erro 502 ", null), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(400, "", null), "Falhou.")).toBe(FALLBACK);
   });
 
-  it("cai no fallback para erro que não veio da API", () => {
-    expect(apiErrorMessage(new Error("Failed to fetch"), "Falhou.")).toBe("Falhou.");
-    expect(apiErrorMessage(new TypeError("x"), "Falhou.")).toBe("Falhou.");
-    expect(apiErrorMessage("string", "Falhou.")).toBe("Falhou.");
-    expect(apiErrorMessage(null, "Falhou.")).toBe("Falhou.");
+  it("cai no fallback com o próximo passo para erro que não veio da API", () => {
+    expect(apiErrorMessage(new Error("Failed to fetch"), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new TypeError("x"), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage("string", "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(null, "Falhou.")).toBe(FALLBACK);
+  });
+
+  it("fallback vazio continua vazio (a tela monta a frase)", () => {
+    expect(apiErrorMessage(new Error("x"), "")).toBe("");
+  });
+
+  it("não duplica a orientação quando o fallback já diz o que fazer", () => {
+    expect(apiErrorMessage(null, "Falhou. Tente novamente mais tarde.")).toBe(
+      "Falhou. Tente novamente mais tarde.",
+    );
+    expect(apiErrorMessage(null, "Falhou. Contate o suporte.")).toBe("Falhou. Contate o suporte.");
+  });
+
+  it("fecha a frase com ponto antes de acrescentar o próximo passo", () => {
+    expect(withRetryHint("Falhou")).toBe(FALLBACK);
   });
 });

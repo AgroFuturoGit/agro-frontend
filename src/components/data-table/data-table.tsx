@@ -11,7 +11,7 @@ import { Inbox, SearchX } from "lucide-react";
 
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { withFocusMove } from "@/lib/focus";
+import { FOCUS_TARGET, withFocusMove } from "@/lib/focus";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -33,9 +33,7 @@ const SKELETON_CARDS = 3;
 const SURFACE = "overflow-hidden rounded-xl border border-border bg-card";
 
 // O contêiner recebe o foco por script (tabindex=-1) quando o botão de erro ou
-// de vazio desmonta; o anel aparece só na navegação por teclado.
-const FOCUS_TARGET =
-  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+// de vazio desmonta; o anel (`FOCUS_TARGET`) aparece só no teclado.
 
 /** 1ª coluna com recuo de 24px e última com 24px à direita (Figma 100:222). */
 function edgePadding(index: number, count: number) {
@@ -45,6 +43,12 @@ function edgePadding(index: number, count: number) {
 type DataTableProps<TData, TValue> = {
   /** Instância já criada pelo chamador via `useReactTable` — nunca criada aqui. */
   table: ReactTableInstance<TData>;
+  /**
+   * Nome do contêiner (`role="region"`), que recebe o foco quando o botão
+   * de erro ou de vazio desmonta: o leitor anuncia onde o usuário está
+   * (ex.: "Lista de usuários", A11Y-L6-3).
+   */
+  label?: string;
   columns: ColumnDef<TData, TValue>[];
   isLoading?: boolean;
   hasError?: boolean;
@@ -77,6 +81,7 @@ type DataTableProps<TData, TValue> = {
 
 export function DataTable<TData, TValue>({
   table,
+  label = "Lista de registros",
   columns,
   isLoading,
   hasError,
@@ -168,6 +173,8 @@ export function DataTable<TData, TValue>({
     return (
       <div
         id={containerId}
+        role="region"
+        aria-label={label}
         className={cn("flex flex-col gap-3", FOCUS_TARGET)}
         aria-busy={isLoading ? true : undefined}
       >
@@ -199,7 +206,12 @@ export function DataTable<TData, TValue>({
   }
 
   return (
-    <div id={containerId} className={cn(SURFACE, FOCUS_TARGET)}>
+    <div
+      id={containerId}
+      role="region"
+      aria-label={label}
+      className={cn(SURFACE, FOCUS_TARGET)}
+    >
       {/* aria-busy enquanto carrega e um status só para leitor de tela: os
           skeletons ficam ocultos e o carregamento é anunciado (A11Y-L2-5,
           A11Y-L2-R2-1). A região fica sempre montada para o anúncio ocorrer. */}

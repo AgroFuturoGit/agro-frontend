@@ -241,6 +241,7 @@ export function UsersPage() {
       />
 
       <DataTable
+        label="Lista de usuários"
         table={table}
         columns={columns}
         isLoading={loading}

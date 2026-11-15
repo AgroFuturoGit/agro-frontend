@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { Download, ImageOff, Images, Loader2, Trash2, Upload } from "lucide-react";
 
 import {
@@ -32,6 +32,8 @@ import {
 } from "@/components/ui/sheet";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FOCUS_TARGET, moveFocusTo } from "@/lib/focus";
+import { cn } from "@/lib/utils";
 import { ApiError, apiErrorMessage } from "@/lib/api";
 import {
   ATTACHMENT_ACCEPT,
@@ -89,6 +91,8 @@ export function ExecutionAttachmentsSheet({
     loaded && loaded.executionId === executionId ? loaded.items : NO_ITEMS;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Alvo do foco do "Tentar novamente" (A11Y-L6-5).
+  const titleId = useId();
 
   // id do anexo → Object URL da imagem; "error" quando a prévia falhou.
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -323,7 +327,15 @@ export function ExecutionAttachmentsSheet({
       return (
         <InlineAlert
           variant="destructive"
-          action={{ label: "Tentar novamente", onClick: () => refresh() }}
+          // O alerta desmonta com a nova carga: o foco vai para o título do
+          // sheet, que fica montado (A11Y-L6-5).
+          action={{
+            label: "Tentar novamente",
+            onClick: () => {
+              moveFocusTo(titleId);
+              refresh();
+            },
+          }}
         >
           {error}
         </InlineAlert>
@@ -405,7 +417,9 @@ export function ExecutionAttachmentsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="data-[side=right]:w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Fotos do apontamento</SheetTitle>
+          <SheetTitle id={titleId} className={cn("rounded-sm", FOCUS_TARGET)}>
+            Fotos do apontamento
+          </SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
 

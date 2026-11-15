@@ -66,6 +66,13 @@ describe("EmptyState", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
+  it("role={null} tira a região viva (estado que é a página inteira)", () => {
+    const { container } = render(<EmptyState title="Página não encontrada" role={null} />);
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(container.querySelector('[data-slot="empty-state"]')).not.toHaveAttribute("role");
+  });
+
   it("sem ação, nenhum botão", () => {
     render(<EmptyState title="Vazio" />);
 

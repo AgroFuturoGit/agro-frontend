@@ -27,13 +27,27 @@ describe("página 404", () => {
     expect(empty?.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("'Voltar ao início' é um link primário para /", () => {
+  it("'Ir para o painel' é um link primário para /admin", () => {
     render(<NotFound />);
 
-    const link = screen.getByRole("link", { name: "Voltar ao início" });
-    expect(link).toHaveAttribute("href", "/");
+    const link = screen.getByRole("link", { name: "Ir para o painel" });
+    expect(link).toHaveAttribute("href", "/admin");
     expect(link.className).toContain("bg-primary");
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("a página inteira não fica dentro de uma região viva", () => {
+    render(<NotFound />);
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("define o título da aba", () => {
+    const { container } = render(<NotFound />);
+
+    const title = document.querySelector("title") ?? container.querySelector("title");
+    expect(title?.textContent).toBe("Página não encontrada · ProduPlan");
   });
 
   it("um único heading na página (só o h1)", () => {

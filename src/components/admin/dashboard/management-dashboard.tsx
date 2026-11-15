@@ -151,11 +151,14 @@ function MobileCard({
 
 function PagedTable<T>({
   testId,
+  label,
   table,
   columns,
   renderMobileCard,
 }: {
   testId: string;
+  /** Nome da região da tabela (A11Y-L6-3). */
+  label: string;
   table: ReactTableInstance<T>;
   columns: ColumnDef<T>[];
   renderMobileCard: (row: Row<T>) => React.ReactNode;
@@ -164,7 +167,12 @@ function PagedTable<T>({
     <TableBox>
       <div className="flex flex-col gap-3">
         <div data-testid={testId}>
-          <DataTable table={table} columns={columns} renderMobileCard={renderMobileCard} />
+          <DataTable
+            label={label}
+            table={table}
+            columns={columns}
+            renderMobileCard={renderMobileCard}
+          />
         </div>
         <DataTablePagination table={table} />
       </div>
@@ -200,6 +208,7 @@ function CropRankingTable({ summary }: { summary: ManagementSummary }) {
   return (
     <PagedTable
       testId="crop-ranking"
+      label="Ranking de culturas"
       table={table}
       columns={cropColumns}
       renderMobileCard={(row) => {
@@ -258,6 +267,7 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
   return (
     <PagedTable
       testId="communities-table"
+      label="Lista de comunidades"
       table={table}
       columns={columns}
       renderMobileCard={(row) => {
@@ -305,6 +315,7 @@ function OrganizationsTable({ summary }: { summary: ManagementSummary }) {
   return (
     <PagedTable
       testId="organizations-table"
+      label="Lista de organizações"
       table={table}
       columns={organizationColumns}
       renderMobileCard={(row) => {

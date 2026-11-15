@@ -21,9 +21,12 @@ type EmptyStateProps = {
   action?: EmptyStateAction;
   /**
    * `status` (padrão) é o anúncio educado de vazio; `alert` só para erro ou
-   * "não encontrado". O `role` fica no mesmo nó que contém os textos.
+   * "não encontrado" que aparece no meio de uma tela já carregada. O `role`
+   * fica no mesmo nó que contém os textos. `null` tira a região viva: para o
+   * estado que É a página inteira (ex.: 404), em que o `h1` já orienta e o
+   * anúncio de rota do Next já lê o título (A11Y-L6-2).
    */
-  role?: "status" | "alert";
+  role?: "status" | "alert" | null;
   /** Tag do título. `h1` só fora do shell (ex.: página 404). */
   headingLevel?: "h1" | "h2" | "p";
   /** `plain` (padrão) não desenha superfície: para uso dentro de um card. */
@@ -54,7 +57,7 @@ export function EmptyState({
 
   return (
     <div
-      role={role}
+      role={role ?? undefined}
       data-slot="empty-state"
       data-variant={variant}
       className={cn(

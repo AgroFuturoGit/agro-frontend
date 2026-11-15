@@ -1,7 +1,11 @@
+import { FOCUS_RING_LINK } from "@/lib/focus";
 import { cn } from "@/lib/utils";
 
 type SectionHeaderProps = {
-  /** `id` do `<h3>`, para âncoras e `aria-labelledby` da seção. */
+  /**
+   * `id` do `<h3>`, para âncoras, `aria-labelledby` da seção e alvo de foco
+   * (`moveFocusTo`): com `id`, ganha anel de foco só no teclado.
+   */
   id?: string;
   title: React.ReactNode;
   description?: React.ReactNode;
@@ -26,7 +30,13 @@ export function SectionHeader({
       )}
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <h3 id={id} className="text-section-title font-bold text-foreground">
+        <h3
+          id={id}
+          className={cn(
+            "text-section-title font-bold text-foreground",
+            id && cn("rounded-sm", FOCUS_RING_LINK),
+          )}
+        >
           {title}
         </h3>
         {description ? (

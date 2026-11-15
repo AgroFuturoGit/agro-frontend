@@ -70,6 +70,8 @@ import { getMyAssignedProducers } from "@/lib/technicians";
 
 /** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
 const FILTER_FOCUS_ID = "tech-harvest";
+/** "Voltar para Todas" muda a Comunidade: o foco vai para esse seletor (UX-L6-05). */
+const COMMUNITY_FOCUS_ID = "tech-community";
 const ALL = "__all__";
 const CURRENT = "__current__";
 
@@ -235,6 +237,7 @@ function FarmersTable({ farmers }: { farmers: TechnicianFarmerSummary[] }) {
   return (
     <div className="flex w-full min-w-0 flex-col gap-3 [contain:inline-size]">
       <DataTable
+        label="Lista de agricultores da carteira"
         table={table}
         columns={farmerColumns}
         emptyTitle="Nenhum agricultor com plano neste recorte."
@@ -395,7 +398,7 @@ export function TechnicianDashboard() {
         ]}
       />
       <FilterSelect
-        id="tech-community"
+        id={COMMUNITY_FOCUS_ID}
         label="Comunidade"
         value={communityId}
         onChange={setCommunityId}
@@ -465,7 +468,7 @@ export function TechnicianDashboard() {
                 {
                   label: "Voltar para Todas",
                   onClick: () => {
-                    moveFocusTo(FILTER_FOCUS_ID);
+                    moveFocusTo(COMMUNITY_FOCUS_ID);
                     setCommunityId(ALL);
                   },
                 },

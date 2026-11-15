@@ -112,11 +112,10 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
     try {
       setMembers(await listFamilyMembers(farmerId));
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar a composição familiar.",
-      );
+      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
+      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
+      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
+      setError(apiErrorMessage(err, ""));
     } finally {
       setLoading(false);
     }
@@ -290,7 +289,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
     );
   }
 
-  const showCount = !loading && !error;
+  const showCount = !loading && error === null;
 
   return (
     <section aria-labelledby="family-composition-title" className="flex flex-col gap-section-sm">
@@ -318,7 +317,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
 
       {/* Carregando, erro (InlineAlert + "Tentar novamente") vêm do DataTable.
           O vazio fica fora da tabela (sem cabeçalhos de coluna vazios). */}
-      {!loading && !error && members.length === 0 ? (
+      {!loading && error === null && members.length === 0 ? (
         <EmptyState
           variant="card"
           icon={Inbox}
@@ -340,10 +339,11 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
         />
       ) : (
         <DataTable
+          label="Lista de membros da família"
           table={table}
           columns={columns}
           isLoading={loading}
-          hasError={Boolean(error)}
+          hasError={error !== null}
           onRetry={refresh}
           errorHint={userFacingErrorHint(error)}
           renderMobileCard={renderMobileCard}

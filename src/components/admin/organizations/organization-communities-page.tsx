@@ -29,7 +29,7 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
@@ -145,11 +145,10 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
     } catch (err) {
       setOrganization(null);
       setCommunities([]);
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar as comunidades desta organização.",
-      );
+      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
+      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
+      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
+      setError(apiErrorMessage(err, ""));
     } finally {
       setLoading(false);
     }
@@ -290,10 +289,11 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
       <DataTableToolbar table={table} searchPlaceholder="Buscar por nome…" />
 
       <DataTable
+        label="Lista de comunidades"
         table={table}
         columns={columns}
         isLoading={loading}
-        hasError={Boolean(error)}
+        hasError={error !== null}
         onRetry={refresh}
         errorHint={userFacingErrorHint(error)}
         hasActiveFilters={Boolean(table.getState().globalFilter)}

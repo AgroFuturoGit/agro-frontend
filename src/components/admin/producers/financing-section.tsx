@@ -136,11 +136,10 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
     try {
       setItems(await listFinancings(farmerId));
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar os financiamentos.",
-      );
+      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
+      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
+      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
+      setError(apiErrorMessage(err, ""));
     } finally {
       setLoading(false);
     }
@@ -322,7 +321,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
   const total = items
     .filter((item) => item.status !== "REJECTED" && item.status !== "CANCELED")
     .reduce((sum, item) => sum + item.amount, 0);
-  const showTotal = !loading && !error && items.length > 0;
+  const showTotal = !loading && error === null && items.length > 0;
 
   return (
     <section aria-labelledby="financing-title" className="flex flex-col gap-section-sm">
@@ -353,7 +352,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
 
       {/* Carregando, erro (InlineAlert + "Tentar novamente") vêm do DataTable.
           O vazio fica fora da tabela (sem cabeçalhos de coluna vazios). */}
-      {!loading && !error && items.length === 0 ? (
+      {!loading && error === null && items.length === 0 ? (
         <EmptyState
           variant="card"
           icon={Inbox}
@@ -375,10 +374,11 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
         />
       ) : (
         <DataTable
+          label="Lista de financiamentos"
           table={table}
           columns={columns}
           isLoading={loading}
-          hasError={Boolean(error)}
+          hasError={error !== null}
           onRetry={refresh}
           errorHint={userFacingErrorHint(error)}
           renderMobileCard={renderMobileCard}

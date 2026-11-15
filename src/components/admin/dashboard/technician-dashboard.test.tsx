@@ -668,6 +668,8 @@ describe("TechnicianDashboard — estados (UNIT-009)", () => {
     expect(alert.textContent).toContain("Comunidade não assistida pelo técnico logado.");
     fireEvent.click(screen.getByRole("button", { name: "Voltar para Todas" }));
     expect(await screen.findByText("Comunidades atendidas")).toBeTruthy();
+    // UX-L6-05: o foco vai para o seletor que mudou (Comunidade), não o de Safra.
+    expect(document.activeElement?.id).toBe("tech-community");
     expect(getTechnicianSummary).toHaveBeenLastCalledWith({
       harvestId: undefined,
       communityId: undefined,

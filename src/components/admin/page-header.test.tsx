@@ -62,6 +62,30 @@ describe("PageHeader", () => {
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
   });
 
+  it("titleId: anel de foco só no teclado e o <h2> fica montado no loading", () => {
+    const { rerender } = render(<PageHeader title="Relatórios" titleId="t" loading />);
+
+    const loadingTitle = document.getElementById("t");
+    expect(loadingTitle?.tagName).toBe("H2");
+    expect(loadingTitle).toHaveAccessibleName("Carregando…");
+    expect(loadingTitle).toHaveClass("focus-visible:ring-2", "focus-visible:ring-ring", "outline-none");
+    expect(loadingTitle?.className).not.toMatch(/(^| )ring-2/);
+
+    loadingTitle?.setAttribute("tabindex", "-1");
+    loadingTitle?.focus();
+    rerender(<PageHeader title="Relatórios" titleId="t" />);
+
+    const title = screen.getByRole("heading", { level: 2, name: "Relatórios" });
+    expect(title).toBe(loadingTitle);
+    expect(document.activeElement).toBe(title);
+  });
+
+  it("sem titleId, o título não ganha classes de foco", () => {
+    render(<PageHeader title="Usuários" />);
+
+    expect(screen.getByRole("heading", { level: 2 }).className).not.toMatch(/focus-visible/);
+  });
+
   it("aceita className", () => {
     const { container } = render(<PageHeader title="X" className="mb-2" />);
 

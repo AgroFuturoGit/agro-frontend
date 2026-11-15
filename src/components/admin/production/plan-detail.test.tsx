@@ -508,10 +508,16 @@ describe("PlanDetail — erro de API e recuperação", () => {
     expect(alert.textContent).toContain("Serviço indisponível");
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    // A11Y-L6-5: o alerta desmonta e o PageHeader entra em loading, mas o
+    // <h2> fica montado e recebe o foco.
+    expect(document.activeElement?.id).toBe("plan-title");
 
     expect(
       await screen.findByRole("heading", { name: "Milho — BRS 1010" }),
     ).toBeTruthy();
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 2, name: "Milho — BRS 1010" }),
+    );
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
     expect(getProductionPlan).toHaveBeenCalledTimes(2);
     expect(getProductionComparison).toHaveBeenCalledTimes(2);
@@ -577,7 +583,7 @@ describe("PlanDetail — tabela de apontamentos", () => {
 
     expect(await screen.findByText("10/05/2026")).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.getByRole("button", { name: "Editar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Editar apontamento de 10/05/2026" })).toBeTruthy();
     expect(
       screen.getByRole("button", { name: /^Excluir apontamento/ }),
     ).toBeTruthy();
@@ -677,7 +683,7 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
     renderPlanDetail();
 
     expect(await screen.findByText("Validado")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Excluir apontamento/ })).toBeNull();
   });
 
@@ -784,8 +790,8 @@ describe("PlanDetail — decisão sobre apontamentos (UNIT-002 / UNIT-003 / UNIT
 
       await screen.findByText("Validado");
       expect(screen.queryByRole("table")).toBeNull();
-      expect(screen.getAllByRole("button", { name: "Validar" })).toHaveLength(1);
-      expect(screen.getAllByRole("button", { name: "Rejeitar" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: /^Validar apontamento de \d{2}\/\d{2}\/\d{4}$/ })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: /^Rejeitar apontamento de \d{2}\/\d{2}\/\d{4}$/ })).toHaveLength(1);
     },
   );
 
@@ -955,7 +961,7 @@ describe("PlanDetail — ocorrências do apontamento (UNIT-006)", () => {
     renderPlanDetail();
 
     await screen.findByText("20/06/2026");
-    const buttons = screen.getAllByRole("button", { name: "Ocorrências" });
+    const buttons = screen.getAllByRole("button", { name: /^Ocorrências do apontamento de / });
     expect(buttons).toHaveLength(2);
     fireEvent.click(buttons[1]);
     await waitFor(() => expect(listOccurrences).toHaveBeenCalledWith("execution-a"));
@@ -1050,7 +1056,7 @@ describe("PlanDetail — fotos do apontamento (UNIT-005)", () => {
     renderPlanDetail();
 
     await screen.findByText("20/06/2026");
-    const buttons = screen.getAllByRole("button", { name: "Fotos" });
+    const buttons = screen.getAllByRole("button", { name: /^Fotos do apontamento de / });
     expect(buttons).toHaveLength(2);
     fireEvent.click(buttons[1]);
     await waitFor(() => expect(listAttachments).toHaveBeenCalledWith("execution-a"));

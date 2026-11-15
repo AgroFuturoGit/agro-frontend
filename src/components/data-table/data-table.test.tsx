@@ -654,6 +654,16 @@ describe("DataTable — foco quando o botão de erro/vazio desmonta (A11Y-L2-R2-
     expect(document.activeElement?.getAttribute("tabindex")).toBe("-1");
   });
 
+  it("A11Y-L6-3: o contêiner focado é uma região com nome", async () => {
+    const user = userEvent.setup();
+    render(<StatefulHost start="error" />);
+
+    await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    const region = screen.getByRole("region", { name: "Lista de registros" });
+    expect(document.activeElement).toBe(region);
+  });
+
   it("CTA do vazio: o foco fica no contêiner quando o primeiro registro aparece", async () => {
     const user = userEvent.setup();
     render(<StatefulHost start="empty" />);

@@ -113,7 +113,11 @@ test.describe("Idioma, 404 e acessibilidade", () => {
   test("rota inexistente mostra a 404 em português", async ({ page }) => {
     await page.goto("/rota-que-nao-existe");
     await expect(page.getByRole("heading", { name: "Página não encontrada" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Voltar ao início" })).toBeVisible();
+    await expect(page).toHaveTitle("Página não encontrada · ProduPlan");
+    await expect(page.getByRole("link", { name: "Ir para o painel" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
   });
 
   test("um único <main> e link 'Pular para o conteúdo' como primeiro foco", async ({ page }) => {

@@ -286,6 +286,7 @@ export function CropsPage() {
       />
 
       <DataTable
+        label="Lista de culturas"
         table={table}
         columns={columns}
         isLoading={loading}

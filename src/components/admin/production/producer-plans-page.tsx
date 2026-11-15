@@ -35,7 +35,8 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
 import { FinancingSection } from "@/components/admin/producers/financing-section";
-import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { withFocusMove } from "@/lib/focus";
+import { userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
@@ -64,6 +65,9 @@ type BreadcrumbNames = {
   communityName: string;
   producerLabel: string;
 };
+
+/** `id` do título: alvo do foco do "Tentar novamente" da guarda (A11Y-L6-5). */
+const PLANS_TITLE_ID = "producer-plans-title";
 
 function PlanStatusBadge({ plan }: { plan: ProductionPlan }) {
   if (!plan.status) return <EmptyValue />;
@@ -248,11 +252,10 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       const data = await listProductionPlans(producerId);
       setPlans(data);
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar os planos de produção.",
-      );
+      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
+      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
+      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
+      setError(apiErrorMessage(err, ""));
     } finally {
       setLoading(false);
     }
@@ -460,15 +463,23 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   }
 
   if (guardError) {
+    // Mesma estrutura (div > div > PageHeader) da tela principal: com
+    // `titleId`, o <h2> continua montado depois do "Tentar novamente" e
+    // recebe o foco quando o alerta desmonta (A11Y-L6-5).
     return (
-      <div className="flex flex-col gap-section-sm">
-        <PageHeader title="Planos de produção" />
-        <InlineAlert
-          variant="destructive"
-          action={{ label: "Tentar novamente", onClick: () => runGuard() }}
-        >
-          {guardError}
-        </InlineAlert>
+      <div className="flex flex-col gap-section">
+        <div className="flex flex-col gap-section-sm">
+          <PageHeader title="Planos de produção" titleId={PLANS_TITLE_ID} />
+          <InlineAlert
+            variant="destructive"
+            action={{
+              label: "Tentar novamente",
+              onClick: withFocusMove(PLANS_TITLE_ID, () => runGuard()),
+            }}
+          >
+            {guardError}
+          </InlineAlert>
+        </div>
       </div>
     );
   }
@@ -493,6 +504,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
             { label: names?.producerLabel ?? "Agricultor" },
           ]}
           title="Planos de produção"
+          titleId={PLANS_TITLE_ID}
           description={`Planos de ${names?.producerLabel ?? "produção"}.`}
           // Até os nomes chegarem, skeleton no lugar do título e da descrição
           // (nada de "Planos de produção." provisório).
@@ -514,10 +526,11 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         />
 
         <DataTable
+          label="Lista de planos de produção"
           table={table}
           columns={columns}
           isLoading={loading}
-          hasError={Boolean(error)}
+          hasError={error !== null}
           onRetry={refresh}
           errorHint={userFacingErrorHint(error)}
           hasActiveFilters={

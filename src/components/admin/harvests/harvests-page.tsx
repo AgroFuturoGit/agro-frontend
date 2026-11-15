@@ -215,6 +215,7 @@ export function HarvestsPage() {
       <DataTableToolbar table={table} searchPlaceholder="Buscar por rótulo…" />
 
       <DataTable
+        label="Lista de safras"
         table={table}
         columns={columns}
         isLoading={loading}

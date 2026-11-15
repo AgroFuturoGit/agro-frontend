@@ -35,13 +35,35 @@ export function userFacingErrorHint(
   return message;
 }
 
+/** Próximo passo acrescentado aos fallbacks de `apiErrorMessage` (regra 12.3). */
+export const RETRY_HINT = "Tente novamente em alguns instantes.";
+
+/** O fallback já orienta o usuário (ex.: "… Contate o suporte."): não repete. */
+const HAS_NEXT_STEP = /tente novamente|contate|verifique|recarregue/i;
+
+/**
+ * Fallback com o próximo passo: "Não foi possível excluir a safra." vira
+ * "Não foi possível excluir a safra. Tente novamente em alguns instantes.".
+ * Vazio continua vazio (quem passa `""` monta a frase por conta própria), e
+ * um fallback que já diz o que fazer fica como está.
+ */
+export function withRetryHint(fallback: string): string {
+  const text = fallback.trim();
+  if (!text || HAS_NEXT_STEP.test(text)) return fallback;
+  return `${/[.!?…]$/.test(text) ? text : `${text}.`} ${RETRY_HINT}`;
+}
+
 /**
  * Mensagem de erro para a tela a partir de qualquer exceção: usa a mensagem
- * de domínio do `ApiError` (via `userFacingErrorHint`) e cai em `fallback`
- * para "Erro NNN" cru, mensagem vazia ou erro que não veio da API.
+ * de domínio do `ApiError` (via `userFacingErrorHint`) e, para "Erro NNN"
+ * cru, mensagem vazia ou erro que não veio da API, cai em `fallback` com o
+ * próximo passo (`withRetryHint`).
  */
 export function apiErrorMessage(err: unknown, fallback: string): string {
-  return (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ?? fallback;
+  return (
+    (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
+    withRetryHint(fallback)
+  );
 }
 
 /** 409 de edição simultânea: o back devolve o registro atual em `current`. */

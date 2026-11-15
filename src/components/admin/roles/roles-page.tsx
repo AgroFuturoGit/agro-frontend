@@ -99,6 +99,7 @@ export function RolesPage() {
       />
 
       <DataTable
+        label="Lista de perfis"
         table={table}
         columns={columns}
         isLoading={loading}

@@ -6,6 +6,14 @@
 export const FOCUS_RING_LINK =
   "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card";
 
+/**
+ * Foco de alvos de script (`moveFocusTo`): contêiner de tabela, título de
+ * página. Anel opaco só no teclado (`focus-visible`), com offset na cor do
+ * fundo da página. Mesmo anel do `FOCUS_RING_LINK`.
+ */
+export const FOCUS_TARGET =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
 const NATIVE_FOCUSABLE =
   "a[href], button, input, select, textarea, summary, [contenteditable='true']";
 
