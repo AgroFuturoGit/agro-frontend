@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sheet";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_MAX_COUNT,
@@ -64,11 +64,6 @@ const NO_ITEMS: ExecutionAttachment[] = [];
 /** Recusa de validação (4xx) não melhora reenviando o mesmo arquivo. */
 function isRetryable(err: unknown): boolean {
   return !(err instanceof ApiError) || err.status >= 500;
-}
-
-/** Mensagem da API para o usuário; "Erro 500" cru cai no texto padrão. */
-function apiMessage(err: unknown, fallback: string): string {
-  return (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ?? fallback;
 }
 
 /**
@@ -135,7 +130,7 @@ export function ExecutionAttachmentsSheet({
     } catch (err) {
       if (seq !== loadSeq.current) return;
       setError(
-        apiMessage(err, "Não foi possível carregar as fotos."),
+        apiErrorMessage(err, "Não foi possível carregar as fotos."),
       );
     } finally {
       if (seq === loadSeq.current) setLoading(false);
@@ -214,7 +209,7 @@ export function ExecutionAttachmentsSheet({
           key: `${file.name}-${failed.length}`,
           name: file.name,
           message: `${file.name}: ${
-            apiMessage(err, "Não foi possível enviar a foto.")
+            apiErrorMessage(err, "Não foi possível enviar a foto.")
           }`,
           file: isRetryable(err) ? file : null,
         });
@@ -253,7 +248,7 @@ export function ExecutionAttachmentsSheet({
       saveBlob(blob, filename);
     } catch (err) {
       setActionError(
-        apiMessage(err, "Não foi possível baixar a foto."),
+        apiErrorMessage(err, "Não foi possível baixar a foto."),
       );
     }
   }
@@ -286,7 +281,7 @@ export function ExecutionAttachmentsSheet({
         await refresh();
       } else {
         setDeleteError(
-          apiMessage(err, "Não foi possível excluir a foto."),
+          apiErrorMessage(err, "Não foi possível excluir a foto."),
         );
       }
     } finally {

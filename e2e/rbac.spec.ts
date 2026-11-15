@@ -246,7 +246,7 @@ test("FARMER vê o dashboard do agricultor na Visão geral, sem o painel de prod
 
   await page.goto("/admin");
 
-  await expect(page.getByText("Safra: Safra 2026")).toBeVisible();
+  await expect(page.getByTestId("dashboard-toolbar-description")).toHaveText("Safra 2026");
   await expect(page.getByText("Pendente de validação")).toBeVisible();
   await expect(page.getByTestId("farmer-plan-card")).toHaveCount(2);
   await expect(page.getByText("Abaixo do esperado")).toBeVisible();
@@ -325,7 +325,7 @@ test("TECHNICIAN vê o dashboard do técnico na Visão geral, sem o painel de pr
 
   await page.goto("/admin");
 
-  await expect(page.getByText("Safra: Safra 2026")).toBeVisible();
+  await expect(page.getByTestId("dashboard-toolbar-description")).toHaveText("Safra 2026");
   await expect(page.getByText("Comunidades atendidas")).toBeVisible();
   await expect(page.getByText("7 apontamentos pendentes")).toBeVisible();
   await expect(page.getByTestId("warning-card")).toHaveCount(2);

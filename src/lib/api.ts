@@ -35,6 +35,15 @@ export function userFacingErrorHint(
   return message;
 }
 
+/**
+ * Mensagem de erro para a tela a partir de qualquer exceção: usa a mensagem
+ * de domínio do `ApiError` (via `userFacingErrorHint`) e cai em `fallback`
+ * para "Erro NNN" cru, mensagem vazia ou erro que não veio da API.
+ */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  return (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ?? fallback;
+}
+
 /** 409 de edição simultânea: o back devolve o registro atual em `current`. */
 export function isConcurrencyConflict(err: ApiError): boolean {
   const payload = err.payload;

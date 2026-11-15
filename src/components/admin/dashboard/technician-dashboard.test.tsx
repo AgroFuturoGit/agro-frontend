@@ -223,7 +223,7 @@ describe("TechnicianDashboard — indicadores (UNIT-003)", () => {
     expect(screen.getByText("7 apontamentos pendentes")).toBeTruthy();
     expect(screen.getByText("26,67%")).toBeTruthy();
     expect(screen.getByText(/apenas apontamentos validados/)).toBeTruthy();
-    expect(screen.getByText("Safra: Safra 2026")).toBeTruthy();
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe("Safra 2026");
   });
 
   it("a primeira consulta vai sem filtros", async () => {
@@ -641,6 +641,9 @@ describe("TechnicianDashboard — estados (UNIT-009)", () => {
     expect(screen.queryByRole("button", { name: "Voltar para Todas" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("Comunidades atendidas")).toBeTruthy();
+    // A11Y-L5-R2-1: o alerta some; o foco fica no seletor de safra.
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement?.id).toBe("tech-harvest");
   });
 
   it("erro que não é ApiError usa a mensagem genérica", async () => {
@@ -777,7 +780,7 @@ describe("TechnicianDashboard — revisão r1 do lote 5", () => {
     await screen.findByText("Comunidades atendidas");
     const bar = screen.getByTestId("dashboard-toolbar");
     expect(within(bar).getByText("Minha carteira").className).toContain("text-lg");
-    expect(within(bar).getByText(/^Safra: /).className).toContain("text-muted-foreground");
+    expect(within(bar).getByText("Safra 2026", { selector: "p" }).className).toContain("text-muted-foreground");
   });
 
   it("A11Y-L5-5: o skeleton do painel é uma região nomeada e ocupada", () => {

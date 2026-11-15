@@ -14,6 +14,8 @@ type EmptyStateAction = {
 
 type EmptyStateProps = {
   icon?: LucideIcon;
+  /** Texto curto acima do título (ex.: "Erro 404"). */
+  eyebrow?: React.ReactNode;
   title: React.ReactNode;
   hint?: React.ReactNode;
   action?: EmptyStateAction;
@@ -38,6 +40,7 @@ const variantClasses: Record<NonNullable<EmptyStateProps["variant"]>, string> = 
 /** Estado vazio/erro com ícone, título, dica e uma ação opcional. */
 export function EmptyState({
   icon: Icon,
+  eyebrow,
   title,
   hint,
   action,
@@ -63,7 +66,18 @@ export function EmptyState({
       {Icon ? (
         <Icon aria-hidden="true" className="mb-2 size-8 text-muted-foreground" />
       ) : null}
-      <Title className="text-base font-medium text-foreground">{title}</Title>
+      {eyebrow ? (
+        <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p>
+      ) : null}
+      <Title
+        className={cn(
+          "text-base font-medium text-foreground",
+          // h1 só na página 404: um passo acima (18px) para marcar o título da página.
+          headingLevel === "h1" && "text-lg font-semibold",
+        )}
+      >
+        {title}
+      </Title>
       {hint ? (
         <p className="max-w-sm text-sm text-muted-foreground">{hint}</p>
       ) : null}

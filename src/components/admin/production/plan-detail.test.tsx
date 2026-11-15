@@ -230,7 +230,7 @@ function queryWriteAffordances() {
       name: /Criar primeiro apontamento/i,
     }),
     editar: screen.queryByRole("button", { name: /^Editar( apontamento)?$/ }),
-    excluir: screen.queryByRole("button", { name: "Excluir apontamento" }),
+    excluir: screen.queryByRole("button", { name: /^Excluir apontamento/ }),
     colunaAcoes: screen.queryByRole("columnheader", { name: "Ações" }),
   };
 }
@@ -311,10 +311,10 @@ describe("PlanDetail — gating das ações de escrita por role", () => {
         screen.getByRole("button", { name: /Novo apontamento/i }),
       ).toBeTruthy();
       expect(
-        screen.getByRole("button", { name: "Editar apontamento" }),
+        screen.getByRole("button", { name: /^Editar apontamento/ }),
       ).toBeTruthy();
       expect(
-        screen.getByRole("button", { name: "Excluir apontamento" }),
+        screen.getByRole("button", { name: /^Excluir apontamento/ }),
       ).toBeTruthy();
       expect(screen.getByRole("columnheader", { name: "Ações" })).toBeTruthy();
     },
@@ -365,7 +365,7 @@ describe("PlanDetail — exclusão de apontamento pelo FARMER", () => {
 
     await expectPlanIsReadable();
     fireEvent.click(
-      screen.getByRole("button", { name: "Excluir apontamento" }),
+      screen.getByRole("button", { name: /^Excluir apontamento/ }),
     );
     expect(
       await screen.findByRole("alertdialog", { name: "Excluir apontamento" }),
@@ -579,7 +579,7 @@ describe("PlanDetail — tabela de apontamentos", () => {
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.getByRole("button", { name: "Editar" })).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Excluir apontamento" }),
+      screen.getByRole("button", { name: /^Excluir apontamento/ }),
     ).toBeTruthy();
   });
 });
@@ -608,6 +608,24 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
     ).toBeTruthy();
   });
 
+  it("A11Y-L4-4: as ações da linha levam a data do apontamento no nome", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
+
+    renderPlanDetail();
+
+    await screen.findByText("Validado");
+    const edit = screen.getAllByRole("button", { name: /^Editar apontamento/ });
+    expect(edit.map((b) => b.getAttribute("aria-label"))).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Editar apontamento de \d{2}\/\d{2}\/\d{4}$/)]),
+    );
+    expect(
+      screen.getAllByRole("button", { name: /^Ocorrências do apontamento de / }).length,
+    ).toBe(ALL_STATUSES.length);
+    // O `title` (dica no hover) continua curto.
+    expect(edit[0].getAttribute("title")).toBe("Editar");
+  });
+
   it("FARMER: edita pendente e rejeitado, exclui só o pendente, validado travado (UNIT-005)", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);
@@ -615,10 +633,10 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
     renderPlanDetail();
 
     await screen.findByText("Validado");
-    expect(screen.getAllByRole("button", { name: "Editar apontamento" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "Excluir apontamento" })).toHaveLength(1);
-    expect(screen.queryByRole("button", { name: "Validar apontamento" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Rejeitar apontamento" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Editar apontamento/ })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: /^Excluir apontamento/ })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /^Validar apontamento/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Rejeitar apontamento/ })).toBeNull();
   });
 
   it("FARMER: editar o rejeitado mostra o aviso de reenvio para validação", async () => {
@@ -627,7 +645,7 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
 
     renderPlanDetail();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Editar apontamento" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Editar apontamento/ }));
     expect(
       await screen.findByText(
         "Alterar quantidade ou data reenvia o apontamento para validação.",
@@ -644,8 +662,8 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
       renderPlanDetail();
 
       await screen.findByText("Validado");
-      expect(screen.getAllByRole("button", { name: "Editar apontamento" })).toHaveLength(1);
-      expect(screen.getAllByRole("button", { name: "Excluir apontamento" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: /^Editar apontamento/ })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: /^Excluir apontamento/ })).toHaveLength(1);
     },
   );
 
@@ -660,7 +678,7 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
 
     expect(await screen.findByText("Validado")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Editar" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Excluir apontamento" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir apontamento/ })).toBeNull();
   });
 
   it("meta, realizado e diferença aparecem em kg (nunca em t)", async () => {
@@ -750,8 +768,8 @@ describe("PlanDetail — decisão sobre apontamentos (UNIT-002 / UNIT-003 / UNIT
       renderPlanDetail();
 
       await screen.findByText("Validado");
-      expect(screen.getAllByRole("button", { name: "Validar apontamento" })).toHaveLength(1);
-      expect(screen.getAllByRole("button", { name: "Rejeitar apontamento" })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: /^Validar apontamento/ })).toHaveLength(1);
+      expect(screen.getAllByRole("button", { name: /^Rejeitar apontamento/ })).toHaveLength(1);
     },
   );
 
@@ -822,7 +840,7 @@ describe("PlanDetail — decisão sobre apontamentos (UNIT-002 / UNIT-003 / UNIT
 
     renderPlanDetail();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Validar apontamento" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Validar apontamento/ }));
     expect(
       await screen.findByRole("alertdialog", { name: "Validar apontamento" }),
     ).toBeTruthy();
@@ -843,7 +861,7 @@ describe("PlanDetail — decisão sobre apontamentos (UNIT-002 / UNIT-003 / UNIT
 
     renderPlanDetail();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Rejeitar apontamento" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Rejeitar apontamento/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Rejeitar" }));
 
     await waitFor(() => expect(rejectProductionExecution).toHaveBeenCalledTimes(1));
@@ -859,7 +877,7 @@ describe("PlanDetail — decisão sobre apontamentos (UNIT-002 / UNIT-003 / UNIT
 
     renderPlanDetail();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Validar apontamento" }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Validar apontamento/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Validar" }));
 
     expect(await screen.findByText("Técnico sem acesso a esta comunidade.")).toBeTruthy();
@@ -912,10 +930,12 @@ describe("PlanDetail — ocorrências do apontamento (UNIT-006)", () => {
 
       await screen.findByText("20/06/2026");
       const buttons = screen.getAllByRole("button", {
-        name: "Ocorrências do apontamento",
+        name: /^Ocorrências do apontamento/,
       });
       expect(buttons).toHaveLength(2);
-      // Mais recente primeiro: a primeira linha é a execution-b.
+      // Mais recente primeiro: a primeira linha é a execution-b (A11Y-L4-4: a
+      // data está no nome do botão).
+      expect(buttons[0]).toHaveAccessibleName("Ocorrências do apontamento de 20/06/2026");
       fireEvent.click(buttons[0]);
       await waitFor(() => expect(listOccurrences).toHaveBeenCalledWith("execution-b"));
       const sheet = await screen.findByRole("dialog");
@@ -961,7 +981,7 @@ describe("PlanDetail — ocorrências do apontamento (UNIT-006)", () => {
 
     await screen.findByText("20/06/2026");
     fireEvent.click(
-      screen.getAllByRole("button", { name: "Ocorrências do apontamento" })[0],
+      screen.getAllByRole("button", { name: /^Ocorrências do apontamento/ })[0],
     );
     expect(await screen.findByText("Lagarta")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Adicionar ocorrência/ })).toBeNull();
@@ -977,7 +997,7 @@ describe("PlanDetail — ocorrências do apontamento (UNIT-006)", () => {
 
     await screen.findByText("20/06/2026");
     fireEvent.click(
-      screen.getAllByRole("button", { name: "Ocorrências do apontamento" })[0],
+      screen.getAllByRole("button", { name: /^Ocorrências do apontamento/ })[0],
     );
     expect(
       await screen.findByRole("button", { name: "Adicionar ocorrência" }),
@@ -1008,7 +1028,7 @@ describe("PlanDetail — fotos do apontamento (UNIT-005)", () => {
       renderPlanDetail();
 
       await screen.findByText("20/06/2026");
-      const buttons = screen.getAllByRole("button", { name: "Fotos do apontamento" });
+      const buttons = screen.getAllByRole("button", { name: /^Fotos do apontamento/ });
       expect(buttons).toHaveLength(2);
       fireEvent.click(buttons[0]);
       await waitFor(() => expect(listAttachments).toHaveBeenCalledWith("execution-b"));
@@ -1043,7 +1063,7 @@ describe("PlanDetail — evidências de apontamento validado", () => {
 
   async function addOccurrenceAfterOpen() {
     await screen.findByText("Validado");
-    fireEvent.click(screen.getByRole("button", { name: "Ocorrências do apontamento" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Ocorrências do apontamento/ }));
     await waitFor(() => expect(listOccurrences).toHaveBeenCalled());
     const addOccurrence = screen.queryByRole("button", { name: "Adicionar ocorrência" });
     cleanup();
@@ -1052,7 +1072,7 @@ describe("PlanDetail — evidências de apontamento validado", () => {
 
   async function attachmentInputAfterOpen() {
     await screen.findByText("Validado");
-    fireEvent.click(screen.getByRole("button", { name: "Fotos do apontamento" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fotos do apontamento/ }));
     await waitFor(() => expect(listAttachments).toHaveBeenCalled());
     return screen.queryByTestId("attachment-input");
   }
@@ -1093,7 +1113,7 @@ describe("PlanDetail — evidências de apontamento validado", () => {
 
     renderPlanDetail();
     await screen.findByText("Rejeitado");
-    fireEvent.click(screen.getByRole("button", { name: "Fotos do apontamento" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Fotos do apontamento/ }));
     await waitFor(() => expect(listAttachments).toHaveBeenCalled());
     expect(screen.queryByTestId("attachment-input")).not.toBeNull();
   });
@@ -1118,8 +1138,8 @@ describe("PlanDetail — revisão r1 do lote 4", () => {
     loginAs("TECHNICIAN");
     renderPlanDetail();
 
-    const validate = (await screen.findAllByRole("button", { name: "Validar apontamento" }))[0];
-    const reject = screen.getAllByRole("button", { name: "Rejeitar apontamento" })[0];
+    const validate = (await screen.findAllByRole("button", { name: /^Validar apontamento/ }))[0];
+    const reject = screen.getAllByRole("button", { name: /^Rejeitar apontamento/ })[0];
     expect(validate.className).toContain("text-primary");
     expect(reject.className).toContain("text-destructive");
   });

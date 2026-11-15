@@ -147,7 +147,7 @@ describe("ManagementDashboard — gestor (UNIT-003)", () => {
   it("consulta só a organização do gestor e mostra as métricas com cabeçalho", async () => {
     render(<ManagementDashboard role="MANAGER" />);
     expect(await screen.findByTestId("mgmt-scope-title")).toHaveProperty("textContent", "Cooperativa Sol");
-    expect(screen.getByText("Safra: Safra 2026")).toBeTruthy();
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe("Safra 2026");
     expect(getGlobalSummary).not.toHaveBeenCalled();
     expect(getManagerSummary).toHaveBeenCalledWith({ harvestId: undefined, communityId: undefined });
     const card = (label: string) => screen.getByText(label).closest("[data-slot=card]") as HTMLElement;

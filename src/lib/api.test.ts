@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -389,5 +389,26 @@ describe("userFacingErrorHint", () => {
     expect(userFacingErrorHint("Erro 500")).toBeUndefined();
     expect(userFacingErrorHint(null)).toBeUndefined();
     expect(userFacingErrorHint("")).toBeUndefined();
+  });
+});
+
+describe("apiErrorMessage", () => {
+  it("usa a mensagem de domínio do ApiError", () => {
+    expect(apiErrorMessage(new ApiError(409, "Safra já existe.", null), "Falhou.")).toBe(
+      "Safra já existe.",
+    );
+  });
+
+  it("cai no fallback para o 'Erro NNN' cru e mensagem vazia", () => {
+    expect(apiErrorMessage(new ApiError(500, "Erro 500", null), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(502, " Erro 502 ", null), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(400, "", null), "Falhou.")).toBe("Falhou.");
+  });
+
+  it("cai no fallback para erro que não veio da API", () => {
+    expect(apiErrorMessage(new Error("Failed to fetch"), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(new TypeError("x"), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage("string", "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(null, "Falhou.")).toBe("Falhou.");
   });
 });

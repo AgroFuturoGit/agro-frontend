@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { unitFactorKg, unitLabel, type Crop } from "@/lib/crops";
 import {
   createProductionExecution,
@@ -207,8 +207,7 @@ export function ExecutionFormDrawer({
         return;
       }
       setFormError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível salvar o apontamento.",
+        apiErrorMessage(err, "Não foi possível salvar o apontamento."),
       );
     } finally {
       setSubmitting(false);

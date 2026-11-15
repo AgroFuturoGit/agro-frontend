@@ -8,7 +8,7 @@ describe("DashboardToolbar / FilterSelect", () => {
 
   it("barra é um Card com o recorte e os filtros; o rótulo nomeia o combobox", () => {
     render(
-      <DashboardToolbar title="Minha carteira" description="Safra: Safra 2026">
+      <DashboardToolbar title="Minha carteira" description="Safra 2026">
         <FilterSelect
           id="f-safra"
           label="Safra"
@@ -24,9 +24,9 @@ describe("DashboardToolbar / FilterSelect", () => {
 
     const bar = screen.getByTestId("dashboard-toolbar");
     expect(bar.getAttribute("data-slot")).toBe("card");
-    expect(bar.textContent).toContain("Safra: Safra 2026");
+    expect(bar.textContent).toContain("Safra 2026");
     expect(screen.getByText("Minha carteira").className).toContain("text-lg");
-    expect(screen.getByText("Safra: Safra 2026").className).toContain("text-muted-foreground");
+    expect(screen.getByTestId("dashboard-toolbar-description").className).toContain("text-muted-foreground");
     const combo = screen.getByRole("combobox", { name: "Safra" });
     expect(combo.textContent).toContain("Safra vigente");
   });

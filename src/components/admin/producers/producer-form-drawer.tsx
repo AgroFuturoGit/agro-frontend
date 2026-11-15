@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
@@ -414,21 +414,20 @@ export function ProducerFormDrawer({
       onSaved();
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (mode === "create") {
-          const apiFieldErrors = parseProducerRegisterFieldErrors(err.payload);
-          if (Object.keys(apiFieldErrors).length > 0) {
-            setFieldErrors(apiFieldErrors);
-          }
+      if (err instanceof ApiError && mode === "create") {
+        const apiFieldErrors = parseProducerRegisterFieldErrors(err.payload);
+        if (Object.keys(apiFieldErrors).length > 0) {
+          setFieldErrors(apiFieldErrors);
         }
-        setFormError(err.message);
-      } else {
-        setFormError(
+      }
+      setFormError(
+        apiErrorMessage(
+          err,
           mode === "create"
             ? "Não foi possível cadastrar o agricultor."
             : "Não foi possível salvar o agricultor.",
-        );
-      }
+        ),
+      );
     } finally {
       setSubmitting(false);
     }

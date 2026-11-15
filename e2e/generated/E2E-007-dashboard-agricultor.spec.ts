@@ -53,7 +53,7 @@ test.describe('E2E-007 Dashboard do agricultor na Visão geral', () => {
     await page.goto('/admin');
     await page.getByRole('combobox', { name: 'Safra' }).click();
     await page.getByRole('option', { name: env('E2E_FARMER_OTHER_HARVEST') }).click();
-    await expect(page.getByText(`Safra: ${env('E2E_FARMER_OTHER_HARVEST')}`)).toBeVisible();
+    await expect(page.getByTestId('dashboard-toolbar-description')).toContainText(env('E2E_FARMER_OTHER_HARVEST'));
   });
 
   test('abre_plano — O cartão leva ao detalhe do plano', {

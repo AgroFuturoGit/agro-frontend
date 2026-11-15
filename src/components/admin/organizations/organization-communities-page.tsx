@@ -29,7 +29,7 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
@@ -111,9 +111,10 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         } catch (err) {
           setOrganization(null);
           setCommunities([]);
+          const hint = apiErrorMessage(err, "");
           setError(
-            err instanceof ApiError
-              ? `Não foi possível identificar a sua organização: ${err.message}`
+            hint
+              ? `Não foi possível identificar a sua organização: ${hint}`
               : "Não foi possível identificar a sua organização. Sem ela, as comunidades não podem ser listadas.",
           );
           return;

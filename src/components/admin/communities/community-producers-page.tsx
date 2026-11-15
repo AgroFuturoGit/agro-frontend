@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
 import { formatCpf } from "@/lib/cpf";
@@ -139,9 +139,10 @@ export function CommunityProducersPage({ communityId }: Props) {
         } catch (err) {
           setCommunity(null);
           setProducers([]);
+          const hint = apiErrorMessage(err, "");
           setError(
-            err instanceof ApiError
-              ? `Não foi possível identificar a sua organização: ${err.message}`
+            hint
+              ? `Não foi possível identificar a sua organização: ${hint}`
               : "Não foi possível identificar a sua organização.",
           );
           return;

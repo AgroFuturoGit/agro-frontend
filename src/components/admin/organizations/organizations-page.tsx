@@ -35,7 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCnpj } from "@/lib/cnpj";
 import { getMyManager } from "@/lib/managers";
@@ -163,9 +163,10 @@ export function OrganizationsPage() {
         const manager = await getMyManager();
         router.replace(`/admin/organizacoes/${manager.organization.id}`);
       } catch (err) {
+        const hint = apiErrorMessage(err, "");
         setRedirectError(
-          err instanceof ApiError
-            ? `Não foi possível identificar a sua organização: ${err.message}`
+          hint
+            ? `Não foi possível identificar a sua organização: ${hint}`
             : "Não foi possível identificar a sua organização.",
         );
       }
@@ -187,9 +188,10 @@ export function OrganizationsPage() {
           `/admin/organizacoes/${community.organization.id}/comunidades/${community.id}/produtores/${producer.id}`,
         );
       } catch (err) {
+        const hint = apiErrorMessage(err, "");
         setRedirectError(
-          err instanceof ApiError
-            ? `Não foi possível identificar o seu agricultor: ${err.message}`
+          hint
+            ? `Não foi possível identificar o seu agricultor: ${hint}`
             : "Não foi possível identificar o seu agricultor.",
         );
       }

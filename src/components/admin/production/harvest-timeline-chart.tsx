@@ -25,7 +25,7 @@ import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getHarvestTimeline } from "@/lib/analytics";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   hasValidExpectedWindow,
@@ -166,8 +166,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
       setData(null);
       // "Erro 500" cru não ajuda o usuário: cai na mensagem genérica.
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          LOAD_ERROR,
+        apiErrorMessage(err, LOAD_ERROR),
       );
     } finally {
       if (request === requestRef.current) setLoading(false);

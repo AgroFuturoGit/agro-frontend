@@ -45,7 +45,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import {
   createFamilyMember,
   deleteFamilyMember,
@@ -180,7 +180,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
         if (Object.keys(fromApi).length > 0) {
           setFieldErrors(fromApi);
         } else {
-          setFormError(err.message);
+          setFormError(apiErrorMessage(err, "Não foi possível salvar o membro familiar."));
         }
       } else {
         setFormError("Não foi possível salvar o membro familiar.");
@@ -200,9 +200,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
       await refresh();
     } catch (err) {
       setDeleteError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir o membro familiar.",
+        apiErrorMessage(err, "Não foi possível excluir o membro familiar."),
       );
     } finally {
       setDeleting(false);

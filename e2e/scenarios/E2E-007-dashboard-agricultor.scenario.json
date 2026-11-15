@@ -133,11 +133,12 @@
       ],
       "assertions": [
         {
-          "expect": "visible",
+          "expect": "text",
           "target": {
-            "by": "text",
-            "value": "Safra: ${env:E2E_FARMER_OTHER_HARVEST}"
-          }
+            "by": "testid",
+            "value": "dashboard-toolbar-description"
+          },
+          "value": "${env:E2E_FARMER_OTHER_HARVEST}"
         }
       ]
     },

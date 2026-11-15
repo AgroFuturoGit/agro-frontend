@@ -112,6 +112,9 @@ describe("ReportsPage", () => {
     expect(screen.queryByText("Nenhum plano de produção para exibir")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByRole("heading", { name: "Consolidado" })).toBeTruthy();
+    // A11Y-L5-R2-1: o alerta desmonta; o foco vai para o título da página.
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Relatórios" }));
   });
 
   it("carregando: região nomeada com o skeleton do consolidado, sem vazio nem alerta", () => {

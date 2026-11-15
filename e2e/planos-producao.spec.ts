@@ -706,8 +706,8 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
     await page.goto(PLAN_URL);
 
     // Linha de 10/05 (ex-a): validar com confirmação.
-    await expect(page.getByRole("button", { name: "Validar apontamento" })).toHaveCount(2);
-    await page.getByRole("button", { name: "Validar apontamento" }).first().click();
+    await expect(page.getByRole("button", { name: /^Validar apontamento/ })).toHaveCount(2);
+    await page.getByRole("button", { name: /^Validar apontamento/ }).first().click();
     const validateDialog = page.getByRole("alertdialog", { name: "Validar apontamento" });
     await expect(validateDialog).toBeVisible();
     expect(Object.keys(bodies)).toHaveLength(0);
@@ -718,15 +718,15 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
     await expect(page.getByText("Decidido em 12/05/2026")).toBeVisible();
 
     // Restou só uma linha pendente: rejeitar com motivo vazio.
-    await expect(page.getByRole("button", { name: "Rejeitar apontamento" })).toHaveCount(1);
-    await page.getByRole("button", { name: "Rejeitar apontamento" }).click();
+    await expect(page.getByRole("button", { name: /^Rejeitar apontamento/ })).toHaveCount(1);
+    await page.getByRole("button", { name: /^Rejeitar apontamento/ }).click();
     const rejectDialog = page.getByRole("alertdialog", { name: "Rejeitar apontamento" });
     await rejectDialog.getByRole("button", { name: "Rejeitar", exact: true }).click();
     await expect(rejectDialog).toBeHidden();
     expect(JSON.parse(bodies["reject:ex-b"] ?? "{}")).not.toHaveProperty("reason");
     await expect(page.getByText("Rejeitado", { exact: true })).toBeVisible();
     // Sem pendentes: nenhuma ação de decisão sobra.
-    await expect(page.getByRole("button", { name: "Validar apontamento" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Validar apontamento/ })).toHaveCount(0);
   });
 
   test("TECHNICIAN vê o erro do back no dialog de rejeição e ele continua aberto", async ({ page }) => {
@@ -748,7 +748,7 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
     );
 
     await page.goto(PLAN_URL);
-    await page.getByRole("button", { name: "Rejeitar apontamento" }).click();
+    await page.getByRole("button", { name: /^Rejeitar apontamento/ }).click();
     const dialog = page.getByRole("alertdialog", { name: "Rejeitar apontamento" });
     await dialog.getByLabel("Motivo (opcional)").fill("Quantidade inconsistente");
     await dialog.getByRole("button", { name: "Rejeitar", exact: true }).click();
@@ -798,8 +798,8 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
 
     await expect(page.getByText("Rejeitado", { exact: true })).toBeVisible();
     await expect(page.getByText("Motivo: Quantidade acima do esperado")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Validar apontamento" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Rejeitar apontamento" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Validar apontamento/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Rejeitar apontamento/ })).toHaveCount(0);
     // Rejeitado não se exclui.
     await expect(page.getByRole("button", { name: "Excluir apontamento" })).toHaveCount(0);
 

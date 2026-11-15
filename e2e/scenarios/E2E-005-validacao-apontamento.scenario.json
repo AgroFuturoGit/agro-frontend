@@ -84,7 +84,7 @@
           "action": "click",
           "target": {
             "by": "css",
-            "value": "tr:has-text('${env:E2E_EXEC_VALIDATE_DATE}') button[aria-label='Validar apontamento']"
+            "value": "tr:has-text('${env:E2E_EXEC_VALIDATE_DATE}') button[aria-label^='Validar apontamento']"
           }
         },
         {
@@ -119,7 +119,7 @@
           "action": "click",
           "target": {
             "by": "css",
-            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') button[aria-label='Rejeitar apontamento']"
+            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') button[aria-label^='Rejeitar apontamento']"
           }
         },
         {
@@ -219,7 +219,7 @@
           "action": "click",
           "target": {
             "by": "css",
-            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') button[aria-label='Editar apontamento']"
+            "value": "tr:has-text('${env:E2E_EXEC_REJECT_DATE}') button[aria-label^='Editar apontamento']"
           }
         },
         {
@@ -314,7 +314,7 @@
           "expect": "count",
           "target": {
             "by": "css",
-            "value": "button[aria-label='Validar apontamento']"
+            "value": "button[aria-label^='Validar apontamento']"
           },
           "value": 0
         },
@@ -322,7 +322,7 @@
           "expect": "count",
           "target": {
             "by": "css",
-            "value": "button[aria-label='Rejeitar apontamento']"
+            "value": "button[aria-label^='Rejeitar apontamento']"
           },
           "value": 0
         }

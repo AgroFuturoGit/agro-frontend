@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 type PageHeaderProps = {
   /** Renderizado em `<h2>`: o `<h1>` ("Painel administrativo") é do shell. */
   title: React.ReactNode;
+  /** `id` do título: alvo de foco (`moveFocusTo`) quando um CTA da página desmonta. */
+  titleId?: string;
   description?: React.ReactNode;
   /** CTA(s) à direita, alinhados à base do bloco de texto; empilham abaixo de `md`. */
   actions?: React.ReactNode;
@@ -26,6 +28,7 @@ type PageHeaderProps = {
  */
 export function PageHeader({
   title,
+  titleId,
   description,
   actions,
   breadcrumb,
@@ -55,7 +58,7 @@ export function PageHeader({
               </div>
             ) : (
               <>
-                <h2 className="text-page-title font-bold text-foreground">
+                <h2 id={titleId} className="text-page-title font-bold text-foreground">
                   {title}
                 </h2>
                 {description ? (

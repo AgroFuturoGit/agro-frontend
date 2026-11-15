@@ -278,6 +278,33 @@ describe("DataTableToolbar — chips removiveis e botao Limpar", () => {
   });
 });
 
+describe("DataTableToolbar — foco quando a linha de chips some (A11Y-L2-R2-2)", () => {
+  afterEach(cleanup);
+
+  it("'Limpar' leva o foco para a busca", async () => {
+    render(<TestHost />);
+    await selectCategoryOption("Beta");
+
+    const limpar = await screen.findByRole("button", { name: "Limpar" });
+    limpar.focus();
+    fireEvent.click(limpar);
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(screen.getByPlaceholderText("Buscar…"));
+  });
+
+  it("remover o último chip leva o foco para a busca", async () => {
+    render(<TestHost />);
+    await selectCategoryOption("Beta");
+
+    const chip = await screen.findByRole("button", { name: /Categoria: Beta/ });
+    chip.focus();
+    fireEvent.click(chip);
+
+    expect(document.activeElement).toBe(screen.getByPlaceholderText("Buscar…"));
+  });
+});
+
 describe("DataTableToolbar — slot extra (Lote 1B)", () => {
   afterEach(cleanup);
 

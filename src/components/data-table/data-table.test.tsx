@@ -623,3 +623,65 @@ describe("DataTableRowActions — title e tone primary (lote 4)", () => {
     expect(button.className).not.toMatch(/text-destructive|text-muted-foreground/);
   });
 });
+
+describe("DataTable — foco quando o botão de erro/vazio desmonta (A11Y-L2-R2-2)", () => {
+  afterEach(cleanup);
+
+  // Simula a tela: o retry ou o CTA trocam o estado e o botão some.
+  function StatefulHost({ start }: { start: "error" | "empty" }) {
+    const [state, setState] = useState<"error" | "empty" | "loading" | "data">(start);
+    return (
+      <TestHost
+        data={state === "data" ? ITEMS : []}
+        isLoading={state === "loading"}
+        hasError={state === "error"}
+        onRetry={() => setState("loading")}
+        emptyActionLabel="Criar primeiro item"
+        onEmptyAction={() => setState("data")}
+      />
+    );
+  }
+
+  it("'Tentar novamente' leva o foco ao contêiner da tabela, não ao body", async () => {
+    const user = userEvent.setup();
+    render(<StatefulHost start="error" />);
+
+    await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    expect(screen.queryByRole("button", { name: "Tentar novamente" })).toBeNull();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(screen.getByRole("table"));
+    expect(document.activeElement?.getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("CTA do vazio: o foco fica no contêiner quando o primeiro registro aparece", async () => {
+    const user = userEvent.setup();
+    render(<StatefulHost start="empty" />);
+
+    await user.click(screen.getByRole("button", { name: "Criar primeiro item" }));
+
+    expect(screen.getByText("Carlos")).toBeTruthy();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(screen.getByRole("table"));
+  });
+
+  it("'Limpar filtros' também leva o foco ao contêiner", async () => {
+    const user = userEvent.setup();
+    function FilteredHost() {
+      const [filtered, setFiltered] = useState(true);
+      return (
+        <TestHost
+          data={filtered ? [] : ITEMS}
+          hasActiveFilters={filtered}
+          onClearFilters={() => setFiltered(false)}
+        />
+      );
+    }
+    render(<FilteredHost />);
+
+    await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toContainElement(screen.getByRole("table"));
+  });
+});

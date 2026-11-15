@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { harvestText } from "@/lib/harvest-label";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
@@ -325,8 +325,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       // "Erro 500" cru não ajuda: cai na mensagem genérica.
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível carregar o plano de produção.",
+        apiErrorMessage(err, "Não foi possível carregar o plano de produção."),
       );
     } finally {
       setLoading(false);
@@ -348,15 +347,19 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   // (leitura → decisão → edição → exclusão).
   const rowActions = useCallback(
     (execution: ProductionExecution): DataTableRowAction[] => {
+      // A data identifica o registro na lista de botões e no comando de voz
+      // (A11Y-L4-4): "Editar apontamento de 05/03/2026".
+      const date = execution.harvestedAt ? formatPlanDate(execution.harvestedAt) : null;
+      const named = (action: string) => (date ? `${action} de ${date}` : action);
       const actions: DataTableRowAction[] = [
         {
-          label: "Ocorrências do apontamento",
+          label: named("Ocorrências do apontamento"),
           title: "Ocorrências",
           icon: MessageSquareWarning,
           onClick: () => setOccurrencesTarget(execution),
         },
         {
-          label: "Fotos do apontamento",
+          label: named("Fotos do apontamento"),
           title: "Fotos",
           icon: Images,
           onClick: () => setAttachmentsTarget(execution),
@@ -365,14 +368,14 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       if (canDecideExecution(currentRole, execution)) {
         actions.push(
           {
-            label: "Validar apontamento",
+            label: named("Validar apontamento"),
             title: "Validar",
             icon: Check,
             tone: "primary",
             onClick: () => setDecision({ mode: "validate", execution }),
           },
           {
-            label: "Rejeitar apontamento",
+            label: named("Rejeitar apontamento"),
             title: "Rejeitar",
             icon: X,
             tone: "destructive",
@@ -382,7 +385,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       if (canEditExecution(currentRole, execution)) {
         actions.push({
-          label: "Editar apontamento",
+          label: named("Editar apontamento"),
           title: "Editar",
           icon: Pencil,
           onClick: () => setEditTarget(execution),
@@ -390,7 +393,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       if (canDelete && canDeleteExecution(currentRole, execution)) {
         actions.push({
-          label: "Excluir apontamento",
+          label: named("Excluir apontamento"),
           title: "Excluir",
           icon: Trash2,
           tone: "destructive",

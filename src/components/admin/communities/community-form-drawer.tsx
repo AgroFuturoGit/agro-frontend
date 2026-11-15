@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import type { Role } from "@/lib/auth";
 import {
   createCommunity,
@@ -214,7 +214,7 @@ export function CommunityFormDrawer({
         if (Object.keys(apiFieldErrors).length > 0) {
           setFieldErrors(apiFieldErrors);
         }
-        setFormError(err.message);
+        setFormError(apiErrorMessage(err, "Não foi possível salvar a comunidade."));
       } else {
         setFormError("Não foi possível salvar a comunidade.");
       }

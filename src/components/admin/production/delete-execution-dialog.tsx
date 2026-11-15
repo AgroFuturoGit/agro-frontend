@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { unitLabel, type MeasurementUnit } from "@/lib/crops";
 import {
   deleteProductionExecution,
@@ -62,8 +62,7 @@ export function DeleteExecutionDialog({
       // Registro já removido: recarrega a lista para refletir o estado real.
       if (err instanceof ApiError && err.status === 404) onDeleted();
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível excluir o apontamento.",
+        apiErrorMessage(err, "Não foi possível excluir o apontamento."),
       );
     } finally {
       setSubmitting(false);

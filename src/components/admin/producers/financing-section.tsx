@@ -48,7 +48,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import {
   FINANCING_STATUSES,
   FINANCING_STATUS_LABELS,
@@ -204,7 +204,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
         if (Object.keys(fromApi).length > 0) {
           setFieldErrors(fromApi);
         } else {
-          setFormError(err.message);
+          setFormError(apiErrorMessage(err, "Não foi possível salvar o financiamento."));
         }
       } else {
         setFormError("Não foi possível salvar o financiamento.");
@@ -224,9 +224,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
       await refresh();
     } catch (err) {
       setDeleteError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir o financiamento.",
+        apiErrorMessage(err, "Não foi possível excluir o financiamento."),
       );
     } finally {
       setDeleting(false);

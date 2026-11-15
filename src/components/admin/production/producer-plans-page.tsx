@@ -35,7 +35,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
 import { FinancingSection } from "@/components/admin/producers/financing-section";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
@@ -195,9 +195,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       setGuardPassed(true);
     } catch (err) {
       setGuardError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível verificar o acesso a este agricultor.",
+        apiErrorMessage(err, "Não foi possível verificar o acesso a este agricultor."),
       );
     }
   }, [roleResolved, currentRole, producerId, router]);

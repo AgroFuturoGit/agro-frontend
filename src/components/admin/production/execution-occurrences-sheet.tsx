@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import {
   OCCURRENCE_TYPES,
   OCCURRENCE_TYPE_LABELS,
@@ -149,8 +149,7 @@ export function ExecutionOccurrencesSheet({
     } catch (err) {
       if (seq !== loadSeq.current) return;
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível carregar as ocorrências.",
+        apiErrorMessage(err, "Não foi possível carregar as ocorrências."),
       );
     } finally {
       if (seq === loadSeq.current) setLoading(false);
@@ -229,7 +228,7 @@ export function ExecutionOccurrencesSheet({
           setFieldErrors(fromApi);
         } else {
           setFormError(
-            userFacingErrorHint(err.message) ?? "Não foi possível salvar a ocorrência.",
+            apiErrorMessage(err, "Não foi possível salvar a ocorrência."),
           );
         }
       } else {
@@ -250,8 +249,7 @@ export function ExecutionOccurrencesSheet({
       await refresh();
     } catch (err) {
       setDeleteError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível excluir a ocorrência.",
+        apiErrorMessage(err, "Não foi possível excluir a ocorrência."),
       );
     } finally {
       setDeleting(false);

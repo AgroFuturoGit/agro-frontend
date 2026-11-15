@@ -12,7 +12,7 @@ import {
 import { PageHeader } from "@/components/admin/page-header";
 import { DataTable } from "@/components/data-table/data-table";
 import { Card } from "@/components/ui/card";
-import { ApiError } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
 import { listRoles, type BackendRole } from "@/lib/roles";
 import { ROLE_LABELS } from "@/lib/users";
 
@@ -36,9 +36,7 @@ export function RolesPage() {
       setRoles(data);
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar os perfis.",
+        apiErrorMessage(err, "Não foi possível carregar os perfis."),
       );
     } finally {
       setLoading(false);

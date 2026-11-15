@@ -126,6 +126,16 @@ describe.each(CASES)("diálogo de exclusão de $name (UNIT-007)", (c) => {
     expect(onDeleted).not.toHaveBeenCalled();
   });
 
+  it("o 'Erro 500' cru do back não aparece: cai no texto do diálogo", async () => {
+    c.del.mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(c.render(true, vi.fn()));
+
+    fireEvent.click(screen.getByRole("button", { name: "Excluir" }));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/Não foi possível excluir/);
+    expect(screen.queryByText("Erro 500")).toBeNull();
+  });
+
   it("depois de um 'não encontrado' a lista é recarregada", async () => {
     c.del.mockRejectedValue(new ApiError(404, "Não encontrado", null));
     const onDeleted = vi.fn();

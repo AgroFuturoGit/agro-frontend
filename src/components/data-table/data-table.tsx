@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, type AriaAttributes, type ReactNode } from "react";
+import { Fragment, useId, useState, type AriaAttributes, type ReactNode } from "react";
 import {
   flexRender,
   type ColumnDef,
@@ -11,6 +11,7 @@ import { Inbox, SearchX } from "lucide-react";
 
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { withFocusMove } from "@/lib/focus";
 import { cn } from "@/lib/utils";
 import {
   Table,
@@ -30,6 +31,11 @@ const SKELETON_CARDS = 3;
 
 // Superfície única de card do painel (mesma do `Card`): borda 1px, raio 12.
 const SURFACE = "overflow-hidden rounded-xl border border-border bg-card";
+
+// O contêiner recebe o foco por script (tabindex=-1) quando o botão de erro ou
+// de vazio desmonta; o anel aparece só na navegação por teclado.
+const FOCUS_TARGET =
+  "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /** 1ª coluna com recuo de 24px e última com 24px à direita (Figma 100:222). */
 function edgePadding(index: number, count: number) {
@@ -107,6 +113,14 @@ export function DataTable<TData, TValue>({
   }
   const liveMessage = isLoading ? "Carregando…" : loadedMessage;
 
+  // "Tentar novamente", "Limpar filtros" e o CTA do vazio desmontam com a
+  // nova carga ou com o primeiro registro: antes da ação, o foco vai para o
+  // contêiner da tabela, que fica montado (A11Y-L2-R2-2, A11Y-L5-R2-1). No
+  // CTA que abre um drawer, é para cá que o drawer devolve o foco ao fechar.
+  const containerId = useId();
+  const focusContainer = (action?: () => void) =>
+    action ? withFocusMove(containerId, action) : undefined;
+
   // Extraído para ser reusado tal e qual nos dois modos (tabela e card) —
   // o JSX do modo tabela permanece byte a byte o mesmo de antes, só que
   // chamado via função em vez de inline, para não arriscar regressão
@@ -122,7 +136,9 @@ export function DataTable<TData, TValue>({
           <InlineAlert
             variant="destructive"
             action={
-              onRetry ? { label: "Tentar novamente", onClick: onRetry } : undefined
+              onRetry
+                ? { label: "Tentar novamente", onClick: withFocusMove(containerId, onRetry) }
+                : undefined
             }
           >
             <p className="font-medium">Não foi possível carregar os dados.</p>
@@ -141,7 +157,7 @@ export function DataTable<TData, TValue>({
         }
         hint={hasActiveFilters ? "Tente ajustar ou limpar os filtros." : emptyHint}
         actionLabel={hasActiveFilters ? "Limpar filtros" : emptyActionLabel}
-        onAction={hasActiveFilters ? onClearFilters : onEmptyAction}
+        onAction={focusContainer(hasActiveFilters ? onClearFilters : onEmptyAction)}
         actionHref={hasActiveFilters ? undefined : emptyActionHref}
         actionVariant={hasActiveFilters ? "outline" : "default"}
       />
@@ -150,7 +166,11 @@ export function DataTable<TData, TValue>({
 
   if (useCardLayout) {
     return (
-      <div className="flex flex-col gap-3" aria-busy={isLoading ? true : undefined}>
+      <div
+        id={containerId}
+        className={cn("flex flex-col gap-3", FOCUS_TARGET)}
+        aria-busy={isLoading ? true : undefined}
+      >
         <span aria-live="polite" className="sr-only">
           {liveMessage}
         </span>
@@ -179,7 +199,7 @@ export function DataTable<TData, TValue>({
   }
 
   return (
-    <div className={SURFACE}>
+    <div id={containerId} className={cn(SURFACE, FOCUS_TARGET)}>
       {/* aria-busy enquanto carrega e um status só para leitor de tela: os
           skeletons ficam ocultos e o carregamento é anunciado (A11Y-L2-5,
           A11Y-L2-R2-1). A região fica sempre montada para o anúncio ocorrer. */}
