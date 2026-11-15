@@ -62,10 +62,23 @@ describe("ReportsPage", () => {
     expect(links[0].getAttribute("href")).toBe(
       "/admin/organizacoes/org-1/comunidades/com-1/produtores/f-1/planos/p-1",
     );
-    expect(links[0].textContent).toContain("safra 2026");
+    expect(links[0].textContent).toContain("Safra 2026");
     expect(screen.getByText("Comparativo indisponível.")).toBeTruthy();
     // O texto da barra diz qual número é qual (as barras são decorativas).
     expect(screen.getByText("Realizado 400 kg de 1.000 kg previstos")).toBeTruthy();
+  });
+
+  it("rótulo de safra que já começa com 'Safra' não fica duplicado no card", async () => {
+    vi.mocked(listProductionPlans).mockResolvedValue([
+      { ...(plan("p-1", "Milho") as object), harvest: { label: "Safra 2024/2025" } } as never,
+    ]);
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Consolidado" });
+    expect(screen.getByText("Safra 2024/2025")).toBeTruthy();
+    expect(screen.queryByText(/Safra Safra/i)).toBeNull();
+    const link = screen.getByRole("link", { name: /Ver detalhes/ });
+    expect(link.textContent).toContain("Safra 2024/2025");
+    expect(link.textContent).not.toMatch(/safra safra/i);
   });
 
   it("sem comunidade/organização não mostra 'Ver detalhes' (não leva a rota proibida)", async () => {

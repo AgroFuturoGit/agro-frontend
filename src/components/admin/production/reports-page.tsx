@@ -18,6 +18,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { harvestText } from "@/lib/harvest-label";
 import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getMyProducer, type Producer } from "@/lib/producers";
@@ -267,7 +268,7 @@ export function ReportsPage() {
                       {planTitle(plan)}
                     </CardTitle>
                     <CardDescription className="text-sm text-muted-foreground">
-                      Safra {plan.harvest?.label ?? "—"}
+                      {harvestText(plan.harvest?.label)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex flex-1 flex-col gap-4 px-6">
@@ -319,7 +320,7 @@ export function ReportsPage() {
                         Ver detalhes
                         <span className="sr-only">
                           {" "}
-                          de {planTitle(plan)}, safra {plan.harvest?.label ?? "—"}
+                          de {planTitle(plan)}, {harvestText(plan.harvest?.label)}
                         </span>
                         <ArrowRight aria-hidden="true" />
                       </Link>
