@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type AriaAttributes, type ReactNode } from "react";
+import { Fragment, useState, type AriaAttributes, type ReactNode } from "react";
 import {
   flexRender,
   type ColumnDef,
@@ -89,6 +89,24 @@ export function DataTable<TData, TValue>({
   const rows = table.getRowModel().rows;
   const useCardLayout = isMobile && Boolean(renderMobileCard);
 
+  // Fim do carregamento (M3): uma frase curta só na transição
+  // carregando → pronto, com o total da lista ("12 registros carregados.").
+  // Não muda ao filtrar/paginar (o "Exibindo…" da paginação já informa) e
+  // fica vazia no erro (o InlineAlert anuncia) e no vazio (o EmptyState
+  // tem role=status). Ajuste de estado durante a renderização, sem efeito.
+  const [prevLoading, setPrevLoading] = useState(Boolean(isLoading));
+  const [loadedMessage, setLoadedMessage] = useState("");
+  if (Boolean(isLoading) !== prevLoading) {
+    setPrevLoading(Boolean(isLoading));
+    const total = table.getPrePaginationRowModel().rows.length;
+    setLoadedMessage(
+      !isLoading && !hasError && total > 0
+        ? `${total} ${total === 1 ? "registro carregado" : "registros carregados"}.`
+        : "",
+    );
+  }
+  const liveMessage = isLoading ? "Carregando…" : loadedMessage;
+
   // Extraído para ser reusado tal e qual nos dois modos (tabela e card) —
   // o JSX do modo tabela permanece byte a byte o mesmo de antes, só que
   // chamado via função em vez de inline, para não arriscar regressão
@@ -134,7 +152,7 @@ export function DataTable<TData, TValue>({
     return (
       <div className="flex flex-col gap-3" aria-busy={isLoading ? true : undefined}>
         <span aria-live="polite" className="sr-only">
-          {isLoading ? "Carregando…" : ""}
+          {liveMessage}
         </span>
         {isLoading ? (
           Array.from({ length: SKELETON_CARDS }).map((_, idx) => (
@@ -166,7 +184,7 @@ export function DataTable<TData, TValue>({
           skeletons ficam ocultos e o carregamento é anunciado (A11Y-L2-5,
           A11Y-L2-R2-1). A região fica sempre montada para o anúncio ocorrer. */}
       <span aria-live="polite" className="sr-only">
-        {isLoading ? "Carregando…" : ""}
+        {liveMessage}
       </span>
       <Table aria-busy={isLoading ? true : undefined}>
         <TableHeader className="bg-card">

@@ -210,6 +210,10 @@ export function CropsPage() {
   const isPriorityFilterActive = Boolean(
     table.getColumn("isPriority")?.getFilterValue(),
   );
+  // Um único ponto para desmarcar "Somente prioritárias" (chip, "Limpar" da
+  // toolbar e "Limpar filtros" do vazio).
+  const clearPriorityFilter = () =>
+    table.getColumn("isPriority")?.setFilterValue(undefined);
 
   function renderMobileCard(row: Row<Crop>) {
     const crop = row.original;
@@ -261,7 +265,7 @@ export function CropsPage() {
         extraFilter={{
           active: isPriorityFilterActive,
           label: "Somente prioritárias",
-          onClear: () => table.getColumn("isPriority")?.setFilterValue(undefined),
+          onClear: clearPriorityFilter,
         }}
         extra={
           // Figma 109:498: à direita, na mesma linha da busca; no mobile
@@ -271,7 +275,9 @@ export function CropsPage() {
               id="only-priority"
               checked={isPriorityFilterActive}
               onCheckedChange={(checked) =>
-                table.getColumn("isPriority")?.setFilterValue(checked === true ? true : undefined)
+                checked === true
+                  ? table.getColumn("isPriority")?.setFilterValue(true)
+                  : clearPriorityFilter()
               }
             />
             <Label htmlFor="only-priority" className="font-medium">
@@ -290,7 +296,7 @@ export function CropsPage() {
         hasActiveFilters={Boolean(globalFilter) || isPriorityFilterActive}
         onClearFilters={() => {
           table.setGlobalFilter("");
-          table.getColumn("isPriority")?.setFilterValue(undefined);
+          clearPriorityFilter();
         }}
         emptyTitle="Nenhuma cultura cadastrada."
         emptyHint={

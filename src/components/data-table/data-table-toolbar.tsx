@@ -63,6 +63,25 @@ export function DataTableToolbar<TData>({
     }
   }, [debouncedSearch, table]);
 
+  // Valor efetivamente aplicado ao `globalFilter` da tabela — só é setado
+  // quando a regra "0 ou 3+ caracteres" (ver useEffect acima) permite
+  // propagar. Diferente de `rawSearch`, que reflete o que está sendo
+  // digitado agora, ainda sem passar pela regra.
+  const appliedSearch = (table.getState().globalFilter as string | undefined) ?? "";
+
+  // M1: quando a busca aplicada é limpa POR FORA (ex.: "Limpar filtros" do
+  // estado vazio chama `table.setGlobalFilter("")`), o campo também tem de
+  // esvaziar; senão o texto fica no input com o filtro já desfeito. Só a
+  // transição "havia busca aplicada → não há mais" zera o campo: digitar
+  // 1–2 caracteres (que nunca propagam) não é afetado, e o debounce segue
+  // igual. Ajuste de estado durante a renderização (padrão do React para
+  // derivar de uma mudança), sem efeito extra.
+  const [prevAppliedSearch, setPrevAppliedSearch] = useState(appliedSearch);
+  if (appliedSearch !== prevAppliedSearch) {
+    setPrevAppliedSearch(appliedSearch);
+    if (prevAppliedSearch && !appliedSearch && rawSearch) setRawSearch("");
+  }
+
   function clearSearch() {
     setRawSearch("");
     table.setGlobalFilter("");
@@ -76,12 +95,6 @@ export function DataTableToolbar<TData>({
         | undefined,
     }))
     .filter((entry) => Boolean(entry.value));
-
-  // Valor efetivamente aplicado ao `globalFilter` da tabela — só é setado
-  // quando a regra "0 ou 3+ caracteres" (ver useEffect acima) permite
-  // propagar. Diferente de `rawSearch`, que reflete o que está sendo
-  // digitado agora, ainda sem passar pela regra.
-  const appliedSearch = (table.getState().globalFilter as string | undefined) ?? "";
 
   const extraFilterActive = Boolean(extraFilter?.active);
   const hasAnyActiveFilter =

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiRequest } from "@/lib/api";
 import {
   createCrop,
+  cropDisplayName,
   cropVersion,
   getCrop,
   unitFactorKg,
@@ -157,5 +158,19 @@ describe("unitFactorKg (UNIT-003)", () => {
     expect(unitLabel("KG", 2)).toBe("kg");
     expect(unitLabel("TON", 2)).toBe("t");
     expect(unitLabel(null, 2)).toBe("kg");
+  });
+});
+
+describe("cropDisplayName", () => {
+  it("junta nome e variedade com travessão", () => {
+    expect(cropDisplayName({ name: "Milho", variety: "BR-106" })).toBe("Milho — BR-106");
+  });
+
+  it.each([null, undefined, "", "   "])("sem variedade (%j) devolve só o nome", (variety) => {
+    expect(cropDisplayName({ name: "Milho", variety })).toBe("Milho");
+  });
+
+  it("apara espaços da variedade", () => {
+    expect(cropDisplayName({ name: "Feijão", variety: "  Carioca " })).toBe("Feijão — Carioca");
   });
 });
