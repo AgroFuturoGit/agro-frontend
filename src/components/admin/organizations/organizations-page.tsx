@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Pencil, Plus, UserPlus } from "lucide-react";
+import { Pencil, Plus, UserPlus } from "lucide-react";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -18,21 +18,20 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { EmptyValue } from "@/components/admin/empty-value";
+import { PageHeader } from "@/components/admin/page-header";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCnpj } from "@/lib/cnpj";
@@ -67,6 +66,29 @@ function organizationsGlobalFilter(
 }
 
 const columnHelper = createColumnHelper<Organization>();
+const producerColumnHelper = createColumnHelper<Producer>();
+
+/** Rota de planos do agricultor; `null` quando faltam comunidade/organização. */
+function producerPlansHref(producer: Producer): string | null {
+  const community = producer.community;
+  const organization = community?.organization;
+  if (!community || !organization) return null;
+  return `/admin/organizacoes/${organization.id}/comunidades/${community.id}/produtores/${producer.id}`;
+}
+
+/** Nome do agricultor como link para os planos (texto puro sem rota). */
+function ProducerNameLink({ producer }: { producer: Producer }) {
+  const name = producerDisplayName(producer, "");
+  if (!name) return <EmptyValue />;
+  const href = producerPlansHref(producer);
+  return href ? (
+    <Link href={href} className="font-medium text-foreground hover:underline">
+      {name}
+    </Link>
+  ) : (
+    <>{name}</>
+  );
+}
 
 /**
  * `/admin/organizacoes` é o único ponto de entrada da hierarquia
@@ -87,6 +109,10 @@ const columnHelper = createColumnHelper<Organization>();
  * `ADMIN`/`MANAGER` apenas), mas a listagem de planos em si já tolera
  * isso (`producer-plans-page.tsx` cai em rótulos genéricos quando não
  * consegue resolver os nomes).
+ *
+ * Visual (Figma 124:232 ADM e 135:898 TÉCNICO): `PageHeader`, toolbar,
+ * tabela e paginação em cards separados; a lista do técnico é o card de
+ * tabela padrão sem toolbar.
  */
 export function OrganizationsPage() {
   const router = useRouter();
@@ -117,6 +143,8 @@ export function OrganizationsPage() {
     pageIndex: 0,
     pageSize: 10,
   });
+  const [producersPagination, setProducersPagination] =
+    useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
   useEffect(() => {
     setCurrentRole(readUserFromStorage()?.role ?? null);
@@ -218,16 +246,36 @@ export function OrganizationsPage() {
   // no backend real (`OrganizationController.java`) — TECHNICIAN só lê.
   const canManage = currentRole === "ADMIN";
 
+  // Mesmos nomes acessíveis na tabela e nos cards mobile. Prefixo fixo
+  // ("Editar organização", "Criar Manager") + nome do registro: os testes
+  // casam pelo prefixo e o leitor de tela sabe qual linha cada botão afeta.
+  const rowActions = useCallback(
+    (organization: Organization): DataTableRowAction[] => [
+      {
+        label: `Editar organização ${organization.name}`,
+        icon: Pencil,
+        onClick: () => setEditTarget(organization),
+      },
+      {
+        label: `Criar Manager para ${organization.name}`,
+        icon: UserPlus,
+        onClick: () => setManagerTarget(organization),
+      },
+    ],
+    [],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor("name", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
         ),
+        meta: { cellVariant: "primary" },
         cell: ({ row }) => (
           <Link
             href={`/admin/organizacoes/${row.original.id}`}
-            className="font-medium text-foreground hover:underline"
+            className="hover:underline"
           >
             {row.original.name}
           </Link>
@@ -236,21 +284,18 @@ export function OrganizationsPage() {
       columnHelper.accessor("taxId", {
         header: "CNPJ",
         enableSorting: false,
-        cell: (info) => (
-          <span className="font-mono text-xs text-muted-foreground">
-            {formatCnpj(info.getValue())}
-          </span>
-        ),
+        // Roboto com algarismos tabulares (Figma 124:232), não fonte mono.
+        meta: { cellVariant: "secondary", cellClassName: "tabular-nums" },
+        cell: (info) =>
+          info.getValue() ? formatCnpj(info.getValue()) : <EmptyValue />,
       }),
       columnHelper.accessor("type", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Tipo" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="text-muted-foreground">
-            {ORGANIZATION_TYPE_LABELS[info.getValue()]}
-          </span>
-        ),
+        meta: { cellVariant: "primary" },
+        cell: (info) =>
+          ORGANIZATION_TYPE_LABELS[info.getValue()] ?? <EmptyValue />,
         filterFn: (row, columnId, filterValue) =>
           !filterValue || row.getValue(columnId) === filterValue,
       }),
@@ -259,35 +304,16 @@ export function OrganizationsPage() {
     const actionsColumn = columnHelper.display({
       id: "actions",
       header: "Ações",
-      cell: ({ row }) => (
-        <div className="inline-flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Editar organização"
-            onClick={() => setEditTarget(row.original)}
-          >
-            <Pencil />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Criar Manager"
-            onClick={() => setManagerTarget(row.original)}
-          >
-            <UserPlus />
-          </Button>
-        </div>
-      ),
+      cell: ({ row }) => <DataTableRowActions actions={rowActions(row.original)} />,
     });
 
+    // Mesmo boundary cast das outras listas: cada coluna tem um TValue
+    // concreto e o `<DataTable>` recebe um único TValue para o array.
     return (canManage ? [...baseColumns, actionsColumn] : baseColumns) as ColumnDef<
       Organization,
       unknown
     >[];
-  }, [canManage, loading]);
+  }, [canManage, loading, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -305,6 +331,44 @@ export function OrganizationsPage() {
     getPaginationRowModel: getPaginationRowModel(),
   });
 
+  // Visão do TÉCNICO (Figma 135:898): Nome (link) + Comunidade/Organização
+  // em texto de apoio, sem ordenação nem ações (a lista já vem ordenada).
+  const producerColumns = useMemo(
+    () =>
+      [
+        producerColumnHelper.display({
+          id: "name",
+          header: "Nome",
+          meta: { cellVariant: "primary" },
+          cell: ({ row }) => <ProducerNameLink producer={row.original} />,
+        }),
+        producerColumnHelper.display({
+          id: "community",
+          header: "Comunidade",
+          meta: { cellVariant: "secondary" },
+          cell: ({ row }) => row.original.community?.name || <EmptyValue />,
+        }),
+        producerColumnHelper.display({
+          id: "organization",
+          header: "Organização",
+          meta: { cellVariant: "secondary" },
+          cell: ({ row }) =>
+            row.original.community?.organization?.name || <EmptyValue />,
+        }),
+      ] as ColumnDef<Producer, unknown>[],
+    [],
+  );
+
+  const producersTable = useReactTable({
+    data: sortedAssignedProducers,
+    columns: producerColumns,
+    state: { pagination: producersPagination },
+    onPaginationChange: setProducersPagination,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getRowId: (producer) => producer.id,
+  });
+
   function renderMobileCard(row: Row<Organization>) {
     const organization = row.original;
     return (
@@ -317,7 +381,7 @@ export function OrganizationsPage() {
             >
               {organization.name}
             </Link>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {formatCnpj(organization.taxId)}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -325,182 +389,119 @@ export function OrganizationsPage() {
             </p>
           </div>
           {canManage && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setEditTarget(organization)}
-              >
-                <Pencil />
-                Editar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Criar Manager"
-                onClick={() => setManagerTarget(organization)}
-              >
-                <UserPlus />
-              </Button>
-            </div>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(organization)}
+            />
           )}
         </div>
       </Card>
     );
   }
 
+  function renderProducerMobileCard(row: Row<Producer>) {
+    const producer = row.original;
+    const community = producer.community;
+    return (
+      <Card className="p-4">
+        <p className="font-medium text-foreground">
+          <ProducerNameLink producer={producer} />
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {community?.name || <EmptyValue />}
+          {" · "}
+          {community?.organization?.name || <EmptyValue />}
+        </p>
+      </Card>
+    );
+  }
+
+  if (!roleResolved) {
+    // O papel vem do localStorage depois da montagem: até lá, só a
+    // estrutura da página (nenhuma visão de papel é adiantada).
+    return (
+      <div className="flex flex-col gap-section-sm">
+        <PageHeader title="Organizações" loading />
+        <Skeleton aria-hidden="true" className="h-40 w-full rounded-xl" />
+      </div>
+    );
+  }
+
   if (currentRole === "MANAGER" || currentRole === "FARMER") {
-    if (redirectError) {
-      return (
-        <div className="flex flex-col gap-6">
-          <div
-            role="alert"
-            className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          >
-            <div className="flex items-start gap-2">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{redirectError}</span>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => resolveAndLoad()}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        </div>
-      );
-    }
+    // Estado de passagem: o GESTOR vai para a própria organização e o
+    // AGRICULTOR para os próprios planos. Só o erro fica na tela.
+    const redirectDescription =
+      currentRole === "MANAGER"
+        ? "Abrindo a sua organização…"
+        : "Abrindo os seus planos de produção…";
 
     return (
-      <div className="flex flex-col gap-6">
-        <Skeleton className="h-7 w-64" />
-        <Skeleton className="h-40 w-full rounded-xl" />
+      <div className="flex flex-col gap-section-sm">
+        <PageHeader
+          title="Organizações"
+          description={redirectError ? undefined : redirectDescription}
+        />
+        {redirectError ? (
+          <InlineAlert
+            variant="destructive"
+            action={{ label: "Tentar novamente", onClick: () => resolveAndLoad() }}
+          >
+            {redirectError}
+          </InlineAlert>
+        ) : (
+          <div aria-busy="true" className="flex flex-col gap-section-sm">
+            <Skeleton aria-hidden="true" className="h-16 w-full rounded-xl" />
+            <Skeleton aria-hidden="true" className="h-40 w-full rounded-xl" />
+          </div>
+        )}
       </div>
     );
   }
 
   if (currentRole === "TECHNICIAN") {
     return (
-      <div className="flex flex-col gap-6">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Meus agricultores atendidos
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Agricultores sob sua assistência técnica.
-          </p>
-        </div>
+      <div className="flex flex-col gap-section-sm">
+        <PageHeader
+          title="Meus agricultores atendidos"
+          description="Agricultores sob sua assistência técnica."
+        />
 
-        {error && (
-          <div
-            role="alert"
-            className="flex items-start justify-between gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-          >
-            <div className="flex items-start gap-2">
-              <AlertCircle className="mt-0.5 size-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => resolveAndLoad()}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        )}
+        <DataTable
+          table={producersTable}
+          columns={producerColumns}
+          isLoading={loading}
+          hasError={Boolean(error)}
+          onRetry={resolveAndLoad}
+          errorHint={error ?? undefined}
+          emptyTitle="Nenhum agricultor atribuído a você ainda."
+          emptyHint="Os agricultores aparecem aqui quando você é vinculado como técnico responsável por eles."
+          renderMobileCard={renderProducerMobileCard}
+        />
 
-        <Card className="py-0">
-          <Table>
-            <TableHeader className="bg-muted/40 [&_th]:h-11 [&_th]:px-4 [&_th]:text-xs [&_th]:font-medium [&_th]:uppercase [&_th]:tracking-wide [&_th]:text-muted-foreground">
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Nome</TableHead>
-                <TableHead>Comunidade</TableHead>
-                <TableHead>Organização</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody className="[&_td]:h-12 [&_td]:px-4">
-              {loading ? (
-                Array.from({ length: 4 }).map((_, idx) => (
-                  <TableRow key={`skeleton-${idx}`}>
-                    {Array.from({ length: 3 }).map((__, cidx) => (
-                      <TableCell key={cidx}>
-                        <Skeleton className="h-4 w-full" />
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : sortedAssignedProducers.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={3}
-                    className="py-12 text-center text-sm text-muted-foreground"
-                  >
-                    Nenhum agricultor atribuído a você ainda.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedAssignedProducers.map((producer) => {
-                  const community = producer.community;
-                  const organization = community?.organization;
-                  const name =
-                    producerDisplayName(producer, "—");
-
-                  return (
-                    <TableRow key={producer.id}>
-                      <TableCell className="font-medium text-foreground">
-                        {community && organization ? (
-                          <Link
-                            href={`/admin/organizacoes/${organization.id}/comunidades/${community.id}/produtores/${producer.id}`}
-                            className="hover:underline"
-                          >
-                            {name}
-                          </Link>
-                        ) : (
-                          name
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {community?.name ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {organization?.name ?? "—"}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </Card>
+        {/* Como no Figma (135:898), sem paginação para listas curtas. Acima
+            do menor tamanho de página, a lista passa a ser paginada (13.2). */}
+        {!loading && !error && sortedAssignedProducers.length > 10 ? (
+          <DataTablePagination table={producersTable} />
+        ) : null}
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Organizações
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Cooperativas e associações cadastradas na plataforma.
-          </p>
-        </div>
-        {canManage && (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Nova Organização
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-col gap-section-sm">
+      <PageHeader
+        title="Organizações"
+        description="Cooperativas e associações cadastradas na plataforma."
+        actions={
+          canManage ? (
+            <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden="true" />
+              Nova organização
+            </Button>
+          ) : undefined
+        }
+      />
 
       <DataTableToolbar
         table={table}
@@ -535,6 +536,13 @@ export function OrganizationsPage() {
           table.resetColumnFilters();
         }}
         emptyTitle="Nenhuma organização cadastrada ainda."
+        emptyHint={
+          canManage
+            ? "Cadastre uma cooperativa ou associação informando nome, CNPJ e tipo."
+            : "As organizações aparecem aqui quando um administrador as cadastra."
+        }
+        emptyActionLabel={canManage ? "Criar primeira organização" : undefined}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />
 

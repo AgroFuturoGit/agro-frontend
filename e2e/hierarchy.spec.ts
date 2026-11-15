@@ -76,7 +76,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
     page,
   }) => {
     // `user` é obrigatório aqui: desde a navegação em cascata,
-    // `organizations-page.tsx` gateia "Nova Organização"/"Editar"/"Criar
+    // `organizations-page.tsx` gateia "Nova organização"/"Editar"/"Criar
     // Manager" por role (`readUserFromStorage()`, populado via
     // `localStorage["agro_user"]`) — TECHNICIAN também alcança esta lista
     // agora e só ADMIN pode escrever (lição
@@ -168,7 +168,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
       page.getByText("Nenhuma organização cadastrada ainda."),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Nova Organização" }).click();
+    await page.getByRole("button", { name: "Nova organização" }).click();
 
     const createDialog = page.getByRole("dialog");
     await expect(createDialog).toBeVisible();
@@ -182,7 +182,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
 
     await expect(createDialog).toBeHidden();
     await expect(
-      page.getByRole("cell", { name: organizationName }),
+      page.getByRole("cell", { name: organizationName, exact: true }),
     ).toBeVisible();
 
     await page.getByRole("button", { name: "Criar Manager" }).click();
@@ -306,7 +306,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
       page.getByText("Nenhuma comunidade cadastrada nesta organização ainda."),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Nova Comunidade" }).click();
+    await page.getByRole("button", { name: "Nova comunidade" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -325,7 +325,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
 
     await expect(dialog).toBeHidden();
     await expect(
-      page.getByRole("cell", { name: communityName }),
+      page.getByRole("cell", { name: communityName, exact: true }),
     ).toBeVisible();
   });
 });
