@@ -343,3 +343,50 @@ describe("DataTableToolbar — chip de filtro de coluna (A11Y-12)", () => {
     expect(chip).toHaveTextContent("Categoria: Beta");
   });
 });
+
+describe("DataTableToolbar — extraFilter (UX-23)", () => {
+  afterEach(cleanup);
+
+  function ExtraHost() {
+    const [onlyFlag, setOnlyFlag] = useState(true);
+    // eslint-disable-next-line react-hooks/incompatible-library
+    const table = useReactTable({
+      data: ITEMS,
+      columns,
+      getCoreRowModel: getCoreRowModel(),
+    });
+    return (
+      <>
+        <DataTableToolbar
+          table={table}
+          extraFilter={{
+            active: onlyFlag,
+            label: "Somente marcados",
+            onClear: () => setOnlyFlag(false),
+          }}
+        />
+        <span data-testid="extra-debug">{String(onlyFlag)}</span>
+      </>
+    );
+  }
+
+  it("filtro extra ativo gera chip e é limpo pelo 'Limpar'", () => {
+    render(<ExtraHost />);
+
+    expect(
+      screen.getByRole("button", { name: "Remover filtro Somente marcados" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Limpar" }));
+    expect(screen.getByTestId("extra-debug").textContent).toBe("false");
+    expect(screen.queryByRole("button", { name: "Limpar" })).toBeNull();
+  });
+
+  it("o chip remove só o filtro extra", () => {
+    render(<ExtraHost />);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remover filtro Somente marcados" }),
+    );
+    expect(screen.getByTestId("extra-debug").textContent).toBe("false");
+  });
+});

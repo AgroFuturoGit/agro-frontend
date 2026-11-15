@@ -98,9 +98,15 @@ export function HarvestsPage() {
   // Mesmos nomes acessíveis na tabela e nos cards mobile (e2e/unit).
   const rowActions = useCallback(
     (harvest: Harvest): DataTableRowAction[] => [
-      { label: "Editar safra", icon: Pencil, onClick: () => setEditTarget(harvest) },
+      // Prefixo fixo ("Editar safra") + rótulo do registro: os testes casam
+      // pelo prefixo; o leitor de tela sabe qual linha cada botão afeta.
       {
-        label: "Excluir safra",
+        label: `Editar safra ${harvest.label}`,
+        icon: Pencil,
+        onClick: () => setEditTarget(harvest),
+      },
+      {
+        label: `Excluir safra ${harvest.label}`,
         icon: Trash2,
         tone: "destructive",
         onClick: () => setDeleteTarget(harvest),
@@ -219,6 +225,13 @@ export function HarvestsPage() {
         hasActiveFilters={Boolean(globalFilter)}
         onClearFilters={() => table.setGlobalFilter("")}
         emptyTitle="Nenhuma safra cadastrada."
+        emptyHint={
+          canManage
+            ? "Cadastre a primeira safra para organizar os planos de produção por período."
+            : "As safras aparecem aqui quando um administrador ou técnico as cadastra."
+        }
+        emptyActionLabel={canManage ? "Criar primeira safra" : undefined}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />
 

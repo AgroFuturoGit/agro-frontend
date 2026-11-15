@@ -106,7 +106,6 @@ export function RolesPage() {
         isLoading={loading}
         hasError={Boolean(error)}
         onRetry={refresh}
-        errorHint={error ?? undefined}
         emptyTitle="Nenhum perfil disponível."
         emptyHint="Os perfis são definidos pelo backend. Se a lista continuar vazia, fale com o suporte."
         renderMobileCard={renderMobileCard}

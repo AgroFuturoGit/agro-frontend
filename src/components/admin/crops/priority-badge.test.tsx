@@ -11,6 +11,8 @@ describe("PriorityBadge", () => {
     const badge = screen.getByText("Prioritária");
     expect(badge.getAttribute("data-slot")).toBe("badge");
     expect(badge.className).toMatch(/\bborder-border\b/);
+    // Texto de 14px como no Figma (109:498).
+    expect(badge.className).toMatch(/\btext-sm\b/);
     // Não é status: sem as cores semânticas de sucesso/atenção/erro.
     expect(badge.className).not.toMatch(/bg-(success|warning|destructive)/);
     const icon = badge.querySelector("svg");

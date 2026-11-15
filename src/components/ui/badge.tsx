@@ -6,13 +6,14 @@ import { CircleCheck, type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // Base: registry shadcn base-nova (badge). Acrescentadas as variantes
-// semânticas success/warning/info/muted e o tamanho do Figma (24px, pílula).
+// semânticas success/warning/info/muted e o tamanho do Figma (24px, pílula,
+// texto 14px como em 109:498/131:941).
 // O texto do badge é sempre o que comunica o status; a cor só reforça.
 // Como o verde da marca é o mesmo verde de sucesso, o badge `success` leva
 // um ícone `CircleCheck` por padrão (status ≠ categoria). Badges de categoria
 // usam `outline` (ver `CATEGORY_BADGE_VARIANT` em `@/lib/status-variants`).
 const badgeVariants = cva(
-  "group/badge inline-flex h-6 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition-all motion-reduce:transition-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex h-6 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-full border border-transparent px-2.5 py-0.5 text-sm font-medium whitespace-nowrap transition-all motion-reduce:transition-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&>svg]:pointer-events-none [&>svg]:size-3.5!",
   {
     variants: {
       variant: {

@@ -251,7 +251,7 @@ describe("UsersPage — integração com UserFormDrawer e DeleteUserDialog", () 
     await renderUsersPage();
 
     await user.click(
-      screen.getAllByRole("button", { name: "Editar usuário" })[0],
+      screen.getAllByRole("button", { name: /^Editar usuário/ })[0],
     );
 
     expect(await screen.findByText("Editar usuário")).toBeTruthy();
@@ -267,7 +267,7 @@ describe("UsersPage — integração com UserFormDrawer e DeleteUserDialog", () 
     await renderUsersPage();
 
     const deleteButtons = screen.getAllByRole("button", {
-      name: "Excluir usuário",
+      name: /^Excluir usuário/,
     });
     await user.click(deleteButtons[0]);
 
@@ -309,8 +309,8 @@ describe("UsersPage — cartões no celular", () => {
 
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.getByText("ana@agro.com")).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Editar usuário" })).toHaveLength(3);
-    expect(screen.getAllByRole("button", { name: "Excluir usuário" })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Editar usuário/ })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Excluir usuário/ })).toHaveLength(3);
   });
 
   it("UNIT-002: MANAGER vê os cartões sem nenhuma ação de escrita", async () => {
@@ -322,8 +322,8 @@ describe("UsersPage — cartões no celular", () => {
 
     expect(screen.queryByRole("table")).toBeNull();
     expect(screen.getByText("Bruno Lima")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Editar usuário" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Excluir usuário" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar usuário/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir usuário/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Novo usuário/ })).toBeNull();
   });
 
@@ -335,7 +335,7 @@ describe("UsersPage — cartões no celular", () => {
 
     await renderUsersPage();
 
-    await user.click(screen.getAllByRole("button", { name: "Editar usuário" })[1]);
+    await user.click(screen.getAllByRole("button", { name: /^Editar usuário/ })[1]);
 
     expect(await screen.findByDisplayValue("Bruno Lima")).toBeTruthy();
   });
@@ -366,5 +366,54 @@ describe("UsersPage — visual do Figma (lote 2)", () => {
     const cell = screen.getByText("111.222.333-44").closest("td");
     expect(cell?.className).toMatch(/\btabular-nums\b/);
     expect(cell?.innerHTML).not.toMatch(/font-mono/);
+  });
+});
+
+
+/** O `role=status` do estado vazio (a paginação também tem um `status`). */
+async function emptyStatus(title: string) {
+  const node = await screen.findByText(title);
+  return node.closest('[role="status"]') as HTMLElement;
+}
+
+describe("UsersPage — ajustes da revisão (lote 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("vazio: dica e CTA 'Criar primeiro usuário' (ADMIN) que abre o drawer", async () => {
+    await mockRole("ADMIN");
+    await mockUsers([]);
+    const user = userEvent.setup();
+
+    render(<UsersPage />);
+
+    const status = await emptyStatus("Nenhum usuário cadastrado ainda.");
+    expect(status).toHaveTextContent("Nenhum usuário cadastrado ainda.");
+    expect(status).toHaveTextContent(/acessar o painel/);
+    await user.click(screen.getByRole("button", { name: "Criar primeiro usuário" }));
+    expect(await screen.findByRole("heading", { name: "Novo usuário" })).toBeTruthy();
+  });
+
+  it("vazio para GESTOR: só a dica, sem CTA", async () => {
+    await mockRole("MANAGER");
+    await mockUsers([]);
+
+    render(<UsersPage />);
+
+    expect(await emptyStatus("Nenhum usuário cadastrado ainda.")).toHaveTextContent(/administrador os cadastra/);
+    expect(screen.queryByRole("button", { name: "Criar primeiro usuário" })).toBeNull();
+  });
+
+  it("ações de linha nomeiam o usuário; CPF ausente com texto para leitor de tela", async () => {
+    await mockRole("ADMIN");
+    await mockUsers([{ ...USERS[0], cpf: null }, ...USERS.slice(1)]);
+
+    await renderUsersPage();
+
+    expect(screen.getByRole("button", { name: "Editar usuário Ana Souza" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Excluir usuário Bruno Lima" })).toBeTruthy();
+    expect(screen.getByText("sem dados").className).toMatch(/\bsr-only\b/);
   });
 });

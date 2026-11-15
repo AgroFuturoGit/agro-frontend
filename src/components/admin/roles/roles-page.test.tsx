@@ -77,7 +77,8 @@ describe("RolesPage", () => {
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Não foi possível carregar os dados.");
-    expect(alert).toHaveTextContent("Não foi possível carregar os perfis.");
+    // Mesma dica padrão das outras listas (sem a mensagem técnica da API).
+    expect(alert).toHaveTextContent("Tente novamente em alguns instantes.");
     expect(screen.queryByText("Nenhum perfil disponível.")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));

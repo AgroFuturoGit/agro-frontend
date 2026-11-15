@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { ApiError } from "@/lib/api";
-import { deleteCrop, type Crop } from "@/lib/crops";
+import { cropDisplayName, deleteCrop, type Crop } from "@/lib/crops";
 
 type Props = {
   crop: Crop | null;
@@ -65,7 +65,7 @@ export function DeleteCropDialog({ crop, open, onOpenChange, onDeleted }: Props)
           <AlertDialogDescription>
             Esta ação removerá{" "}
             <span className="font-medium text-foreground">
-              {crop?.name ?? "a cultura"}
+              {crop ? cropDisplayName(crop) : "a cultura"}
             </span>{" "}
             do sistema. Não é possível desfazer.
           </AlertDialogDescription>

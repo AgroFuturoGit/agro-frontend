@@ -132,7 +132,7 @@ export function DataTable<TData, TValue>({
 
   if (useCardLayout) {
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-3" aria-busy={isLoading ? true : undefined}>
         {isLoading ? (
           Array.from({ length: SKELETON_CARDS }).map((_, idx) => (
             <div
@@ -158,7 +158,9 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className={SURFACE}>
-      <Table>
+      {/* aria-busy enquanto carrega: o leitor de tela não lê os skeletons
+          como conteúdo (A11Y-L2-5). */}
+      <Table aria-busy={isLoading ? true : undefined}>
         <TableHeader className="bg-card">
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="h-12 hover:bg-transparent">

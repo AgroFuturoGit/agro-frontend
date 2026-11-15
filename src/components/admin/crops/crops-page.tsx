@@ -16,6 +16,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { EmptyValue } from "@/components/admin/empty-value";
 import { PageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -34,6 +35,7 @@ import { readUserFromStorage, type Role } from "@/lib/auth";
 import {
   HARVEST_TYPE_LABELS,
   UNIT_NAMES,
+  cropDisplayName,
   listCrops,
   type Crop,
 } from "@/lib/crops";
@@ -107,6 +109,25 @@ export function CropsPage() {
     refresh();
   }, [refresh]);
 
+  // Prefixo fixo ("Editar cultura") + "nome — variedade" (há nomes
+  // repetidos, ex. Milho BR-106 × AG 1051). Os testes casam pelo prefixo; o
+  // e2e mobile procura "Editar" por substring.
+  const rowActions = useCallback(
+    (crop: Crop): DataTableRowAction[] => {
+      const name = cropDisplayName(crop);
+      return [
+        { label: `Editar cultura ${name}`, icon: Pencil, onClick: () => setEditTarget(crop) },
+        {
+          label: `Excluir cultura ${name}`,
+          icon: Trash2,
+          tone: "destructive",
+          onClick: () => setDeleteTarget(crop),
+        },
+      ];
+    },
+    [],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor("name", {
@@ -131,7 +152,7 @@ export function CropsPage() {
         cell: ({ row }) =>
           row.original.harvestType
             ? HARVEST_TYPE_LABELS[row.original.harvestType]
-            : "—",
+            : <EmptyValue />,
       }),
       columnHelper.accessor((crop) => crop.unit ?? "", {
         id: "unit",
@@ -139,7 +160,7 @@ export function CropsPage() {
         enableSorting: false,
         meta: { cellVariant: "secondary" },
         cell: ({ row }) =>
-          row.original.unit ? UNIT_NAMES[row.original.unit] : "—",
+          row.original.unit ? UNIT_NAMES[row.original.unit] : <EmptyValue />,
       }),
       columnHelper.accessor("isPriority", {
         header: "Prioritária",
@@ -157,17 +178,7 @@ export function CropsPage() {
       id: "actions",
       header: "Ações",
       cell: ({ row }) => {
-        const crop = row.original;
-        const actions: DataTableRowAction[] = [
-          { label: "Editar cultura", icon: Pencil, onClick: () => setEditTarget(crop) },
-          {
-            label: "Excluir cultura",
-            icon: Trash2,
-            tone: "destructive",
-            onClick: () => setDeleteTarget(crop),
-          },
-        ];
-        return <DataTableRowActions actions={actions} />;
+        return <DataTableRowActions actions={rowActions(row.original)} />;
       },
     });
 
@@ -178,7 +189,7 @@ export function CropsPage() {
       Crop,
       unknown
     >[];
-  }, [canManage, loading]);
+  }, [canManage, loading, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -206,39 +217,23 @@ export function CropsPage() {
       <Card className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-foreground">
-              {crop.name} — {crop.variety}
-            </p>
+            <p className="font-medium text-foreground">{cropDisplayName(crop)}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {crop.harvestType ? HARVEST_TYPE_LABELS[crop.harvestType] : "—"} ·{" "}
-              {crop.unit ? UNIT_NAMES[crop.unit] : "—"}
+              {crop.harvestType ? HARVEST_TYPE_LABELS[crop.harvestType] : <EmptyValue />} ·{" "}
+              {crop.unit ? UNIT_NAMES[crop.unit] : <EmptyValue />}
             </p>
             <div className="mt-2">
               <PriorityBadge isPriority={crop.isPriority} />
             </div>
           </div>
+          {/* Ações filhas diretas do mesmo container do nome: o e2e sobe
+              dois níveis a partir do nome para achá-las. */}
           {canManage && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setEditTarget(crop)}
-              >
-                <Pencil aria-hidden="true" />
-                Editar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Excluir cultura"
-                onClick={() => setDeleteTarget(crop)}
-                className="text-destructive hover:bg-destructive-muted hover:text-destructive-strong"
-              >
-                <Trash2 aria-hidden="true" />
-              </Button>
-            </div>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(crop)}
+            />
           )}
         </div>
       </Card>
@@ -263,6 +258,11 @@ export function CropsPage() {
       <DataTableToolbar
         table={table}
         searchPlaceholder="Buscar por nome ou variedade…"
+        extraFilter={{
+          active: isPriorityFilterActive,
+          label: "Somente prioritárias",
+          onClear: () => table.getColumn("isPriority")?.setFilterValue(undefined),
+        }}
         extra={
           // Figma 109:498: à direita, na mesma linha da busca; no mobile
           // quebra para a linha de baixo. Alvo de toque = altura de controle.
@@ -293,6 +293,13 @@ export function CropsPage() {
           table.getColumn("isPriority")?.setFilterValue(undefined);
         }}
         emptyTitle="Nenhuma cultura cadastrada."
+        emptyHint={
+          canManage
+            ? "Cadastre as culturas (nome e variedade) que vão compor os planos de produção."
+            : "As culturas aparecem aqui quando um administrador ou técnico as cadastra."
+        }
+        emptyActionLabel={canManage ? "Criar primeira cultura" : undefined}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />
 

@@ -16,6 +16,7 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { EmptyValue } from "@/components/admin/empty-value";
 import { PageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -100,9 +101,15 @@ export function UsersPage() {
   // Mesmos nomes acessíveis na tabela e nos cards mobile (e2e/unit).
   const rowActions = useCallback(
     (user: User): DataTableRowAction[] => [
-      { label: "Editar usuário", icon: Pencil, onClick: () => setEditTarget(user) },
+      // Prefixo fixo ("Editar usuário") + nome do registro: os testes casam
+      // pelo prefixo; o leitor de tela sabe qual linha cada botão afeta.
       {
-        label: "Excluir usuário",
+        label: `Editar usuário ${user.fullName}`,
+        icon: Pencil,
+        onClick: () => setEditTarget(user),
+      },
+      {
+        label: `Excluir usuário ${user.fullName}`,
         icon: Trash2,
         tone: "destructive",
         onClick: () => setDeleteTarget(user),
@@ -133,7 +140,7 @@ export function UsersPage() {
         // Roboto com algarismos tabulares (Figma 97:91), não fonte mono.
         meta: { cellVariant: "secondary", cellClassName: "tabular-nums" },
         cell: (info) =>
-          info.getValue() ? formatCpf(info.getValue() as string) : "—",
+          info.getValue() ? formatCpf(info.getValue() as string) : <EmptyValue />,
       }),
       columnHelper.accessor("role", {
         header: ({ column }) => (
@@ -250,6 +257,13 @@ export function UsersPage() {
           table.resetColumnFilters();
         }}
         emptyTitle="Nenhum usuário cadastrado ainda."
+        emptyHint={
+          canManage
+            ? "Cadastre os usuários que vão acessar o painel: técnicos, gestores e administradores."
+            : "Os usuários aparecem aqui quando um administrador os cadastra."
+        }
+        emptyActionLabel={canManage ? "Criar primeiro usuário" : undefined}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />
 

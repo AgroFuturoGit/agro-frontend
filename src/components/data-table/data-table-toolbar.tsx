@@ -32,6 +32,13 @@ type DataTableToolbarProps<TData> = {
    * checkbox "Somente prioritárias" de Culturas). Quebra linha no mobile.
    */
   extra?: React.ReactNode;
+  /**
+   * Filtro controlado fora do `filters` (ex.: checkbox do `extra`). Quando
+   * `active`, entra na linha de chips (com `label`) e é limpo pelo "Limpar",
+   * para o "Limpar" da toolbar ter o mesmo alcance do "Limpar filtros" do
+   * estado vazio.
+   */
+  extraFilter?: { active: boolean; label: string; onClear: () => void };
 };
 
 const CHIP_CLASS =
@@ -42,6 +49,7 @@ export function DataTableToolbar<TData>({
   searchPlaceholder = "Buscar…",
   filters = [],
   extra,
+  extraFilter,
 }: DataTableToolbarProps<TData>) {
   const [rawSearch, setRawSearch] = useState("");
   const debouncedSearch = useDebouncedValue(rawSearch, 500);
@@ -75,11 +83,14 @@ export function DataTableToolbar<TData>({
   // digitado agora, ainda sem passar pela regra.
   const appliedSearch = (table.getState().globalFilter as string | undefined) ?? "";
 
-  const hasAnyActiveFilter = Boolean(appliedSearch) || activeColumnFilters.length > 0;
+  const extraFilterActive = Boolean(extraFilter?.active);
+  const hasAnyActiveFilter =
+    Boolean(appliedSearch) || activeColumnFilters.length > 0 || extraFilterActive;
 
   function clearAll() {
     clearSearch();
     filters.forEach((f) => table.getColumn(f.columnId)?.setFilterValue(undefined));
+    if (extraFilterActive) extraFilter?.onClear();
   }
 
   return (
@@ -151,6 +162,16 @@ export function DataTableToolbar<TData>({
               </button>
             );
           })}
+          {extraFilterActive && extraFilter && (
+            <button
+              type="button"
+              onClick={extraFilter.onClear}
+              aria-label={`Remover filtro ${extraFilter.label}`}
+              className={CHIP_CLASS}
+            >
+              {extraFilter.label} <X className="size-3" aria-hidden="true" />
+            </button>
+          )}
           <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
             Limpar
           </Button>

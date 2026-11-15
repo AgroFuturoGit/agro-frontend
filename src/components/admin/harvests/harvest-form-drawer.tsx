@@ -219,11 +219,9 @@ export function HarvestFormDrawer({
           className="flex flex-1 flex-col overflow-y-auto"
         >
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
-            <div aria-live="polite">
-              {formError && (
-                <InlineAlert variant="destructive">{formError}</InlineAlert>
-              )}
-            </div>
+            {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta
+                (evita anúncio duplicado). */}
+            {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="harvest-label">Rótulo</Label>

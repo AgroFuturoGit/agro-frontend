@@ -188,3 +188,12 @@ export function parseCropFieldErrors(payload: unknown): Record<string, string> {
 
   return errors;
 }
+
+/**
+ * Identificação inequívoca da cultura: há nomes repetidos com variedades
+ * diferentes (ex. "Milho — BR-106" × "Milho — AG 1051").
+ */
+export function cropDisplayName(crop: Pick<Crop, "name" | "variety">): string {
+  const variety = crop.variety?.trim();
+  return variety ? `${crop.name} — ${variety}` : crop.name;
+}
