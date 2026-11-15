@@ -69,7 +69,9 @@ export function mapCrop(raw: CropApiResponse): Crop {
   return {
     id: raw.id,
     name: raw.name,
-    variety: raw.variety,
+    // Normaliza na fronteira: `Crop.variety` é sempre string (busca e
+    // `cropDisplayName` contam com isso), mesmo se a API mandar null.
+    variety: raw.variety ?? "",
     isPriority: raw.isPriority,
     cycleDays: numOrNull(raw.cycleDays),
     expectedProductivity: numOrNull(raw.expectedProductivity),
@@ -187,4 +189,18 @@ export function parseCropFieldErrors(payload: unknown): Record<string, string> {
   }
 
   return errors;
+}
+
+/**
+ * Identificação inequívoca da cultura: há nomes repetidos com variedades
+ * diferentes (ex. "Milho — BR-106" × "Milho — AG 1051").
+ */
+// Assinatura aceita variedade ausente porque também recebe objetos que não
+// passaram por `mapCrop` (ex.: `plan.crop` aninhado em planos).
+export function cropDisplayName(crop: {
+  name: string;
+  variety?: string | null;
+}): string {
+  const variety = crop.variety?.trim();
+  return variety ? `${crop.name} — ${variety}` : crop.name;
 }

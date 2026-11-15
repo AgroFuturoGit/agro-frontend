@@ -182,10 +182,10 @@ describe("HarvestsPage — RBAC", () => {
 
     expect(screen.getByRole("button", { name: /Nova safra/ })).toBeTruthy();
     expect(
-      screen.getAllByRole("button", { name: "Editar safra" }).length,
+      screen.getAllByRole("button", { name: /^Editar safra/ }).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByRole("button", { name: "Excluir safra" }).length,
+      screen.getAllByRole("button", { name: /^Excluir safra/ }).length,
     ).toBeGreaterThan(0);
   });
 
@@ -198,7 +198,7 @@ describe("HarvestsPage — RBAC", () => {
 
     expect(screen.getByRole("button", { name: /Nova safra/ })).toBeTruthy();
     expect(
-      screen.getAllByRole("button", { name: "Editar safra" }).length,
+      screen.getAllByRole("button", { name: /^Editar safra/ }).length,
     ).toBeGreaterThan(0);
   });
 
@@ -210,8 +210,8 @@ describe("HarvestsPage — RBAC", () => {
     await renderHarvestsPage();
 
     expect(screen.queryByRole("button", { name: /Nova safra/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Editar safra" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Excluir safra" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar safra/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir safra/ })).toBeNull();
   });
 
   it("role=MANAGER: nenhuma ação de escrita aparece, mesmo com linhas na lista", async () => {
@@ -222,8 +222,8 @@ describe("HarvestsPage — RBAC", () => {
     await renderHarvestsPage();
 
     expect(screen.queryByRole("button", { name: /Nova safra/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Editar safra" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Excluir safra" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar safra/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir safra/ })).toBeNull();
   });
 });
 
@@ -290,7 +290,7 @@ describe("HarvestsPage — integração com DeleteHarvestDialog", () => {
     await renderHarvestsPage();
 
     await user.click(
-      screen.getAllByRole("button", { name: "Excluir safra" })[0],
+      screen.getAllByRole("button", { name: /^Excluir safra/ })[0],
     );
 
     expect(await screen.findByText("Excluir safra")).toBeTruthy();
@@ -319,10 +319,10 @@ describe("HarvestsPage — layout mobile", () => {
 
     expect(screen.queryByRole("table")).toBeNull();
     expect(
-      screen.getAllByRole("button", { name: "Editar safra" }).length,
+      screen.getAllByRole("button", { name: /^Editar safra/ }).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByRole("button", { name: "Excluir safra" }).length,
+      screen.getAllByRole("button", { name: /^Excluir safra/ }).length,
     ).toBeGreaterThan(0);
   });
 
@@ -334,7 +334,58 @@ describe("HarvestsPage — layout mobile", () => {
     await renderHarvestsPage();
 
     expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Editar safra" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Excluir safra" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar safra/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir safra/ })).toBeNull();
+  });
+});
+
+
+/** O `role=status` do estado vazio (a paginação também tem um `status`). */
+async function emptyStatus(title: string) {
+  const node = await screen.findByText(title);
+  return node.closest('[role="status"]') as HTMLElement;
+}
+
+describe("HarvestsPage — ajustes da revisão (lote 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("vazio sem filtro: dica e CTA 'Criar primeira safra' que abre o drawer", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockHarvestsApi([]);
+    const user = userEvent.setup();
+
+    render(<HarvestsPage />);
+
+    const status = await emptyStatus("Nenhuma safra cadastrada.");
+    expect(status).toHaveTextContent("Nenhuma safra cadastrada.");
+    expect(status).toHaveTextContent(/por período/);
+    await user.click(screen.getByRole("button", { name: "Criar primeira safra" }));
+    expect(await screen.findByRole("heading", { name: "Nova safra" })).toBeTruthy();
+  });
+
+  it("vazio sem permissão: só a dica, sem CTA", async () => {
+    await mockRole("FARMER");
+    await mockMobile(false);
+    await mockHarvestsApi([]);
+
+    render(<HarvestsPage />);
+
+    expect(await emptyStatus("Nenhuma safra cadastrada.")).toHaveTextContent(/administrador ou técnico/);
+    expect(screen.queryByRole("button", { name: "Criar primeira safra" })).toBeNull();
+  });
+
+  it("ações de linha nomeiam a safra", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockHarvestsApi();
+
+    await renderHarvestsPage();
+
+    expect(screen.getByRole("button", { name: "Editar safra Safra 2023/2024" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Excluir safra Safra 2023/2024" })).toBeTruthy();
   });
 });

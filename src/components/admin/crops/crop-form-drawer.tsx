@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { InlineAlert } from "@/components/ui/inline-alert";
 import {
   Sheet,
   SheetContent,
@@ -358,17 +359,9 @@ export function CropFormDrawer({
           className="flex flex-1 flex-col overflow-y-auto"
         >
           <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
-            <div aria-live="polite">
-              {formError && (
-                <div
-                  role="alert"
-                  className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-                >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <span>{formError}</span>
-                </div>
-              )}
-            </div>
+            {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta
+                (evita anúncio duplicado). */}
+            {formError && <InlineAlert variant="destructive">{formError}</InlineAlert>}
 
             {!isCreate && crop && (
               <>

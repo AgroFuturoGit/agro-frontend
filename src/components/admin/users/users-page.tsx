@@ -16,11 +16,17 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { EmptyValue } from "@/components/admin/empty-value";
+import { PageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
@@ -92,37 +98,55 @@ export function UsersPage() {
     refresh();
   }, [refresh]);
 
+  // Mesmos nomes acessíveis na tabela e nos cards mobile (e2e/unit).
+  const rowActions = useCallback(
+    (user: User): DataTableRowAction[] => [
+      // Prefixo fixo ("Editar usuário") + nome do registro: os testes casam
+      // pelo prefixo; o leitor de tela sabe qual linha cada botão afeta.
+      {
+        label: `Editar usuário ${user.fullName}`,
+        icon: Pencil,
+        onClick: () => setEditTarget(user),
+      },
+      {
+        label: `Excluir usuário ${user.fullName}`,
+        icon: Trash2,
+        tone: "destructive",
+        onClick: () => setDeleteTarget(user),
+      },
+    ],
+    [],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor("fullName", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="font-medium text-foreground">{info.getValue()}</span>
-        ),
+        meta: { cellVariant: "primary" },
+        cell: (info) => info.getValue(),
       }),
       columnHelper.accessor("email", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="E-mail" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="text-muted-foreground">{info.getValue()}</span>
-        ),
+        meta: { cellVariant: "secondary" },
+        cell: (info) => info.getValue(),
       }),
       columnHelper.accessor("cpf", {
         header: "CPF",
         enableSorting: false,
-        cell: (info) => (
-          <span className="font-mono text-xs text-muted-foreground">
-            {info.getValue() ? formatCpf(info.getValue() as string) : "—"}
-          </span>
-        ),
+        // Roboto com algarismos tabulares (Figma 97:91), não fonte mono.
+        meta: { cellVariant: "secondary", cellClassName: "tabular-nums" },
+        cell: (info) =>
+          info.getValue() ? formatCpf(info.getValue() as string) : <EmptyValue />,
       }),
       columnHelper.accessor("role", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Papel" disabled={loading} />
         ),
+        meta: { cellVariant: "primary" },
         cell: (info) => ROLE_LABELS[info.getValue() as Role] ?? info.getValue(),
         filterFn: (row, columnId, filterValue) =>
           !filterValue || row.getValue(columnId) === filterValue,
@@ -134,29 +158,7 @@ export function UsersPage() {
       header: "Ações",
       cell: ({ row }) => {
         const user = row.original;
-        return (
-          <div className="inline-flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Editar usuário"
-              onClick={() => setEditTarget(user)}
-            >
-              <Pencil />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Excluir usuário"
-              onClick={() => setDeleteTarget(user)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        );
+        return <DataTableRowActions actions={rowActions(user)} />;
       },
     });
 
@@ -168,7 +170,7 @@ export function UsersPage() {
       User,
       unknown
     >[];
-  }, [canManage, loading]);
+  }, [canManage, loading, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -196,33 +198,17 @@ export function UsersPage() {
             <p className="mt-1 break-all text-sm text-muted-foreground">
               {user.email}
             </p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {ROLE_LABELS[user.role as Role] ?? user.role}
               {user.cpf ? ` · ${formatCpf(user.cpf)}` : ""}
             </p>
           </div>
           {canManage && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Editar usuário"
-                onClick={() => setEditTarget(user)}
-              >
-                <Pencil />
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Excluir usuário"
-                onClick={() => setDeleteTarget(user)}
-                className="text-destructive hover:text-destructive"
-              >
-                <Trash2 />
-              </Button>
-            </div>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(user)}
+            />
           )}
         </div>
       </Card>
@@ -230,21 +216,19 @@ export function UsersPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Usuários</h2>
-          <p className="text-sm text-muted-foreground">
-            Gerencie os usuários do sistema.
-          </p>
-        </div>
-        {canManage && (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Novo usuário
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-col gap-section-sm">
+      <PageHeader
+        title="Usuários"
+        description="Gerencie os usuários do sistema."
+        actions={
+          canManage ? (
+            <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden="true" />
+              Novo usuário
+            </Button>
+          ) : undefined
+        }
+      />
 
       <DataTableToolbar
         table={table}
@@ -273,6 +257,13 @@ export function UsersPage() {
           table.resetColumnFilters();
         }}
         emptyTitle="Nenhum usuário cadastrado ainda."
+        emptyHint={
+          canManage
+            ? "Cadastre aqui os administradores e técnicos que vão acessar o painel."
+            : "Os usuários aparecem aqui quando um administrador os cadastra."
+        }
+        emptyActionLabel={canManage ? "Criar primeiro usuário" : undefined}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />
 

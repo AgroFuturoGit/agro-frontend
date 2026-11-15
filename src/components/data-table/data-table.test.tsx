@@ -188,6 +188,58 @@ describe("DataTable — estado de carregamento", () => {
     );
     expect(screen.queryByText("Carlos")).toBeNull();
   });
+
+  it("anuncia 'Carregando…' numa região aria-live e esconde os skeletons do leitor de tela", () => {
+    const { container, rerender } = render(<TestHost isLoading />);
+
+    const live = container.querySelector('[aria-live="polite"].sr-only');
+    expect(live).toHaveTextContent("Carregando…");
+    expect(container.querySelector("table")).toHaveAttribute("aria-busy", "true");
+    container.querySelectorAll('[data-slot="skeleton"]').forEach((skeleton) => {
+      expect(skeleton.closest('[aria-hidden="true"]')).not.toBeNull();
+    });
+
+    rerender(<TestHost />);
+    // Fim do carregamento (M3): frase curta com o total, sem role=status.
+    expect(live).toHaveTextContent(`${ITEMS.length} registros carregados.`);
+    expect(container.querySelector("table")).not.toHaveAttribute("aria-busy");
+  });
+
+  it("fim do carregamento: singular, e nada a anunciar no vazio ou no erro", () => {
+    const { container, rerender } = render(<TestHost data={ITEMS.slice(0, 1)} isLoading />);
+    const live = container.querySelector('[aria-live="polite"].sr-only');
+    rerender(<TestHost data={ITEMS.slice(0, 1)} />);
+    expect(live).toHaveTextContent("1 registro carregado.");
+
+    rerender(<TestHost data={[]} isLoading />);
+    rerender(<TestHost data={[]} />);
+    expect(live).toHaveTextContent("");
+
+    rerender(<TestHost data={[]} isLoading />);
+    rerender(<TestHost data={[]} hasError />);
+    expect(live).toHaveTextContent("");
+  });
+
+  it("a mensagem de fim não muda quando a lista é filtrada depois", () => {
+    const { container, rerender } = render(<TestHost isLoading />);
+    const live = container.querySelector('[aria-live="polite"].sr-only');
+    rerender(<TestHost />);
+    rerender(<TestHost data={ITEMS.slice(0, 2)} />);
+    expect(live).toHaveTextContent(`${ITEMS.length} registros carregados.`);
+  });
+
+  it("no layout de cards, o container fica aria-busy durante o carregamento", () => {
+    vi.mocked(useIsMobile).mockReturnValue(true);
+    const { container, rerender } = render(
+      <TestHost isLoading renderMobileCard={renderItemCard} />,
+    );
+    expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(container.querySelector("table")).toBeNull();
+
+    rerender(<TestHost renderMobileCard={renderItemCard} />);
+    expect(container.querySelector('[aria-busy="true"]')).toBeNull();
+    vi.mocked(useIsMobile).mockReturnValue(false);
+  });
 });
 
 describe("DataTable — os três estados de DataTableStatus", () => {

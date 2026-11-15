@@ -16,6 +16,8 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 
+import { EmptyValue } from "@/components/admin/empty-value";
+import { PageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,12 +25,17 @@ import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import {
+  DataTableRowActions,
+  type DataTableRowAction,
+} from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import {
   HARVEST_TYPE_LABELS,
   UNIT_NAMES,
+  cropDisplayName,
   listCrops,
   type Crop,
 } from "@/lib/crops";
@@ -102,53 +109,66 @@ export function CropsPage() {
     refresh();
   }, [refresh]);
 
+  // Prefixo fixo ("Editar cultura") + "nome — variedade" (há nomes
+  // repetidos, ex. Milho BR-106 × AG 1051). Os testes casam pelo prefixo; o
+  // e2e mobile procura "Editar" por substring.
+  const rowActions = useCallback(
+    (crop: Crop): DataTableRowAction[] => {
+      const name = cropDisplayName(crop);
+      return [
+        { label: `Editar cultura ${name}`, icon: Pencil, onClick: () => setEditTarget(crop) },
+        {
+          label: `Excluir cultura ${name}`,
+          icon: Trash2,
+          tone: "destructive",
+          onClick: () => setDeleteTarget(crop),
+        },
+      ];
+    },
+    [],
+  );
+
   const columns = useMemo(() => {
     const baseColumns = [
       columnHelper.accessor("name", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Nome" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="font-medium text-foreground">{info.getValue()}</span>
-        ),
+        meta: { cellVariant: "primary" },
+        cell: (info) => info.getValue(),
       }),
       columnHelper.accessor("variety", {
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="Variedade" disabled={loading} />
         ),
-        cell: (info) => (
-          <span className="text-muted-foreground">{info.getValue()}</span>
-        ),
+        meta: { cellVariant: "secondary" },
+        cell: (info) => info.getValue(),
       }),
       columnHelper.accessor((crop) => crop.harvestType ?? "", {
         id: "harvestType",
         header: "Colheita",
         enableSorting: false,
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">
-            {row.original.harvestType
-              ? HARVEST_TYPE_LABELS[row.original.harvestType]
-              : "—"}
-          </span>
-        ),
+        meta: { cellVariant: "secondary" },
+        cell: ({ row }) =>
+          row.original.harvestType
+            ? HARVEST_TYPE_LABELS[row.original.harvestType]
+            : <EmptyValue />,
       }),
       columnHelper.accessor((crop) => crop.unit ?? "", {
         id: "unit",
         header: "Unidade",
         enableSorting: false,
-        cell: ({ row }) => (
-          <span className="text-muted-foreground">
-            {row.original.unit ? UNIT_NAMES[row.original.unit] : "—"}
-          </span>
-        ),
+        meta: { cellVariant: "secondary" },
+        cell: ({ row }) =>
+          row.original.unit ? UNIT_NAMES[row.original.unit] : <EmptyValue />,
       }),
       columnHelper.accessor("isPriority", {
         header: "Prioritária",
         enableSorting: false,
         cell: (info) => <PriorityBadge isPriority={info.getValue()} />,
-        // Controlado pelo checkbox "Somente prioritárias" abaixo da
-        // toolbar, não pelo dropdown genérico de `filters` — mantém a
-        // mesma interação (checkbox) da implementação anterior.
+        // Controlado pelo checkbox "Somente prioritárias" dentro do card da
+        // toolbar (slot `extra`), não pelo dropdown genérico de `filters` —
+        // mantém a mesma interação (checkbox) da implementação anterior.
         filterFn: (row, columnId, filterValue) =>
           !filterValue || row.getValue(columnId) === true,
       }),
@@ -158,30 +178,7 @@ export function CropsPage() {
       id: "actions",
       header: "Ações",
       cell: ({ row }) => {
-        const crop = row.original;
-        return (
-          <div className="inline-flex items-center gap-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Editar cultura"
-              onClick={() => setEditTarget(crop)}
-            >
-              <Pencil />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Excluir cultura"
-              onClick={() => setDeleteTarget(crop)}
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 />
-            </Button>
-          </div>
-        );
+        return <DataTableRowActions actions={rowActions(row.original)} />;
       },
     });
 
@@ -192,7 +189,7 @@ export function CropsPage() {
       Crop,
       unknown
     >[];
-  }, [canManage, loading]);
+  }, [canManage, loading, rowActions]);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -213,6 +210,10 @@ export function CropsPage() {
   const isPriorityFilterActive = Boolean(
     table.getColumn("isPriority")?.getFilterValue(),
   );
+  // Um único ponto para desmarcar "Somente prioritárias" (chip, "Limpar" da
+  // toolbar e "Limpar filtros" do vazio).
+  const clearPriorityFilter = () =>
+    table.getColumn("isPriority")?.setFilterValue(undefined);
 
   function renderMobileCard(row: Row<Crop>) {
     const crop = row.original;
@@ -220,38 +221,23 @@ export function CropsPage() {
       <Card className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-foreground">
-              {crop.name} — {crop.variety}
-            </p>
+            <p className="font-medium text-foreground">{cropDisplayName(crop)}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {crop.harvestType ? HARVEST_TYPE_LABELS[crop.harvestType] : "—"} ·{" "}
-              {crop.unit ? UNIT_NAMES[crop.unit] : "—"}
+              {crop.harvestType ? HARVEST_TYPE_LABELS[crop.harvestType] : <EmptyValue />} ·{" "}
+              {crop.unit ? UNIT_NAMES[crop.unit] : <EmptyValue />}
             </p>
             <div className="mt-2">
               <PriorityBadge isPriority={crop.isPriority} />
             </div>
           </div>
+          {/* Ações filhas diretas do mesmo container do nome: o e2e sobe
+              dois níveis a partir do nome para achá-las. */}
           {canManage && (
-            <div className="flex shrink-0 gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setEditTarget(crop)}
-              >
-                <Pencil />
-                Editar
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                aria-label="Excluir cultura"
-                onClick={() => setDeleteTarget(crop)}
-              >
-                <Trash2 />
-              </Button>
-            </div>
+            <DataTableRowActions
+              align="end"
+              className="shrink-0"
+              actions={rowActions(crop)}
+            />
           )}
         </div>
       </Card>
@@ -259,41 +245,47 @@ export function CropsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Culturas Agrícolas
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Gerencie as culturas cadastradas no sistema.
-          </p>
-        </div>
-        {canManage && (
-          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus />
-            Nova cultura
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-col gap-section-sm">
+      <PageHeader
+        title="Culturas Agrícolas"
+        description="Gerencie as culturas cadastradas no sistema."
+        actions={
+          canManage ? (
+            <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+              <Plus aria-hidden="true" />
+              Nova cultura
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex-1">
-          <DataTableToolbar table={table} searchPlaceholder="Buscar por nome ou variedade…" />
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="only-priority"
-            checked={isPriorityFilterActive}
-            onCheckedChange={(checked) =>
-              table.getColumn("isPriority")?.setFilterValue(checked === true ? true : undefined)
-            }
-          />
-          <Label htmlFor="only-priority" className="font-normal">
-            Somente prioritárias
-          </Label>
-        </div>
-      </div>
+      <DataTableToolbar
+        table={table}
+        searchPlaceholder="Buscar por nome ou variedade…"
+        extraFilter={{
+          active: isPriorityFilterActive,
+          label: "Somente prioritárias",
+          onClear: clearPriorityFilter,
+        }}
+        extra={
+          // Figma 109:498: à direita, na mesma linha da busca; no mobile
+          // quebra para a linha de baixo. Alvo de toque = altura de controle.
+          <div className="flex min-h-control items-center gap-2 sm:ml-auto">
+            <Checkbox
+              id="only-priority"
+              checked={isPriorityFilterActive}
+              onCheckedChange={(checked) =>
+                checked === true
+                  ? table.getColumn("isPriority")?.setFilterValue(true)
+                  : clearPriorityFilter()
+              }
+            />
+            <Label htmlFor="only-priority" className="font-medium">
+              Somente prioritárias
+            </Label>
+          </div>
+        }
+      />
 
       <DataTable
         table={table}
@@ -304,9 +296,16 @@ export function CropsPage() {
         hasActiveFilters={Boolean(globalFilter) || isPriorityFilterActive}
         onClearFilters={() => {
           table.setGlobalFilter("");
-          table.getColumn("isPriority")?.setFilterValue(undefined);
+          clearPriorityFilter();
         }}
         emptyTitle="Nenhuma cultura cadastrada."
+        emptyHint={
+          canManage
+            ? "Cadastre as culturas (nome e variedade) que vão compor os planos de produção."
+            : "As culturas aparecem aqui quando um administrador ou técnico as cadastra."
+        }
+        emptyActionLabel={canManage ? "Criar primeira cultura" : undefined}
+        onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />
 

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -395,14 +395,14 @@ describe("CropsPage — integração com DeleteCropDialog", () => {
     await renderCropsPage();
 
     await user.click(
-      screen.getAllByRole("button", { name: "Excluir cultura" })[0],
+      screen.getAllByRole("button", { name: /^Excluir cultura/ })[0],
     );
 
     expect(await screen.findByText("Excluir cultura")).toBeTruthy();
     expect(
       screen.getByText(
         (_, node) =>
-          node?.textContent === "Esta ação removerá Soja do sistema. Não é possível desfazer.",
+          node?.textContent === "Esta ação removerá Soja — Convencional do sistema. Não é possível desfazer.",
       ),
     ).toBeTruthy();
   });
@@ -414,7 +414,7 @@ describe("CropsPage — integração com DeleteCropDialog", () => {
 
     await renderCropsPage();
 
-    expect(screen.queryByRole("button", { name: "Excluir cultura" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir cultura/ })).toBeNull();
   });
 
   it("em viewport mobile, a ação de excluir também fica acessível quando canManage", async () => {
@@ -425,7 +425,7 @@ describe("CropsPage — integração com DeleteCropDialog", () => {
     await renderCropsPage();
 
     expect(
-      screen.getAllByRole("button", { name: "Excluir cultura" }).length,
+      screen.getAllByRole("button", { name: /^Excluir cultura/ }).length,
     ).toBeGreaterThan(0);
   });
 
@@ -436,6 +436,240 @@ describe("CropsPage — integração com DeleteCropDialog", () => {
 
     await renderCropsPage();
 
-    expect(screen.queryByRole("button", { name: "Excluir cultura" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir cultura/ })).toBeNull();
   });
+});
+
+describe("CropsPage — visual do Figma (lote 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("'Somente prioritárias' fica dentro do card da toolbar, junto da busca", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    const checkbox = screen.getByRole("checkbox", { name: /Somente prioritárias/ });
+    const search = screen.getByRole("searchbox");
+    const toolbarCard = search.closest(".rounded-xl");
+    expect(toolbarCard).toBeTruthy();
+    expect(toolbarCard?.contains(checkbox)).toBe(true);
+  });
+
+  it("título em PageHeader (h2) e badge 'Prioritária' outline", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Culturas Agrícolas" }),
+    ).toBeTruthy();
+    // "Prioritária" também é o cabeçalho da coluna: busca o badge da linha.
+    const badge = screen
+      .getAllByText("Prioritária")
+      .find((el) => el.getAttribute("data-slot") === "badge");
+    expect(badge).toBeTruthy();
+    expect(badge?.className).toMatch(/\bborder-border\b/);
+  });
+});
+
+
+/** O `role=status` do estado vazio (a paginação também tem um `status`). */
+async function emptyStatus(title: string) {
+  const node = await screen.findByText(title);
+  return node.closest('[role="status"]') as HTMLElement;
+}
+
+describe("CropsPage — ajustes da revisão (lote 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("vazio sem filtro: dica e CTA 'Criar primeira cultura' que abre o drawer", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi([]);
+    const user = userEvent.setup();
+
+    render(<CropsPage />);
+
+    const status = await emptyStatus("Nenhuma cultura cadastrada.");
+    expect(status).toHaveTextContent("Nenhuma cultura cadastrada.");
+    expect(status).toHaveTextContent(/planos de produção/);
+    await user.click(screen.getByRole("button", { name: "Criar primeira cultura" }));
+    expect(await screen.findByRole("heading", { name: "Nova cultura" })).toBeTruthy();
+  });
+
+  it("vazio sem permissão: só a dica, sem CTA", async () => {
+    await mockRole("FARMER");
+    await mockMobile(false);
+    await mockCropsApi([]);
+
+    render(<CropsPage />);
+
+    const status = await emptyStatus("Nenhuma cultura cadastrada.");
+    expect(status).toHaveTextContent(/administrador ou técnico/);
+    expect(screen.queryByRole("button", { name: "Criar primeira cultura" })).toBeNull();
+  });
+
+  it("'Limpar' da toolbar também desmarca 'Somente prioritárias'", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+    const user = userEvent.setup();
+
+    await renderCropsPage();
+
+    const checkbox = screen.getByRole("checkbox", { name: /Somente prioritárias/ });
+    await user.click(checkbox);
+    expect(checkbox).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByRole("button", { name: "Remover filtro Somente prioritárias" }),
+    ).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Limpar" }));
+    expect(checkbox).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Milho")).toBeTruthy();
+  });
+
+  it("ações de linha nomeiam a cultura (nome — variedade)", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    expect(
+      screen.getByRole("button", { name: "Editar cultura Soja — Convencional" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Excluir cultura Milho — Transgênico" }),
+    ).toBeTruthy();
+  });
+
+  it("mobile: ações iguais às da tabela, irmãs do bloco do nome", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(true);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    const name = screen.getByText("Soja — Convencional");
+    const card = name.parentElement?.parentElement as HTMLElement;
+    expect(
+      within(card).getByRole("button", { name: /^Editar cultura Soja/ }),
+    ).toBeTruthy();
+    expect(
+      within(card).getByRole("button", { name: /^Excluir cultura Soja/ }),
+    ).toBeTruthy();
+  });
+});
+
+describe("CropsPage — lacunas do QA e M1 (lote 2)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("vazio por 'Somente prioritárias': 'Limpar filtros' desmarca o checkbox e restaura a lista", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi(CROPS.map((crop) => ({ ...crop, isPriority: false })));
+    const user = userEvent.setup();
+
+    await renderCropsPage();
+
+    const checkbox = screen.getByRole("checkbox", { name: /Somente prioritárias/ });
+    await user.click(checkbox);
+
+    expect(
+      await screen.findByText("Nenhum resultado para os filtros aplicados."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Criar primeira cultura" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(checkbox).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByText("Soja")).toBeInTheDocument();
+    expect(screen.getAllByRole("row").length).toBe(CROPS.length + 1);
+  });
+
+  it("M1: 'Limpar filtros' do vazio também esvazia o campo de busca", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+    const user = userEvent.setup();
+
+    await renderCropsPage();
+
+    const search = screen.getByRole("searchbox");
+    await user.type(search, "zzz");
+    expect(
+      await screen.findByText("Nenhum resultado para os filtros aplicados."),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Limpar filtros" }));
+    expect(search).toHaveValue("");
+    expect(screen.getByText("Soja")).toBeInTheDocument();
+    // O debounce não reaplica o texto antigo depois de limpo.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(search).toHaveValue("");
+    expect(screen.getByText("Milho")).toBeInTheDocument();
+  });
+
+  it("M1: digitar 1–2 caracteres (que não filtram) não apaga o campo", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi();
+    const user = userEvent.setup();
+
+    await renderCropsPage();
+
+    const search = screen.getByRole("searchbox");
+    await user.type(search, "so");
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(search).toHaveValue("so");
+  });
+
+  it("diálogo de exclusão de cultura sem variedade mostra só o nome", async () => {
+    await mockRole("ADMIN");
+    await mockMobile(false);
+    await mockCropsApi([{ ...CROPS[0], name: "Cana", variety: "" }]);
+    const user = userEvent.setup();
+
+    render(<CropsPage />);
+    await user.click(await screen.findByRole("button", { name: "Excluir cultura Cana" }));
+
+    expect(
+      screen.getByText(
+        (_, node) =>
+          node?.textContent === "Esta ação removerá Cana do sistema. Não é possível desfazer.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it.each([false, true])(
+    "Colheita/Unidade ausentes: '—' oculto e 'sem dados' para leitor de tela (mobile=%s)",
+    async (isMobile) => {
+      await mockRole("ADMIN");
+      await mockMobile(isMobile);
+      await mockCropsApi([CROPS[2]]);
+
+      render(<CropsPage />);
+
+      const nodes = await screen.findAllByText("sem dados");
+      expect(nodes).toHaveLength(2);
+      nodes.forEach((node) => {
+        expect(node.className).toMatch(/\bsr-only\b/);
+        expect(node.previousElementSibling?.getAttribute("aria-hidden")).toBe("true");
+        expect(node.previousElementSibling?.textContent).toBe("—");
+      });
+    },
+  );
 });

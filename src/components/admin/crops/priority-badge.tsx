@@ -1,18 +1,36 @@
 import { Star } from "lucide-react";
 
+import { Badge } from "@/components/ui/badge";
+import { CATEGORY_BADGE_VARIANT } from "@/lib/status-variants";
+import { cn } from "@/lib/utils";
+
 type Props = {
   isPriority: boolean;
+  className?: string;
 };
 
-export function PriorityBadge({ isPriority }: Props) {
+/**
+ * "Prioritária" é categoria, não status: badge `outline` (ver
+ * `CATEGORY_BADGE_VARIANT`) com a estrela do Figma (109:498) como ícone
+ * decorativo. Sem prioridade, "—" visual com texto para leitor de tela.
+ */
+export function PriorityBadge({ isPriority, className }: Props) {
   if (!isPriority) {
-    return <span className="text-muted-foreground">—</span>;
+    return (
+      <span className={cn("text-muted-foreground", className)}>
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">Não prioritária</span>
+      </span>
+    );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
-      <Star className="size-3 fill-current" aria-hidden />
+    <Badge
+      variant={CATEGORY_BADGE_VARIANT}
+      icon={Star}
+      className={cn("[&>svg]:fill-current", className)}
+    >
       Prioritária
-    </span>
+    </Badge>
   );
 }
