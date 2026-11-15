@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCnpj } from "@/lib/cnpj";
 import { getMyManager } from "@/lib/managers";
@@ -247,7 +247,7 @@ export function OrganizationsPage() {
   const canManage = currentRole === "ADMIN";
 
   // Mesmos nomes acessíveis na tabela e nos cards mobile. Prefixo fixo
-  // ("Editar organização", "Criar Manager") + nome do registro: os testes
+  // ("Editar organização", "Criar gestor para") + nome do registro: os testes
   // casam pelo prefixo e o leitor de tela sabe qual linha cada botão afeta.
   const rowActions = useCallback(
     (organization: Organization): DataTableRowAction[] => [
@@ -257,7 +257,7 @@ export function OrganizationsPage() {
         onClick: () => setEditTarget(organization),
       },
       {
-        label: `Criar Manager para ${organization.name}`,
+        label: `Criar gestor para ${organization.name}`,
         icon: UserPlus,
         onClick: () => setManagerTarget(organization),
       },
@@ -473,7 +473,7 @@ export function OrganizationsPage() {
           isLoading={loading}
           hasError={Boolean(error)}
           onRetry={resolveAndLoad}
-          errorHint={error ?? undefined}
+          errorHint={userFacingErrorHint(error)}
           emptyTitle="Nenhum agricultor atribuído a você ainda."
           emptyHint="Os agricultores aparecem aqui quando você é vinculado como técnico responsável por eles."
           renderMobileCard={renderProducerMobileCard}
@@ -526,7 +526,7 @@ export function OrganizationsPage() {
         isLoading={loading}
         hasError={Boolean(error)}
         onRetry={resolveAndLoad}
-        errorHint={error ?? undefined}
+        errorHint={userFacingErrorHint(error)}
         hasActiveFilters={
           Boolean(table.getState().globalFilter) ||
           table.getState().columnFilters.length > 0

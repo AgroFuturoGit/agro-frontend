@@ -448,8 +448,26 @@ describe("CommunityProducersPage — visual do redesign", () => {
       ),
     ).toBeTruthy();
     await userEvent.setup().click(
-      screen.getByRole("button", { name: "Cadastrar primeiro agricultor" }),
+      screen.getByRole("button", { name: "Criar primeiro agricultor" }),
     );
     expect(await screen.findByRole("dialog")).toBeTruthy();
+  });
+});
+
+describe("CommunityProducersPage — diálogo de exclusão (UX-L3-02)", () => {
+  it("avisa da perda de acesso ao painel e que agricultor com planos não pode ser excluído", async () => {
+    loginAs("ADMIN");
+
+    render(<CommunityProducersPage communityId="community-alfa" />);
+
+    await userEvent.setup().click(
+      await screen.findByRole("button", { name: "Excluir agricultor Ana Alves" }),
+    );
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Ana Alves (CPF 123.456.789-01)");
+    expect(dialog.textContent).toContain("e o acesso dele ao painel");
+    expect(dialog.textContent).toContain(
+      "Agricultores com planos de produção não podem ser excluídos.",
+    );
   });
 });

@@ -334,3 +334,19 @@ describe("PlanFormDrawer — QA (UNIT-003 / UNIT-004)", () => {
     expect(updateProductionPlan).not.toHaveBeenCalled();
   });
 });
+
+describe("PlanFormDrawer — erros ligados aos campos (A11Y-L3-1)", () => {
+  it("safra, cultivo e área sem valor: aria-invalid + aria-describedby para o erro", async () => {
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)");
+    submit();
+
+    for (const label of ["Safra", "Cultivo", "Área plantada (ha)"]) {
+      const control = await screen.findByLabelText(label);
+      await waitFor(() => expect(control.getAttribute("aria-invalid")).toBe("true"));
+      const errorId = control.getAttribute("aria-describedby");
+      expect(errorId).toBeTruthy();
+      expect(document.getElementById(errorId as string)?.textContent).toBeTruthy();
+    }
+  });
+});

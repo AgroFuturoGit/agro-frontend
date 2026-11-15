@@ -205,6 +205,10 @@ describe("ManagerRegisterDrawer — erro de servidor com campo específico (gap 
       "João Silva foi cadastrado(a) como gestor(a) desta organização.",
     );
     expect(screen.getAllByRole("status")).toHaveLength(1);
+    // O foco vai para o título da visão de sucesso (A11Y-L3-3).
+    await waitFor(() =>
+      expect(document.activeElement?.textContent).toBe("Gestor cadastrado"),
+    );
   });
 
   it("erro de campo fica ligado ao input por aria-describedby", async () => {

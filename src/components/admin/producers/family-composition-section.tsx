@@ -42,7 +42,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import {
   createFamilyMember,
   deleteFamilyMember,
@@ -321,7 +321,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
         <EmptyState
           variant="card"
           icon={Inbox}
-          title="Nenhum membro familiar cadastrado"
+          title="Nenhum membro familiar cadastrado."
           hint={
             canWrite
               ? "Cadastre as pessoas da família do agricultor com nome, parentesco e idade."
@@ -330,9 +330,9 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
           action={
             canWrite
               ? {
-                  label: "Cadastrar primeiro membro",
+                  label: "Criar primeiro membro",
                   onClick: openCreate,
-                  variant: "default",
+                  variant: "outline",
                 }
               : undefined
           }
@@ -344,11 +344,13 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
           isLoading={loading}
           hasError={Boolean(error)}
           onRetry={refresh}
-          errorHint={error ?? undefined}
+          errorHint={userFacingErrorHint(error)}
           renderMobileCard={renderMobileCard}
         />
       )}
-      {showCount && members.length > 0 ? <DataTablePagination table={table} /> : null}
+      {/* Paginação só acima do menor tamanho de página (10), como na lista
+          do técnico: as seções raramente passam disso. */}
+      {showCount && members.length > 10 ? <DataTablePagination table={table} /> : null}
 
       {canWrite && (
         <>

@@ -29,7 +29,7 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
@@ -294,7 +294,7 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         isLoading={loading}
         hasError={Boolean(error)}
         onRetry={refresh}
-        errorHint={error ?? undefined}
+        errorHint={userFacingErrorHint(error)}
         hasActiveFilters={Boolean(table.getState().globalFilter)}
         onClearFilters={() => table.setGlobalFilter("")}
         emptyTitle="Nenhuma comunidade cadastrada nesta organização ainda."

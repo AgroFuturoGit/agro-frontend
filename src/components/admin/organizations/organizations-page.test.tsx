@@ -93,13 +93,13 @@ describe("OrganizationsPage — listagem do ADMIN", () => {
     ]);
     expect(screen.getByRole("button", { name: "Nova organização" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: /^Editar organização/ })).toHaveLength(3);
-    expect(screen.getAllByRole("button", { name: /^Criar Manager/ })).toHaveLength(3);
+    expect(screen.getAllByRole("button", { name: /^Criar gestor para/ })).toHaveLength(3);
     // O nome do registro entra no rótulo da ação.
     expect(
       screen.getByRole("button", { name: "Editar organização Cooperativa Beta" }),
     ).toBeTruthy();
     expect(
-      screen.getByRole("button", { name: "Criar Manager para Cooperativa Beta" }),
+      screen.getByRole("button", { name: "Criar gestor para Cooperativa Beta" }),
     ).toBeTruthy();
   });
 

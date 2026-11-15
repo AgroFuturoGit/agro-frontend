@@ -35,7 +35,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
 import { FinancingSection } from "@/components/admin/producers/financing-section";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
@@ -450,8 +450,15 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     // redirecionamento acontece (só a estrutura da página).
     return (
       <div className="flex flex-col gap-section-sm">
-        <PageHeader title="Planos de produção" />
-        <Skeleton aria-hidden="true" className="h-40 w-full rounded-xl" />
+        {/* Texto de espera visível (sem role=status permanente), como em
+            organizations-page. */}
+        <PageHeader
+          title="Planos de produção"
+          description="Abrindo os seus planos de produção…"
+        />
+        <div aria-busy="true">
+          <Skeleton aria-hidden="true" className="h-40 w-full rounded-xl" />
+        </div>
       </div>
     );
   }
@@ -471,66 +478,73 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-section-sm">
-      {/* Figma 129:569: breadcrumb de 4 níveis acima do título. */}
-      <PageHeader
-        breadcrumb={[
-          { label: "Organizações", href: "/admin/organizacoes" },
-          {
-            label: names?.organizationName ?? "Organização",
-            href: `/admin/organizacoes/${orgId}`,
-          },
-          {
-            label: names?.communityName ?? "Comunidade",
-            href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
-          },
-          { label: names?.producerLabel ?? "Agricultor" },
-        ]}
-        title="Planos de produção"
-        description={`Planos de ${names?.producerLabel ?? "produção"}.`}
-        actions={
-          canWrite && guardPassed ? (
-            <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
-              <Plus aria-hidden="true" />
-              Novo plano
-            </Button>
-          ) : undefined
-        }
-      />
+    // Entre blocos da página (planos, composição familiar, financiamentos):
+    // gap-section (24px); dentro do bloco dos planos: gap-section-sm (16px).
+    <div className="flex flex-col gap-section">
+      <div className="flex flex-col gap-section-sm">
+        {/* Figma 129:569: breadcrumb de 4 níveis acima do título. */}
+        <PageHeader
+          breadcrumb={[
+            { label: "Organizações", href: "/admin/organizacoes" },
+            {
+              label: names?.organizationName ?? "Organização",
+              href: `/admin/organizacoes/${orgId}`,
+            },
+            {
+              label: names?.communityName ?? "Comunidade",
+              href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
+            },
+            { label: names?.producerLabel ?? "Agricultor" },
+          ]}
+          title="Planos de produção"
+          description={`Planos de ${names?.producerLabel ?? "produção"}.`}
+          // Até os nomes chegarem, skeleton no lugar do título e da descrição
+          // (nada de "Planos de produção." provisório).
+          loading={names === null}
+          actions={
+            canWrite && guardPassed ? (
+              <Button type="button" size="lg" onClick={() => setCreateOpen(true)}>
+                <Plus aria-hidden="true" />
+                Novo plano
+              </Button>
+            ) : undefined
+          }
+        />
 
-      <DataTableToolbar
-        table={table}
-        searchPlaceholder="Buscar por cultivo ou safra…"
-        filters={[{ columnId: "harvest", label: "Safra", options: harvestOptions }]}
-      />
+        <DataTableToolbar
+          table={table}
+          searchPlaceholder="Buscar por cultivo ou safra…"
+          filters={[{ columnId: "harvest", label: "Safra", options: harvestOptions }]}
+        />
 
-      <DataTable
-        table={table}
-        columns={columns}
-        isLoading={loading}
-        hasError={Boolean(error)}
-        onRetry={refresh}
-        errorHint={error ?? undefined}
-        hasActiveFilters={
-          Boolean(table.getState().globalFilter) ||
-          table.getState().columnFilters.length > 0
-        }
-        onClearFilters={() => {
-          table.setGlobalFilter("");
-          table.resetColumnFilters();
-        }}
-        emptyTitle="Nenhum plano de produção cadastrado ainda."
-        emptyHint={
-          canWrite
-            ? "Crie um plano escolhendo a cultura, a safra, a área plantada e as datas previstas."
-            : "Os planos deste agricultor aparecem aqui quando forem cadastrados."
-        }
-        emptyActionLabel={canWrite ? "Criar primeiro plano" : undefined}
-        onEmptyAction={canWrite ? () => setCreateOpen(true) : undefined}
-        renderMobileCard={renderMobileCard}
-      />
+        <DataTable
+          table={table}
+          columns={columns}
+          isLoading={loading}
+          hasError={Boolean(error)}
+          onRetry={refresh}
+          errorHint={userFacingErrorHint(error)}
+          hasActiveFilters={
+            Boolean(table.getState().globalFilter) ||
+            table.getState().columnFilters.length > 0
+          }
+          onClearFilters={() => {
+            table.setGlobalFilter("");
+            table.resetColumnFilters();
+          }}
+          emptyTitle="Nenhum plano de produção cadastrado ainda."
+          emptyHint={
+            canWrite
+              ? "Crie um plano escolhendo a cultura, a safra, a área plantada e as datas previstas."
+              : "Os planos deste agricultor aparecem aqui quando forem cadastrados."
+          }
+          emptyActionLabel={canWrite ? "Criar primeiro plano" : undefined}
+          onEmptyAction={canWrite ? () => setCreateOpen(true) : undefined}
+          renderMobileCard={renderMobileCard}
+        />
 
-      <DataTablePagination table={table} />
+        <DataTablePagination table={table} />
+      </div>
 
       {/* Dados sociais do agricultor: carregam e falham de forma independente
           dos planos. Escrita: ADMIN, TECHNICIAN e FARMER (o back decide o

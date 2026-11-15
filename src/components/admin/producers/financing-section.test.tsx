@@ -96,7 +96,7 @@ describe("FinancingSection — leitura (UNIT-003)", () => {
   it("mostra o estado vazio, sem total", async () => {
     vi.mocked(listFinancings).mockResolvedValue([]);
     render(<FinancingSection farmerId="f-1" canWrite />);
-    expect(await screen.findByText("Nenhum financiamento cadastrado")).toBeInTheDocument();
+    expect(await screen.findByText("Nenhum financiamento cadastrado.")).toBeInTheDocument();
     expect(screen.queryByTestId("financing-total")).toBeNull();
   });
 
@@ -279,9 +279,9 @@ describe("FinancingSection — formulário (UNIT-005)", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
       await waitFor(() => expect(deleteFinancing).toHaveBeenCalledWith("fin-11"));
       expect(await screen.findByText("Financiamento 01")).toBeInTheDocument();
-      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
-        "Exibindo 1–10 de 10",
-      );
+      expect(screen.getByText("Financiamento 10")).toBeInTheDocument();
+      // Com 10 itens (o menor tamanho de página) a paginação some (UX-L3-06).
+      expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
     });
   });
 });
@@ -315,7 +315,7 @@ describe("FinancingSection — visual do redesign", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Cadastrar primeiro financiamento" }));
+    fireEvent.click(screen.getByRole("button", { name: "Criar primeiro financiamento" }));
     expect(await screen.findByRole("dialog")).toHaveTextContent("Novo financiamento");
   });
 });

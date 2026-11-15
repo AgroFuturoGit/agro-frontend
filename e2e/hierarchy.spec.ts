@@ -77,7 +77,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
   }) => {
     // `user` é obrigatório aqui: desde a navegação em cascata,
     // `organizations-page.tsx` gateia "Nova organização"/"Editar"/"Criar
-    // Manager" por role (`readUserFromStorage()`, populado via
+    // gestor para" por role (`readUserFromStorage()`, populado via
     // `localStorage["agro_user"]`) — TECHNICIAN também alcança esta lista
     // agora e só ADMIN pode escrever (lição
     // `role-gating-must-cover-all-write-affordances`). Sem o `user` fabricado
@@ -185,7 +185,7 @@ test.describe("Hierarquia — Organização, Manager e Comunidade", () => {
       page.getByRole("cell", { name: organizationName, exact: true }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Criar Manager" }).click();
+    await page.getByRole("button", { name: "Criar gestor para" }).click();
 
     const managerDialog = page.getByRole("dialog");
     await expect(managerDialog).toBeVisible();

@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
 import { formatCpf } from "@/lib/cpf";
@@ -351,7 +351,7 @@ export function CommunityProducersPage({ communityId }: Props) {
         isLoading={loading}
         hasError={Boolean(error)}
         onRetry={refresh}
-        errorHint={error ?? undefined}
+        errorHint={userFacingErrorHint(error)}
         hasActiveFilters={Boolean(table.getState().globalFilter)}
         onClearFilters={() => table.setGlobalFilter("")}
         emptyTitle="Nenhum agricultor cadastrado nesta comunidade ainda."
@@ -360,7 +360,7 @@ export function CommunityProducersPage({ communityId }: Props) {
             ? "Cadastre o primeiro agricultor desta comunidade com os dados pessoais, o endereço e o acesso dele ao painel."
             : "Os agricultores desta comunidade aparecem aqui assim que são cadastrados."
         }
-        emptyActionLabel={canManage && community ? "Cadastrar primeiro agricultor" : undefined}
+        emptyActionLabel={canManage && community ? "Criar primeiro agricultor" : undefined}
         onEmptyAction={canManage && community ? () => setRegisterOpen(true) : undefined}
         renderMobileCard={renderMobileCard}
       />

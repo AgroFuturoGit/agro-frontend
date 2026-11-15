@@ -85,7 +85,12 @@ export function DeleteProducerDialog({
             <span className="font-medium text-foreground">
               {producerIdentity(producer)}
             </span>{" "}
-            do sistema. Não é possível desfazer.
+            do sistema
+            {/* `DeleteFarmerUseCase` desativa o usuário de login vinculado. */}
+            {producer?.user ? " e o acesso dele ao painel" : ""}. Não é possível
+            desfazer.{" "}
+            {/* O back recusa (EntityInUseException) agricultor com planos. */}
+            Agricultores com planos de produção não podem ser excluídos.
           </AlertDialogDescription>
         </AlertDialogHeader>
 

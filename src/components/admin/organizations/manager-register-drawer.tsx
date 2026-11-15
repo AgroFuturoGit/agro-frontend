@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,14 @@ export function ManagerRegisterDrawer({
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [registeredName, setRegisteredName] = useState<string | null>(null);
+  // Na troca para a visão de sucesso, o botão "Cadastrar" (focado) some:
+  // o foco vai para o título "Gestor cadastrado", que é lido junto com a
+  // descrição (A11Y-L3-3).
+  const successTitleRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (registeredName) successTitleRef.current?.focus();
+  }, [registeredName]);
 
   useEffect(() => {
     if (!open) return;
@@ -176,7 +184,13 @@ export function ManagerRegisterDrawer({
         {registeredName ? (
           <>
             <SheetHeader>
-              <SheetTitle>Gestor cadastrado</SheetTitle>
+              <SheetTitle
+                ref={successTitleRef}
+                tabIndex={-1}
+                className="outline-none"
+              >
+                Gestor cadastrado
+              </SheetTitle>
               <SheetDescription>
                 O gestor foi vinculado à organização &quot;{organizationName}
                 &quot;.

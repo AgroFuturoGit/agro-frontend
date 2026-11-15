@@ -45,7 +45,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { ApiError } from "@/lib/api";
+import { ApiError, userFacingErrorHint } from "@/lib/api";
 import {
   FINANCING_STATUSES,
   FINANCING_STATUS_LABELS,
@@ -356,7 +356,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
         <EmptyState
           variant="card"
           icon={Inbox}
-          title="Nenhum financiamento cadastrado"
+          title="Nenhum financiamento cadastrado."
           hint={
             canWrite
               ? "Registre os financiamentos do agricultor com descrição, situação e valor."
@@ -365,9 +365,9 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
           action={
             canWrite
               ? {
-                  label: "Cadastrar primeiro financiamento",
+                  label: "Criar primeiro financiamento",
                   onClick: openCreate,
-                  variant: "default",
+                  variant: "outline",
                 }
               : undefined
           }
@@ -379,11 +379,13 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
           isLoading={loading}
           hasError={Boolean(error)}
           onRetry={refresh}
-          errorHint={error ?? undefined}
+          errorHint={userFacingErrorHint(error)}
           renderMobileCard={renderMobileCard}
         />
       )}
-      {showTotal ? <DataTablePagination table={table} /> : null}
+      {/* Paginação só acima do menor tamanho de página (10), como na lista
+          do técnico: as seções raramente passam disso. */}
+      {showTotal && items.length > 10 ? <DataTablePagination table={table} /> : null}
 
       {canWrite && (
         <>

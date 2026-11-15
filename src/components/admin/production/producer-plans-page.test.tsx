@@ -235,6 +235,22 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     );
     expect(listProductionPlans).not.toHaveBeenCalled();
     expect(screen.queryByText("Milho — BRS 1010")).toBeNull();
+    // Texto de espera visível, sem role=status (A11Y-L3-2).
+    expect(await screen.findByText("Abrindo os seus planos de produção…")).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("blocos da página separados por gap-section (planos × seções sociais)", async () => {
+    loginAs("ADMIN");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    await screen.findByText("Milho — BRS 1010");
+    const familySection = screen
+      .getByRole("heading", { name: /Composição familiar/ })
+      .closest("section") as HTMLElement;
+    expect(familySection.parentElement?.className.split(" ")).toContain("gap-section");
   });
 });
 
@@ -419,9 +435,9 @@ describe("ProducerPlansPage — seções de dados sociais (UNIT-002 / UNIT-007)"
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
     expect(
-      await screen.findByText("Nenhum membro familiar cadastrado"),
+      await screen.findByText("Nenhum membro familiar cadastrado."),
     ).toBeTruthy();
-    expect(await screen.findByText("Nenhum financiamento cadastrado")).toBeTruthy();
+    expect(await screen.findByText("Nenhum financiamento cadastrado.")).toBeTruthy();
     expect(listFamilyMembers).toHaveBeenCalledWith("producer-1");
     expect(listFinancings).toHaveBeenCalledWith("producer-1");
   });

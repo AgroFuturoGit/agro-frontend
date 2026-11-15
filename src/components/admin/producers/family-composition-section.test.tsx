@@ -71,7 +71,7 @@ describe("FamilyCompositionSection — leitura (UNIT-002)", () => {
   it("mostra o estado vazio", async () => {
     vi.mocked(listFamilyMembers).mockResolvedValue([]);
     render(<FamilyCompositionSection farmerId="f-1" canWrite />);
-    expect(await screen.findByText("Nenhum membro familiar cadastrado")).toBeInTheDocument();
+    expect(await screen.findByText("Nenhum membro familiar cadastrado.")).toBeInTheDocument();
     expect(screen.getByText("(0 membros)")).toBeInTheDocument();
   });
 
@@ -270,9 +270,9 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
       fireEvent.click(within(dialog).getByRole("button", { name: "Excluir" }));
       await waitFor(() => expect(deleteFamilyMember).toHaveBeenCalledWith("m-11"));
       expect(await screen.findByText("Membro 01")).toBeInTheDocument();
-      expect(screen.getByRole("navigation", { name: "Paginação" })).toHaveTextContent(
-        "Exibindo 1–10 de 10",
-      );
+      expect(screen.getByText("Membro 10")).toBeInTheDocument();
+      // Com 10 itens (o menor tamanho de página) a paginação some (UX-L3-06).
+      expect(screen.queryByRole("navigation", { name: "Paginação" })).toBeNull();
     });
   });
 });
@@ -287,7 +287,7 @@ describe("FamilyCompositionSection — visual do redesign", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.queryByRole("table")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Cadastrar primeiro membro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Criar primeiro membro" }));
     expect(await screen.findByRole("dialog")).toHaveTextContent("Novo membro familiar");
   });
 

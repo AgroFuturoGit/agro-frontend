@@ -335,7 +335,12 @@ export function PlanFormDrawer({
                     onValueChange={(v) => update("harvestId", v ?? "")}
                     disabled={submitting || loadingOptions}
                   >
-                    <SelectTrigger id="plan-harvest" className="w-full">
+                    <SelectTrigger
+                      id="plan-harvest"
+                      className="w-full"
+                      aria-invalid={Boolean(fieldErrors.harvestId)}
+                      aria-describedby={fieldErrors.harvestId ? "plan-harvest-error" : undefined}
+                    >
                       <SelectValue
                         placeholder={
                           loadingOptions ? "Carregando…" : "Selecione a safra"
@@ -356,7 +361,7 @@ export function PlanFormDrawer({
                     </SelectContent>
                   </Select>
                   {fieldErrors.harvestId && (
-                    <p className="text-sm text-destructive">
+                    <p id="plan-harvest-error" className="text-sm text-destructive">
                       {fieldErrors.harvestId}
                     </p>
                   )}
@@ -369,7 +374,12 @@ export function PlanFormDrawer({
                     onValueChange={(v) => update("cropId", v ?? "")}
                     disabled={submitting || loadingOptions}
                   >
-                    <SelectTrigger id="plan-crop" className="w-full">
+                    <SelectTrigger
+                      id="plan-crop"
+                      className="w-full"
+                      aria-invalid={Boolean(fieldErrors.cropId)}
+                      aria-describedby={fieldErrors.cropId ? "plan-crop-error" : undefined}
+                    >
                       <SelectValue
                         placeholder={
                           loadingOptions ? "Carregando…" : "Selecione o cultivo"
@@ -392,7 +402,7 @@ export function PlanFormDrawer({
                     </SelectContent>
                   </Select>
                   {fieldErrors.cropId && (
-                    <p className="text-sm text-destructive">{fieldErrors.cropId}</p>
+                    <p id="plan-crop-error" className="text-sm text-destructive">{fieldErrors.cropId}</p>
                   )}
                 </div>
               </>
@@ -421,9 +431,10 @@ export function PlanFormDrawer({
                   required
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.plantedArea)}
+                  aria-describedby={fieldErrors.plantedArea ? "plan-area-error" : undefined}
                 />
                 {fieldErrors.plantedArea && (
-                  <p className="text-sm text-destructive">
+                  <p id="plan-area-error" className="text-sm text-destructive">
                     {fieldErrors.plantedArea}
                   </p>
                 )}
@@ -492,9 +503,10 @@ export function PlanFormDrawer({
                   onChange={(e) => update("expectedHarvestStart", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.expectedHarvestStart)}
+                  aria-describedby={fieldErrors.expectedHarvestStart ? "plan-harvest-start-error" : undefined}
                 />
                 {fieldErrors.expectedHarvestStart && (
-                  <p className="text-sm text-destructive">
+                  <p id="plan-harvest-start-error" className="text-sm text-destructive">
                     {fieldErrors.expectedHarvestStart}
                   </p>
                 )}
@@ -508,9 +520,10 @@ export function PlanFormDrawer({
                   onChange={(e) => update("expectedHarvestEnd", e.target.value)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.expectedHarvestEnd)}
+                  aria-describedby={fieldErrors.expectedHarvestEnd ? "plan-harvest-end-error" : undefined}
                 />
                 {fieldErrors.expectedHarvestEnd && (
-                  <p className="text-sm text-destructive">
+                  <p id="plan-harvest-end-error" className="text-sm text-destructive">
                     {fieldErrors.expectedHarvestEnd}
                   </p>
                 )}
@@ -526,9 +539,10 @@ export function PlanFormDrawer({
                 onChange={(e) => update("plannedPlantingDate", e.target.value)}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.plannedPlantingDate)}
+                aria-describedby={fieldErrors.plannedPlantingDate ? "plan-planting-date-error" : undefined}
               />
               {fieldErrors.plannedPlantingDate && (
-                <p className="text-sm text-destructive">
+                <p id="plan-planting-date-error" className="text-sm text-destructive">
                   {fieldErrors.plannedPlantingDate}
                 </p>
               )}
