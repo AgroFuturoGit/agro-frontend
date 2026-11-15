@@ -267,7 +267,7 @@ describe("CommunityProducersPage — tabela de dados", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await user.type(
-      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou nome local…"),
+      screen.getByPlaceholderText("Buscar por nome, e-mail ou CPF…"),
       "bruno@agro.com",
     );
     await act(async () => {
@@ -301,7 +301,7 @@ describe("CommunityProducersPage — tabela de dados", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await user.type(
-      screen.getByPlaceholderText("Buscar por nome, e-mail, CPF ou nome local…"),
+      screen.getByPlaceholderText("Buscar por nome, e-mail ou CPF…"),
       "52998224725",
     );
     await act(async () => {

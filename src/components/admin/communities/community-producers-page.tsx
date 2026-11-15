@@ -342,7 +342,7 @@ export function CommunityProducersPage({ communityId }: Props) {
 
       <DataTableToolbar
         table={table}
-        searchPlaceholder="Buscar por nome, e-mail, CPF ou nome local…"
+        searchPlaceholder="Buscar por nome, e-mail ou CPF…"
       />
 
       <DataTable
