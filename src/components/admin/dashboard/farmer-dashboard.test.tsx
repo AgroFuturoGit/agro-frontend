@@ -263,3 +263,44 @@ describe("FarmerDashboard — exportação (AC-005)", () => {
     expect(trigger.hasAttribute("disabled") || trigger.hasAttribute("data-disabled")).toBe(true);
   });
 });
+
+describe("FarmerDashboard — revisão r1 do lote 5", () => {
+  it("A11Y-L5-1: 'Ver plano' com anel de foco opaco e offset (sem ring-ring/50)", async () => {
+    render(<FarmerDashboard />);
+    const [link] = await screen.findAllByRole("link", { name: /Ver plano/ });
+    expect(link).toHaveClass(
+      "focus-visible:ring-2",
+      "focus-visible:ring-ring",
+      "focus-visible:ring-offset-2",
+      "focus-visible:ring-offset-card",
+    );
+    expect(link.className).not.toMatch(/ring-ring\/50/);
+  });
+
+  it("UX-L5-03: vazio numa safra antiga oferece 'Voltar para a safra vigente'", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({ ...SUMMARY, isEmpty: true, plans: [] });
+    render(<FarmerDashboard />);
+    await screen.findByText(/ainda não tem planos de produção/);
+    await waitFor(() => expect(listHarvests).toHaveBeenCalled());
+    await chooseHarvest("Safra 2025");
+    expect(await screen.findByText("Nenhum plano nesta safra")).toBeTruthy();
+    expect(screen.queryByText(/ainda não tem planos de produção/)).toBeNull();
+    vi.mocked(getFarmerSummary).mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Voltar para a safra vigente" }));
+    await waitFor(() => expect(getFarmerSummary).toHaveBeenLastCalledWith(undefined));
+  });
+
+  it("UX-L5-05: barra com título do recorte e a safra em texto secundário", async () => {
+    render(<FarmerDashboard />);
+    await screen.findAllByTestId("farmer-plan-card");
+    const bar = screen.getByTestId("dashboard-toolbar");
+    expect(bar.textContent).toContain("Minha produção");
+    expect(screen.getByText("Safra: Safra 2026").className).toContain("text-muted-foreground");
+  });
+
+  it("A11Y-L5-5: o skeleton é uma região nomeada", () => {
+    vi.mocked(getFarmerSummary).mockReturnValue(new Promise(() => {}));
+    render(<FarmerDashboard />);
+    expect(screen.getByRole("region", { name: "Carregando painel" })).toBeTruthy();
+  });
+});

@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -60,15 +61,21 @@ export function FilterSelect({
 }
 
 /**
- * Barra do painel: recorte atual à esquerda; filtros e "Exportar" à direita,
- * alinhados pela base (o botão fica na linha dos seletores).
+ * Barra do painel: recorte atual à esquerda (título 18 semibold + safra 14
+ * muted, no mesmo formato nos três painéis); filtros e "Exportar" à
+ * direita, alinhados pela base (o botão fica na linha dos seletores).
  */
 export function DashboardToolbar({
-  heading,
+  title,
+  description,
+  loading = false,
   children,
   className,
 }: {
-  heading?: React.ReactNode;
+  title?: React.ReactNode;
+  description?: React.ReactNode;
+  /** Primeira carga: skeleton no lugar do que ainda não chegou. */
+  loading?: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -80,7 +87,18 @@ export function DashboardToolbar({
         className,
       )}
     >
-      <div className="flex min-w-0 flex-col gap-1">{heading}</div>
+      <div className="flex min-w-0 flex-col gap-1 lg:self-center">
+        {title ? (
+          <p className="text-lg font-semibold text-foreground">{title}</p>
+        ) : loading ? (
+          <Skeleton aria-hidden="true" className="h-7 w-48" />
+        ) : null}
+        {description ? (
+          <p className="text-sm text-muted-foreground">{description}</p>
+        ) : loading ? (
+          <Skeleton aria-hidden="true" className="h-5 w-32" />
+        ) : null}
+      </div>
       <div className="flex flex-wrap items-end gap-3">{children}</div>
     </Card>
   );

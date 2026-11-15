@@ -8,7 +8,7 @@ describe("DashboardToolbar / FilterSelect", () => {
 
   it("barra é um Card com o recorte e os filtros; o rótulo nomeia o combobox", () => {
     render(
-      <DashboardToolbar heading={<p>Safra: Safra 2026</p>}>
+      <DashboardToolbar title="Minha carteira" description="Safra: Safra 2026">
         <FilterSelect
           id="f-safra"
           label="Safra"
@@ -25,6 +25,8 @@ describe("DashboardToolbar / FilterSelect", () => {
     const bar = screen.getByTestId("dashboard-toolbar");
     expect(bar.getAttribute("data-slot")).toBe("card");
     expect(bar.textContent).toContain("Safra: Safra 2026");
+    expect(screen.getByText("Minha carteira").className).toContain("text-lg");
+    expect(screen.getByText("Safra: Safra 2026").className).toContain("text-muted-foreground");
     const combo = screen.getByRole("combobox", { name: "Safra" });
     expect(combo.textContent).toContain("Safra vigente");
   });
@@ -41,5 +43,15 @@ describe("DashboardToolbar / FilterSelect", () => {
       />,
     );
     expect(screen.getByRole("combobox", { name: "Comunidade" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it("primeira carga: skeleton só no que ainda não chegou", () => {
+    const { container } = render(
+      <DashboardToolbar title="Minha produção" loading>
+        <span />
+      </DashboardToolbar>,
+    );
+    expect(screen.getByText("Minha produção")).toBeTruthy();
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(1);
   });
 });

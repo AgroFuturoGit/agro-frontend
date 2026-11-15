@@ -45,6 +45,7 @@ import {
   type ProgressStatus,
 } from "@/lib/analytics";
 import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { FOCUS_RING_LINK } from "@/lib/focus";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { getMyProducer } from "@/lib/producers";
 import {
@@ -56,6 +57,7 @@ import {
   PROGRESS_STATUS_BADGE_VARIANT,
   PROGRESS_STATUS_VARIANT,
 } from "@/lib/status-variants";
+import { cn } from "@/lib/utils";
 
 const CURRENT = "__current__";
 const LOAD_ERROR = "Não foi possível carregar o resumo da sua safra.";
@@ -158,7 +160,10 @@ function PlanCard({ card, href }: { card: FarmerPlanCard; href: string | null })
         {href && (
           <Link
             href={href}
-            className="mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className={cn(
+              "mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline",
+              FOCUS_RING_LINK,
+            )}
           >
             Ver plano
             <span className="sr-only"> de {title}</span>
@@ -255,6 +260,7 @@ export function FarmerDashboard() {
     body = (
       <div
         className="flex flex-col gap-8"
+        role="region"
         aria-busy="true"
         aria-label="Carregando painel"
       >
@@ -293,19 +299,32 @@ export function FarmerDashboard() {
       ? `/admin/organizacoes/${paths.org}/comunidades/${paths.community}/produtores/${paths.farmerId}`
       : null;
     if (summary.isEmpty) {
-      body = (
-        <EmptyState
-          variant="dashed"
-          icon={Sprout}
-          title="Você ainda não tem planos de produção nesta safra"
-          hint="Cadastre o seu primeiro plano de produção ou fale com o seu técnico para planejar a safra. Depois dos apontamentos validados, o progresso aparece aqui."
-          action={
-            plansHref
-              ? { label: "Ir para os meus planos", href: plansHref, variant: "default" }
-              : undefined
-          }
-        />
-      );
+      // Safra antiga sem planos: a saída é voltar para a vigente, não cadastrar.
+      body =
+        harvestId !== CURRENT ? (
+          <EmptyState
+            variant="dashed"
+            icon={Sprout}
+            title="Nenhum plano nesta safra"
+            hint="Escolha outra safra ou volte para a safra vigente."
+            action={{
+              label: "Voltar para a safra vigente",
+              onClick: () => setHarvestId(CURRENT),
+            }}
+          />
+        ) : (
+          <EmptyState
+            variant="dashed"
+            icon={Sprout}
+            title="Você ainda não tem planos de produção nesta safra"
+            hint="Cadastre o seu primeiro plano de produção ou fale com o seu técnico para planejar a safra. Depois dos apontamentos validados, o progresso aparece aqui."
+            action={
+              plansHref
+                ? { label: "Ir para os meus planos", href: plansHref, variant: "default" }
+                : undefined
+            }
+          />
+        );
     } else {
       const totals: [string, string][] = [
         ["Planos de produção", formatNumber(summary.totalPlansCount)],
@@ -354,18 +373,15 @@ export function FarmerDashboard() {
     body = null;
   }
 
-  const heading =
-    loading && !summary ? (
-      <Skeleton aria-hidden="true" className="h-6 w-40" />
-    ) : summary?.currentHarvest ? (
-      <p className="text-base font-medium text-foreground">
-        {`Safra: ${summary.currentHarvest.label}`}
-      </p>
-    ) : null;
-
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <DashboardToolbar heading={heading}>
+      <DashboardToolbar
+        loading={loading && !summary}
+        title="Minha produção"
+        description={
+          summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : undefined
+        }
+      >
         {selector}
         <ExportMenu
           disabled={loading || error !== null}

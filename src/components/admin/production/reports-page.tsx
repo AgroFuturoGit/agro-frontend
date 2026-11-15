@@ -139,16 +139,30 @@ export function ReportsPage() {
   let body: React.ReactNode;
   if (loading) {
     body = (
-      <div className="flex flex-col gap-8" aria-busy="true" aria-label="Carregando relatórios">
+      <div
+        className="flex flex-col gap-8"
+        role="region"
+        aria-busy="true"
+        aria-label="Carregando relatórios"
+      >
         <div className="flex flex-col gap-4">
           <Skeleton className="h-7 w-40" />
           <ComparisonSummary comparison={null} loading />
         </div>
-        <Skeleton className="h-56 w-full rounded-xl" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-64 w-full rounded-xl" />
-          ))}
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <Skeleton className="h-7 w-56" />
+            <Skeleton className="h-6 w-80 max-w-full" />
+          </div>
+          <Skeleton className="h-56 w-full rounded-xl" />
+        </div>
+        <div className="flex flex-col gap-4">
+          <Skeleton className="h-7 w-56" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <Skeleton key={idx} className="h-64 w-full rounded-xl" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -209,12 +223,15 @@ export function ReportsPage() {
                 {withComparison.map(({ plan, comparison }) => (
                   <li key={plan.id} className="flex flex-col gap-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-sm font-medium text-foreground">
+                      <span
+                        className="truncate text-sm font-medium text-foreground"
+                        title={planTitle(plan)}
+                      >
                         {planTitle(plan)}
                       </span>
                       <span className="shrink-0 text-sm text-muted-foreground tabular-nums">
-                        {formatNumber(comparison.totalActualYield)} /{" "}
-                        {formatNumber(comparison.expectedYield)} kg
+                        Realizado {formatNumber(comparison.totalActualYield)} kg de{" "}
+                        {formatNumber(comparison.expectedYield)} kg previstos
                       </span>
                     </div>
                     <div aria-hidden="true" className="relative h-7 w-full overflow-hidden rounded-md bg-muted">
@@ -246,7 +263,7 @@ export function ReportsPage() {
               return (
                 <Card key={plan.id} className="gap-4 py-6">
                   <CardHeader className="px-6">
-                    <CardTitle className="truncate text-base font-semibold">
+                    <CardTitle className="line-clamp-2 text-base font-semibold break-words">
                       {planTitle(plan)}
                     </CardTitle>
                     <CardDescription className="text-sm text-muted-foreground">
@@ -261,14 +278,14 @@ export function ReportsPage() {
                             <span className="text-kpi font-bold text-foreground tabular-nums">
                               {formatNumber(percentage)}%
                             </span>
-                            <span className="text-sm text-muted-foreground">
+                            <span className="text-base text-muted-foreground">
                               da meta
                             </span>
                           </div>
                           <Progress
                             value={Math.max(0, Math.min(100, percentage))}
                             variant="primary"
-                            aria-label="Progresso da produção em relação à meta"
+                            aria-label={`Progresso de ${planTitle(plan)} em relação à meta`}
                           />
                         </div>
                         <div className="flex justify-between gap-2 text-sm text-muted-foreground">
@@ -292,19 +309,21 @@ export function ReportsPage() {
                         Comparativo indisponível.
                       </p>
                     )}
-                    {/* Link de verdade (role=link) com o visual do botão outline. */}
-                    <Link
-                      href={
-                        producerBase
-                          ? `${producerBase}/planos/${plan.id}`
-                          : "/admin/organizacoes"
-                      }
-                      className={cn(buttonVariants({ variant: "outline" }), "mt-auto self-start")}
-                    >
-                      Ver detalhes
-                      <span className="sr-only"> de {planTitle(plan)}</span>
-                      <ArrowRight aria-hidden="true" />
-                    </Link>
+                    {/* Link de verdade (role=link) com o visual do botão outline. Sem
+                        comunidade/organização não há rota do plano: sem link. */}
+                    {producerBase ? (
+                      <Link
+                        href={`${producerBase}/planos/${plan.id}`}
+                        className={cn(buttonVariants({ variant: "outline" }), "mt-auto self-start")}
+                      >
+                        Ver detalhes
+                        <span className="sr-only">
+                          {" "}
+                          de {planTitle(plan)}, safra {plan.harvest?.label ?? "—"}
+                        </span>
+                        <ArrowRight aria-hidden="true" />
+                      </Link>
+                    ) : null}
                   </CardContent>
                 </Card>
               );

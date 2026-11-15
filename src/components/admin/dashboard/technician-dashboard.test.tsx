@@ -718,3 +718,27 @@ describe("TechnicianDashboard — exportação (AC-005)", () => {
     );
   });
 });
+
+describe("TechnicianDashboard — revisão r1 do lote 5", () => {
+  it("A11Y-L5-1: 'Ver plano' do alerta com anel de foco opaco e offset", async () => {
+    render(<TechnicianDashboard />);
+    const [link] = await screen.findAllByRole("link", { name: /Ver plano/ });
+    expect(link).toHaveClass("focus-visible:ring-ring", "focus-visible:ring-offset-2");
+    expect(link.className).not.toMatch(/ring-ring\/50/);
+  });
+
+  it("UX-L5-04: 'Pendências' (warning) usa TriangleAlert, como os outros avisos", async () => {
+    render(<TechnicianDashboard />);
+    const rows = await screen.findAllByRole("row");
+    const second = rows.find((r) => r.textContent?.includes("Agricultor f-2")) as HTMLElement;
+    const badge = within(second).getByText("Pendências");
+    expect(badge.querySelector("svg")?.getAttribute("class")).toMatch(/triangle-alert/);
+  });
+
+  it("UX-L5-08: no erro, 'Tentar novamente' fica nas ações do alerta", async () => {
+    vi.mocked(getTechnicianSummary).mockRejectedValue(new ApiError(500, "Falhou", null));
+    render(<TechnicianDashboard />);
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByRole("button", { name: "Tentar novamente" })).toBeTruthy();
+  });
+});

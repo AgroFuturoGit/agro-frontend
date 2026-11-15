@@ -14,11 +14,13 @@ import type {
   WarningSeverity,
   WarningType,
 } from "@/lib/analytics";
+import { FOCUS_RING_LINK } from "@/lib/focus";
 import { formatNumber, formatPlanDate } from "@/lib/production";
 import {
   CATEGORY_BADGE_VARIANT,
   SEVERITY_VARIANT,
 } from "@/lib/status-variants";
+import { cn } from "@/lib/utils";
 
 export const WARNING_TYPE_LABELS: Record<WarningType, string> = {
   INACTIVE_EXECUTIONS: "Sem apontamentos recentes",
@@ -91,7 +93,10 @@ export function WarningCard({
         {href && (
           <Link
             href={href}
-            className="mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className={cn(
+              "mt-auto inline-flex w-fit items-center gap-1 rounded-sm text-sm font-medium text-primary underline-offset-4 hover:underline",
+              FOCUS_RING_LINK,
+            )}
           >
             Ver plano
             <span className="sr-only">

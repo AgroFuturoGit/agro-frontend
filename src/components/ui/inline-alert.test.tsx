@@ -70,3 +70,28 @@ describe("InlineAlert", () => {
     expect(screen.getByRole("button", { name: "Tentar novamente" })).toBeDisabled();
   });
 });
+
+describe("InlineAlert — actions (UX-L5-08)", () => {
+  afterEach(cleanup);
+
+  it("renderiza vários botões na ordem, com o mesmo formato do action", async () => {
+    const clear = vi.fn();
+    const retry = vi.fn();
+    render(
+      <InlineAlert
+        actions={[
+          { label: "Limpar filtros", onClick: clear },
+          { label: "Tentar novamente", onClick: retry },
+        ]}
+      >
+        Falhou
+      </InlineAlert>,
+    );
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.map((b) => b.textContent)).toEqual(["Limpar filtros", "Tentar novamente"]);
+    buttons.forEach((b) => expect(b.getAttribute("data-slot")).toBe("button"));
+    await userEvent.click(buttons[1]);
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(clear).not.toHaveBeenCalled();
+  });
+});

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  CircleAlert,
   CircleCheck,
   ClipboardList,
   Hourglass,
@@ -11,6 +10,7 @@ import {
   Sprout,
   Target,
   TrendingUp,
+  TriangleAlert,
   Users,
   Wheat,
   type LucideIcon,
@@ -30,6 +30,12 @@ import {
   FilterSelect,
   type FilterOption,
 } from "@/components/admin/dashboard/dashboard-toolbar";
+import {
+  NAME_CELL,
+  NUMERIC,
+  TEXT_CELL,
+  WRAP_HEADER,
+} from "@/components/admin/dashboard/table-meta";
 import { WarningCard } from "@/components/admin/dashboard/warning-card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
@@ -38,7 +44,6 @@ import { EmptyState } from "@/components/admin/empty-state";
 import { KpiCard, KpiGrid } from "@/components/admin/kpi-card";
 import { SectionHeader } from "@/components/admin/section-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardDescription,
@@ -105,23 +110,17 @@ function ComplianceBadge({ compliant }: { compliant: boolean }) {
       Em dia
     </Badge>
   ) : (
-    <Badge variant="warning" icon={CircleAlert}>
+    <Badge variant="warning" icon={TriangleAlert}>
       Pendências
     </Badge>
   );
 }
 
-// 11 colunas precisam caber em 1440px sem rolagem: cabeçalhos longos
-// quebram linha e nomes quebram dentro de uma largura mínima.
-const WRAP_HEADER = "whitespace-normal leading-tight";
-const TEXT_CELL = "min-w-28 whitespace-normal";
-const NUMERIC = { numeric: true, headerClassName: WRAP_HEADER } as const;
-
 const farmerColumns: ColumnDef<TechnicianFarmerSummary>[] = [
   {
     accessorKey: "farmerName",
     header: "Agricultor",
-    meta: { cellVariant: "primary", cellClassName: TEXT_CELL },
+    meta: NAME_CELL,
     cell: ({ row }) => row.original.farmerName,
   },
   {
@@ -421,6 +420,7 @@ export function TechnicianDashboard() {
     body = (
       <div
         className="flex flex-col gap-8"
+        role="region"
         aria-busy="true"
         aria-label="Carregando painel"
       >
@@ -439,38 +439,25 @@ export function TechnicianDashboard() {
         </KpiGrid>
         <div className="flex flex-col gap-4">
           <Skeleton className="h-7 w-40" />
-          <Skeleton className="h-48 w-full rounded-xl" />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Skeleton className="h-56 rounded-xl" />
+            <Skeleton className="h-56 rounded-xl" />
+            <Skeleton className="h-56 rounded-xl" />
+          </div>
         </div>
       </div>
     );
   } else if (error) {
     body = (
-      <InlineAlert>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span>{error.message}</span>
-          <div className="flex flex-wrap gap-2">
-            {error.status === 403 && communityId !== ALL && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-foreground"
-                onClick={() => setCommunityId(ALL)}
-              >
-                Voltar para Todas
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-foreground"
-              onClick={() => load(harvestId, communityId, cropId)}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        </div>
+      <InlineAlert
+        actions={[
+          ...(error.status === 403 && communityId !== ALL
+            ? [{ label: "Voltar para Todas", onClick: () => setCommunityId(ALL) }]
+            : []),
+          { label: "Tentar novamente", onClick: () => load(harvestId, communityId, cropId) },
+        ]}
+      >
+        {error.message}
       </InlineAlert>
     );
   } else if (summary) {
@@ -568,18 +555,15 @@ export function TechnicianDashboard() {
     }
   }
 
-  const heading =
-    loading && !summary ? (
-      <Skeleton aria-hidden="true" className="h-6 w-40" />
-    ) : summary?.currentHarvest ? (
-      <p className="text-base font-medium text-foreground">
-        {`Safra: ${summary.currentHarvest.label}`}
-      </p>
-    ) : null;
-
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <DashboardToolbar heading={heading}>{filters}</DashboardToolbar>
+      <DashboardToolbar
+        loading={loading && !summary}
+        title="Minha carteira"
+        description={
+          summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : undefined
+        }
+      >{filters}</DashboardToolbar>
       {body}
     </div>
   );

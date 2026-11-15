@@ -639,3 +639,32 @@ describe("ManagementDashboard — exportação (UNIT-005)", () => {
     expect(trigger.hasAttribute("disabled") || trigger.hasAttribute("data-disabled")).toBe(true);
   });
 });
+
+describe("ManagementDashboard — revisão r1 do lote 5", () => {
+  it("UX-L5-01: colunas numéricas à direita com tabular-nums; nome em destaque", async () => {
+    render(<ManagementDashboard role="MANAGER" />);
+    const table = await screen.findByTestId("crop-ranking");
+    const header = within(table).getByRole("columnheader", { name: "Meta (kg)" });
+    expect(header.className).toContain("text-right");
+    const [firstRow] = within(table).getAllByRole("row").slice(1);
+    const cells = within(firstRow).getAllByRole("cell");
+    expect(cells[0].className).toContain("tabular-nums");
+    expect(cells[1].className).toContain("font-medium");
+  });
+
+  it("UX-L5-07: a nota de atualização fica junto dos KPIs e some no erro", async () => {
+    vi.mocked(getManagerSummary).mockRejectedValue(new ApiError(500, "Falha no servidor", null));
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByRole("alert");
+    expect(screen.queryByText(/alguns minutos/)).toBeNull();
+  });
+
+  it("UX-L5-08: erro sem filtro mostra só 'Tentar novamente' nas ações do alerta", async () => {
+    vi.mocked(getManagerSummary).mockRejectedValue(new ApiError(500, "Falha no servidor", null));
+    render(<ManagementDashboard role="MANAGER" />);
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Tentar novamente",
+    ]);
+  });
+});

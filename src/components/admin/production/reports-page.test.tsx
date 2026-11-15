@@ -54,7 +54,7 @@ describe("ReportsPage", () => {
     expect(await screen.findByRole("heading", { name: "Consolidado" })).toBeTruthy();
     expect(screen.getByText("Soma de 1 plano de produção.")).toBeTruthy();
     const bar = screen.getByRole("progressbar", {
-      name: "Progresso da produção em relação à meta",
+      name: "Progresso de Milho — Comum em relação à meta",
     });
     expect(bar.getAttribute("aria-valuenow")).toBe("40");
     const links = screen.getAllByRole("link", { name: /Ver detalhes/ });
@@ -62,7 +62,17 @@ describe("ReportsPage", () => {
     expect(links[0].getAttribute("href")).toBe(
       "/admin/organizacoes/org-1/comunidades/com-1/produtores/f-1/planos/p-1",
     );
+    expect(links[0].textContent).toContain("safra 2026");
     expect(screen.getByText("Comparativo indisponível.")).toBeTruthy();
+    // O texto da barra diz qual número é qual (as barras são decorativas).
+    expect(screen.getByText("Realizado 400 kg de 1.000 kg previstos")).toBeTruthy();
+  });
+
+  it("sem comunidade/organização não mostra 'Ver detalhes' (não leva a rota proibida)", async () => {
+    vi.mocked(getMyProducer).mockResolvedValue({ id: "f-1", community: null } as never);
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Consolidado" });
+    expect(screen.queryByRole("link", { name: /Ver detalhes/ })).toBeNull();
   });
 
   it("sem planos mostra o vazio com o CTA para os planos", async () => {

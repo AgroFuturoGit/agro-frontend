@@ -30,13 +30,17 @@ import {
   FilterSelect,
   type FilterOption,
 } from "@/components/admin/dashboard/dashboard-toolbar";
+import {
+  NAME_CELL,
+  NUMERIC,
+  WRAP_HEADER,
+} from "@/components/admin/dashboard/table-meta";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
 import { ExportMenu } from "@/components/admin/dashboard/export-menu";
 import { EmptyState } from "@/components/admin/empty-state";
 import { KpiCard, KpiGrid } from "@/components/admin/kpi-card";
 import { SectionHeader } from "@/components/admin/section-header";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -167,18 +171,19 @@ const cropName = (c: ManagementCropRankingItem) =>
   `${c.cropName}${c.cropVariety ? ` (${c.cropVariety})` : ""}`;
 
 const cropColumns: ColumnDef<ManagementCropRankingItem>[] = [
-  { id: "rank", header: "#", cell: ({ row }) => row.original.rankPosition },
+  { id: "rank", meta: NUMERIC, header: "#", cell: ({ row }) => row.original.rankPosition },
   {
     id: "crop",
+    meta: NAME_CELL,
     header: "Cultura",
     cell: ({ row }) => <span className="font-medium">{cropName(row.original)}</span>,
   },
-  { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
-  { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
-  { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
-  { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
-  { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
-  { id: "share", header: "Participação", cell: ({ row }) => pct(row.original.productionSharePct) },
+  { id: "plans", meta: NUMERIC, header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+  { id: "area", meta: NUMERIC, header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+  { id: "target", meta: NUMERIC, header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+  { id: "realized", meta: NUMERIC, header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+  { id: "conversion", meta: NUMERIC, header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+  { id: "share", meta: NUMERIC, header: "Participação", cell: ({ row }) => pct(row.original.productionSharePct) },
 ];
 
 function CropRankingTable({ summary }: { summary: ManagementSummary }) {
@@ -218,6 +223,7 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
     () => [
       {
         id: "community",
+        meta: NAME_CELL,
         header: "Comunidade",
         cell: ({ row }) => <span className="font-medium">{row.original.communityName}</span>,
       },
@@ -225,20 +231,21 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
         ? [
             {
               id: "organization",
+              meta: NAME_CELL,
               header: "Organização",
               cell: ({ row }: { row: Row<ManagementCommunityPerformance> }) =>
                 row.original.organizationName ?? "—",
             },
           ]
         : []),
-      { id: "farmers", header: "Agricultores ativos", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
-      { id: "compliance", header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
-      { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
-      { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
-      { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
-      { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
-      { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
-      { id: "last", header: "Último apontamento", cell: ({ row }) => formatPlanDate(row.original.lastExecutionDate) },
+      { id: "farmers", meta: NUMERIC, header: "Agricultores ativos", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
+      { id: "compliance", meta: NUMERIC, header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
+      { id: "plans", meta: NUMERIC, header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+      { id: "area", meta: NUMERIC, header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+      { id: "target", meta: NUMERIC, header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+      { id: "realized", meta: NUMERIC, header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+      { id: "conversion", meta: NUMERIC, header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+      { id: "last", meta: { headerClassName: WRAP_HEADER }, header: "Último apontamento", cell: ({ row }) => formatPlanDate(row.original.lastExecutionDate) },
     ],
     [global],
   );
@@ -274,17 +281,18 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
 const organizationColumns: ColumnDef<ManagementOrganizationSummary>[] = [
   {
     id: "organization",
+    meta: NAME_CELL,
     header: "Organização",
     cell: ({ row }) => <span className="font-medium">{row.original.organizationName}</span>,
   },
-  { id: "communities", header: "Comunidades", cell: ({ row }) => formatNumber(row.original.communitiesCount) },
-  { id: "farmers", header: "Agricultores", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
-  { id: "compliance", header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
-  { id: "plans", header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
-  { id: "area", header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
-  { id: "target", header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
-  { id: "realized", header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
-  { id: "conversion", header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
+  { id: "communities", meta: NUMERIC, header: "Comunidades", cell: ({ row }) => formatNumber(row.original.communitiesCount) },
+  { id: "farmers", meta: NUMERIC, header: "Agricultores", cell: ({ row }) => formatNumber(row.original.activeFarmersCount) },
+  { id: "compliance", meta: NUMERIC, header: "Em dia", cell: ({ row }) => pct(row.original.complianceRatePct) },
+  { id: "plans", meta: NUMERIC, header: "Planos", cell: ({ row }) => formatNumber(row.original.plansCount) },
+  { id: "area", meta: NUMERIC, header: "Área (ha)", cell: ({ row }) => formatNumber(row.original.plantedAreaHa) },
+  { id: "target", meta: NUMERIC, header: "Meta (kg)", cell: ({ row }) => formatNumber(row.original.targetKg) },
+  { id: "realized", meta: NUMERIC, header: "Colhido (kg)", cell: ({ row }) => formatNumber(row.original.realizedKg) },
+  { id: "conversion", meta: NUMERIC, header: "Conversão", cell: ({ row }) => pct(row.original.conversionRatePct) },
 ];
 
 function OrganizationsTable({ summary }: { summary: ManagementSummary }) {
@@ -496,7 +504,12 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
   let body: React.ReactNode = null;
   if (loading) {
     body = (
-      <div className="flex flex-col gap-8" aria-busy="true" aria-label="Carregando painel">
+      <div
+        className="flex flex-col gap-8"
+        role="region"
+        aria-busy="true"
+        aria-label="Carregando painel"
+      >
         <KpiGrid>
           {kpiLabels.map((label) => (
             <KpiCard
@@ -512,38 +525,22 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
         </KpiGrid>
         <div className="flex flex-col gap-4">
           <Skeleton className="h-7 w-56" />
-          <Skeleton className="h-80 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
       </div>
     );
   } else if (error) {
     body = (
-      <InlineAlert>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span>{error.message}</span>
-          <div className="flex flex-wrap gap-2">
-            {hasFilters && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-foreground"
-                onClick={clearFilters}
-              >
-                Limpar filtros
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="text-foreground"
-              onClick={() => load(harvestId, organizationId, communityId)}
-            >
-              Tentar novamente
-            </Button>
-          </div>
-        </div>
+      <InlineAlert
+        actions={[
+          ...(hasFilters ? [{ label: "Limpar filtros", onClick: clearFilters }] : []),
+          {
+            label: "Tentar novamente",
+            onClick: () => load(harvestId, organizationId, communityId),
+          },
+        ]}
+      >
+        {error.message}
       </InlineAlert>
     );
   } else if (summary) {
@@ -584,18 +581,24 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
       ];
       body = (
         <div className="flex flex-col gap-8">
-          <KpiGrid>
-            {totals.map(([label, value, hint]) => (
-              <KpiCard
-                key={label}
-                label={label}
-                value={value}
-                hint={hint}
-                icon={KPI_ICONS[label]}
-                highlight={label === HIGHLIGHT_KPI}
-              />
-            ))}
-          </KpiGrid>
+          <div className="flex flex-col gap-3">
+            <KpiGrid>
+              {totals.map(([label, value, hint]) => (
+                <KpiCard
+                  key={label}
+                  label={label}
+                  value={value}
+                  hint={hint}
+                  icon={KPI_ICONS[label]}
+                  highlight={label === HIGHLIGHT_KPI}
+                />
+              ))}
+            </KpiGrid>
+            <p className="text-sm text-muted-foreground">
+              Os números são atualizados periodicamente: um apontamento validado
+              pode levar alguns minutos para aparecer aqui.
+            </p>
+          </div>
 
           {summary.cropRanking.length > 0 && (
             <>
@@ -635,35 +638,18 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
       (summary.scope === "GLOBAL" ? "Todas as organizações" : ""))
     : "";
 
-  const heading =
-    loading && !summary ? (
-      <div aria-hidden="true" className="flex flex-col gap-1">
-        <Skeleton className="h-7 w-48" />
-        <Skeleton className="h-5 w-32" />
-      </div>
-    ) : (
-      <>
-        {title && (
-          <p className="text-lg font-semibold text-foreground" data-testid="mgmt-scope-title">
-            {title}
-          </p>
-        )}
-        {summary?.currentHarvest ? (
-          <p className="text-sm text-muted-foreground">
-            {`Safra: ${summary.currentHarvest.label}`}
-          </p>
-        ) : null}
-      </>
-    );
-
   return (
     <div className="flex min-w-0 flex-col gap-6">
-      <DashboardToolbar heading={heading}>{filters}</DashboardToolbar>
+      <DashboardToolbar
+        loading={loading && !summary}
+        title={title ? <span data-testid="mgmt-scope-title">{title}</span> : undefined}
+        description={
+          summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : undefined
+        }
+      >
+        {filters}
+      </DashboardToolbar>
       {body}
-      <p className="text-sm text-muted-foreground">
-        Os números são atualizados periodicamente: um apontamento validado pode
-        levar alguns minutos para aparecer aqui.
-      </p>
     </div>
   );
 }
