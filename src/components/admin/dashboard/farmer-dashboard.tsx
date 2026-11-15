@@ -81,7 +81,7 @@ const PROGRESS_ICON: Record<ProgressStatus, LucideIcon | undefined> = {
 };
 
 /** Ícone decorativo de cada indicador (o rótulo é o que comunica). */
-const KPI_ICONS: Record<string, LucideIcon> = {
+const KPI_ICONS = {
   "Planos de produção": ClipboardList,
   "Talhões ativos": Fence,
   "Área plantada": LandPlot,
@@ -89,8 +89,9 @@ const KPI_ICONS: Record<string, LucideIcon> = {
   "Realizado (validado)": Wheat,
   "Pendente de validação": Hourglass,
   Conclusão: TrendingUp,
-};
-const KPI_LABELS = Object.keys(KPI_ICONS);
+} as const satisfies Record<string, LucideIcon>;
+type KpiLabel = keyof typeof KPI_ICONS;
+const KPI_LABELS = Object.keys(KPI_ICONS) as KpiLabel[];
 const HIGHLIGHT_KPI = "Conclusão";
 
 type Paths = { farmerId: string; org: string; community: string } | null;
@@ -326,7 +327,7 @@ export function FarmerDashboard() {
           />
         );
     } else {
-      const totals: [string, string][] = [
+      const totals: [KpiLabel, string][] = [
         ["Planos de produção", formatNumber(summary.totalPlansCount)],
         ["Talhões ativos", formatNumber(summary.activePlotsCount)],
         ["Área plantada", `${formatNumber(summary.totalPlantedAreaHa)} ha`],

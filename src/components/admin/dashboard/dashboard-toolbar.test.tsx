@@ -54,4 +54,13 @@ describe("DashboardToolbar / FilterSelect", () => {
     expect(screen.getByText("Minha produção")).toBeTruthy();
     expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(1);
   });
+
+  it("primeira carga sem título: skeleton do título e da safra", () => {
+    const { container } = render(
+      <DashboardToolbar loading>
+        <span />
+      </DashboardToolbar>,
+    );
+    expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(2);
+  });
 });

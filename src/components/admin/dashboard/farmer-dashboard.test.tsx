@@ -303,4 +303,12 @@ describe("FarmerDashboard — revisão r1 do lote 5", () => {
     render(<FarmerDashboard />);
     expect(screen.getByRole("region", { name: "Carregando painel" })).toBeTruthy();
   });
+
+  it("'Erro 500' cru vira a mensagem padrão do painel", async () => {
+    vi.mocked(getFarmerSummary).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(<FarmerDashboard />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.textContent).toContain("Não foi possível carregar o resumo da sua safra.");
+  });
 });

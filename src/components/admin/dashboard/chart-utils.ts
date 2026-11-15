@@ -21,6 +21,7 @@ import { formatNumber } from "@/lib/production";
 import { readChartFontFamily, readToken, toRgb } from "./chart-tokens";
 
 export {
+  chartTextStyle,
   formatAxisNumber,
   readChartFontFamily,
   readToken,

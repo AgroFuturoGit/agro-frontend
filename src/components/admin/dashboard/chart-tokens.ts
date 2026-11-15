@@ -47,3 +47,14 @@ export function formatAxisNumber(value: number): string {
     maximumFractionDigits: 2,
   });
 }
+
+/**
+ * `textStyle` do ECharts com a cor e, quando houver, a fonte do sistema.
+ * Ponto único da regra de fonte dos gráficos (raiz e tooltip).
+ */
+export function chartTextStyle(
+  color: string,
+  fontFamily?: string,
+): { color: string; fontFamily?: string } {
+  return fontFamily ? { color, fontFamily } : { color };
+}

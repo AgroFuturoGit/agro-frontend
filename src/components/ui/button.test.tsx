@@ -50,6 +50,7 @@ describe("Button — foco da variante default (A11Y-L5-2)", () => {
     const classes = buttonVariants().split(" ");
     expect(classes).toContain("focus-visible:ring-offset-2");
     expect(classes).not.toContain("focus-visible:ring-ring/50");
+    expect(classes).not.toContain("focus-visible:ring-3");
   });
 
   it("outline mantém o foco da base (só o default mudou)", () => {

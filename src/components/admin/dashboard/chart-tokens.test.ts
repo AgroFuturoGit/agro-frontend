@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  chartTextStyle,
   formatAxisNumber,
   readChartFontFamily,
   readToken,
@@ -71,5 +72,19 @@ describe("formatAxisNumber", () => {
     expect(formatAxisNumber(30000)).toBe("30.000");
     expect(formatAxisNumber(2.5)).toBe("2,5");
     expect(formatAxisNumber(0)).toBe("0");
+  });
+});
+
+describe("formatAxisNumber — bordas", () => {
+  it("negativo e arredondamento em 2 casas", () => {
+    expect(formatAxisNumber(-1500)).toBe("-1.500");
+    expect(formatAxisNumber(2.555)).toBe("2,56");
+  });
+});
+
+describe("chartTextStyle", () => {
+  it("só inclui fontFamily quando houver", () => {
+    expect(chartTextStyle("red")).toEqual({ color: "red" });
+    expect(chartTextStyle("red", "Roboto")).toEqual({ color: "red", fontFamily: "Roboto" });
   });
 });

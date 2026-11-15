@@ -100,4 +100,25 @@ describe("ReportsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByRole("heading", { name: "Consolidado" })).toBeTruthy();
   });
+
+  it("carregando: região nomeada com o skeleton do consolidado, sem vazio nem alerta", () => {
+    vi.mocked(getMyProducer).mockReturnValue(new Promise(() => {}));
+    render(<ReportsPage />);
+    const region = screen.getByRole("region", { name: "Carregando relatórios" });
+    expect(region.getAttribute("aria-busy")).toBe("true");
+    expect(within(region).getByText("Carregando Previsto")).toBeTruthy();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Consolidado" })).toBeNull();
+  });
+
+  it("A11Y-L5-8/9: 'da meta' em 16px; título do card em até 2 linhas e linha do gráfico com title", async () => {
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Consolidado" });
+    expect(screen.getAllByText("da meta")[0].className).toContain("text-base");
+    const titles = screen.getAllByText("Milho — Comum");
+    const chartLabel = titles.find((t) => t.getAttribute("title") === "Milho — Comum");
+    expect(chartLabel?.className).toContain("truncate");
+    expect(titles.some((t) => t.className.includes("line-clamp-2"))).toBe(true);
+  });
 });

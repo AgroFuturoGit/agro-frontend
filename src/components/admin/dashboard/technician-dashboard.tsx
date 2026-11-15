@@ -70,12 +70,11 @@ const CURRENT = "__current__";
 
 type Paths = Record<string, { org: string; community: string }>;
 
-type Option = FilterOption;
 
 const LOAD_ERROR = "Não foi possível carregar o resumo da carteira.";
 
 /** Ícone decorativo de cada indicador (o rótulo é o que comunica). */
-const KPI_ICONS: Record<string, LucideIcon> = {
+const KPI_ICONS = {
   "Comunidades atendidas": MapPin,
   "Agricultores assistidos": Users,
   "Planos de produção": ClipboardList,
@@ -84,10 +83,11 @@ const KPI_ICONS: Record<string, LucideIcon> = {
   "Realizado (validado)": Wheat,
   "Pendente de validação": Hourglass,
   Conclusão: TrendingUp,
-};
-const KPI_LABELS = Object.keys(KPI_ICONS);
+} as const satisfies Record<string, LucideIcon>;
+type KpiLabel = keyof typeof KPI_ICONS;
+const KPI_LABELS = Object.keys(KPI_ICONS) as KpiLabel[];
 /** Indicadores que têm a linha de dica (o skeleton reserva a altura). */
-const KPI_WITH_HINT = new Set(["Planos de produção", "Pendente de validação"]);
+const KPI_WITH_HINT = new Set<KpiLabel>(["Planos de produção", "Pendente de validação"]);
 const HIGHLIGHT_KPI = "Conclusão";
 
 function planHref(paths: Paths, warning: TechnicianWarning): string | null {
@@ -253,7 +253,7 @@ export function TechnicianDashboard() {
   const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [crops, setCrops] = useState<Crop[]>([]);
   const [paths, setPaths] = useState<Paths>({});
-  const [communityOptions, setCommunityOptions] = useState<Option[]>([]);
+  const [communityOptions, setCommunityOptions] = useState<FilterOption[]>([]);
   const [harvestId, setHarvestId] = useState(CURRENT);
   const [communityId, setCommunityId] = useState(ALL);
   const [cropId, setCropId] = useState(ALL);
@@ -303,7 +303,7 @@ export function TechnicianDashboard() {
       const harvestParam = h === CURRENT ? undefined : h;
       const cropParam = k === ALL ? undefined : k;
       const key = `${h}|${k}`;
-      const toOptions = (data: TechnicianSummary): Option[] =>
+      const toOptions = (data: TechnicianSummary): FilterOption[] =>
         data.communities.map((x) => ({ value: x.communityId, label: x.communityName }));
 
       // Com comunidade escolhida a resposta encolhe: se a safra ou a cultura
@@ -430,7 +430,7 @@ export function TechnicianDashboard() {
               key={label}
               label={label}
               value={null}
-              hint={KPI_WITH_HINT.has(label) ? "…" : undefined}
+              reserveHint={KPI_WITH_HINT.has(label)}
               icon={KPI_ICONS[label]}
               highlight={label === HIGHLIGHT_KPI}
               loading
@@ -478,7 +478,7 @@ export function TechnicianDashboard() {
         />
       );
     } else {
-      const totals: [string, string, string?][] = [
+      const totals: [KpiLabel, string, string?][] = [
         ["Comunidades atendidas", formatNumber(summary.totalAssistedCommunitiesCount)],
         ["Agricultores assistidos", formatNumber(summary.totalAssistedFarmersCount)],
         [

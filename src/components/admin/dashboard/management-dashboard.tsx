@@ -64,12 +64,11 @@ const ALL = "__all__";
 const CURRENT = "__current__";
 const LOAD_ERROR = "Não foi possível carregar o painel de gestão.";
 
-type Option = FilterOption;
 
 const pct = (value: number) => `${formatNumber(value)}%`;
 
 /** Ícone decorativo de cada indicador (o rótulo é o que comunica). */
-const KPI_ICONS: Record<string, LucideIcon> = {
+const KPI_ICONS = {
   "Organizações": Building2,
   "Volume previsto": Target,
   "Volume colhido (validado)": Wheat,
@@ -78,7 +77,8 @@ const KPI_ICONS: Record<string, LucideIcon> = {
   "Agricultores": Users,
   "Planos de produção": ClipboardList,
   "Área plantada": LandPlot,
-};
+} as const satisfies Record<string, LucideIcon>;
+type KpiLabel = keyof typeof KPI_ICONS;
 const HIGHLIGHT_KPI = "Taxa de conversão";
 
 function Section({
@@ -337,7 +337,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
   const [error, setError] = useState<{ message: string; status: number | null } | null>(null);
   const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [communityOptions, setCommunityOptions] = useState<Option[]>([]);
+  const [communityOptions, setCommunityOptions] = useState<FilterOption[]>([]);
   const [managerOrgId, setManagerOrgId] = useState<string | null>(null);
   const [harvestId, setHarvestId] = useState(CURRENT);
   const [organizationId, setOrganizationId] = useState(ALL);
@@ -490,8 +490,8 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
 
   // Rótulos dos indicadores na ordem em que aparecem (o skeleton usa os mesmos).
   const showOrgCount = isAdmin && organizationId === ALL;
-  const kpiLabels = [
-    ...(showOrgCount ? ["Organizações"] : []),
+  const kpiLabels: KpiLabel[] = [
+    ...(showOrgCount ? (["Organizações"] as const) : []),
     "Volume previsto",
     "Volume colhido (validado)",
     "Taxa de conversão",
@@ -516,7 +516,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
               key={label}
               label={label}
               value={null}
-              hint={label === "Agricultores" ? "em dia" : undefined}
+              reserveHint={label === "Agricultores"}
               icon={KPI_ICONS[label]}
               highlight={label === HIGHLIGHT_KPI}
               loading
@@ -563,9 +563,9 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
       );
     } else {
       const showOrgs = summary.scope === "GLOBAL" && organizationId === ALL;
-      const totals: [string, string, string?][] = [
+      const totals: [KpiLabel, string, string?][] = [
         ...(showOrgs
-          ? ([["Organizações", formatNumber(summary.totalOrganizationsCount)]] as [string, string][])
+          ? ([["Organizações", formatNumber(summary.totalOrganizationsCount)]] as [KpiLabel, string][])
           : []),
         ["Volume previsto", `${formatNumber(summary.totalTargetKg)} kg`],
         ["Volume colhido (validado)", `${formatNumber(summary.totalRealizedKg)} kg`],

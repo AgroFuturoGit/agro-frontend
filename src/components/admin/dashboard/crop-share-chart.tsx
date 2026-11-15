@@ -11,6 +11,7 @@ import { formatNumber } from "@/lib/production";
 
 import {
   CHART_HEIGHT,
+  chartTextStyle,
   escapeHtml,
   kg,
   useEchart,
@@ -49,10 +50,7 @@ export function buildCropShareOption(
     animation: false,
     aria: { enabled: true, label: { description: ariaLabel } },
     color: colors.palette,
-    textStyle: {
-      color: colors.text,
-      ...(colors.fontFamily ? { fontFamily: colors.fontFamily } : {}),
-    },
+    textStyle: chartTextStyle(colors.text, colors.fontFamily),
     legend: {
       type: "scroll",
       orient: "vertical",
@@ -65,10 +63,7 @@ export function buildCropShareOption(
       trigger: "item",
       backgroundColor: colors.popover,
       borderColor: colors.grid,
-      textStyle: {
-        color: colors.popoverText,
-        ...(colors.fontFamily ? { fontFamily: colors.fontFamily } : {}),
-      },
+      textStyle: chartTextStyle(colors.popoverText, colors.fontFamily),
       formatter: (params: unknown) => {
         const item = items[(params as { dataIndex: number }).dataIndex];
         if (!item) return "";

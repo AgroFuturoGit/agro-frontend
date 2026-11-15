@@ -95,3 +95,26 @@ describe("InlineAlert — actions (UX-L5-08)", () => {
     expect(clear).not.toHaveBeenCalled();
   });
 });
+
+describe("InlineAlert — action e actions juntos", () => {
+  afterEach(cleanup);
+
+  it("action primeiro; disabled vale dentro de actions; rótulos repetidos não colidem", () => {
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <InlineAlert
+        action={{ label: "A", onClick: vi.fn() }}
+        actions={[
+          { label: "B", onClick: vi.fn(), disabled: true },
+          { label: "A", onClick: vi.fn() },
+        ]}
+      >
+        Falhou
+      </InlineAlert>,
+    );
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual(["A", "B", "A"]);
+    expect(screen.getByRole("button", { name: "B" })).toBeDisabled();
+    expect(errors.mock.calls.some((c) => String(c[0]).includes("same key"))).toBe(false);
+    errors.mockRestore();
+  });
+});

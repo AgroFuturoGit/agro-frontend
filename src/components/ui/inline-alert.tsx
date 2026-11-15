@@ -86,9 +86,9 @@ function InlineAlert({
       <div className="min-w-0 flex-1">{children}</div>
       {allActions.length > 0 ? (
         <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
-          {allActions.map((a) => (
+          {allActions.map((a, i) => (
             <Button
-              key={a.label}
+              key={`${i}-${a.label}`}
               type="button"
               variant="outline"
               size="sm"

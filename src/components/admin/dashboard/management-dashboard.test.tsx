@@ -641,18 +641,35 @@ describe("ManagementDashboard — exportação (UNIT-005)", () => {
 });
 
 describe("ManagementDashboard — revisão r1 do lote 5", () => {
-  it("UX-L5-01: colunas numéricas à direita com tabular-nums; nome em destaque", async () => {
+  it("UX-L5-01: ranking com quantidades à direita e tabular-nums; nome em destaque", async () => {
     render(<ManagementDashboard role="MANAGER" />);
     const table = await screen.findByTestId("crop-ranking");
-    const header = within(table).getByRole("columnheader", { name: "Meta (kg)" });
-    expect(header.className).toContain("text-right");
+    const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(within(table).getByRole("columnheader", { name: "Meta (kg)" }).className).toContain("text-right");
     const [firstRow] = within(table).getAllByRole("row").slice(1);
     const cells = within(firstRow).getAllByRole("cell");
-    expect(cells[0].className).toContain("tabular-nums");
-    expect(cells[1].className).toContain("font-medium");
+    expect(cells[headers.indexOf("Meta (kg)")].className).toContain("tabular-nums");
+    expect(cells[headers.indexOf("Cultura")].className).toContain("font-medium");
   });
 
-  it("UX-L5-07: a nota de atualização fica junto dos KPIs e some no erro", async () => {
+  it.each([
+    ["communities-table", "Comunidade"],
+    ["organizations-table", "Organização"],
+  ])("UX-L5-01: %s com números à direita e nome em destaque", async (testId, nameHeader) => {
+    render(<ManagementDashboard role="ADMIN" />);
+    const table = await screen.findByTestId(testId);
+    const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent);
+    expect(within(table).getByRole("columnheader", { name: "Meta (kg)" }).className).toContain("text-right");
+    expect(within(table).getByRole("columnheader", { name: nameHeader }).className).not.toContain(
+      "text-right",
+    );
+    const [row] = within(table).getAllByRole("row").slice(1);
+    const cells = within(row).getAllByRole("cell");
+    expect(cells[headers.indexOf("Meta (kg)")].className).toContain("tabular-nums");
+    expect(cells[headers.indexOf(nameHeader)].className).toContain("font-medium");
+  });
+
+  it("UX-L5-07: a nota de atualização some no erro", async () => {
     vi.mocked(getManagerSummary).mockRejectedValue(new ApiError(500, "Falha no servidor", null));
     render(<ManagementDashboard role="MANAGER" />);
     await screen.findByRole("alert");
@@ -666,5 +683,66 @@ describe("ManagementDashboard — revisão r1 do lote 5", () => {
     expect(within(alert).getAllByRole("button").map((b) => b.textContent)).toEqual([
       "Tentar novamente",
     ]);
+  });
+
+  it("UX-L5-07: a nota fica no bloco dos KPIs e some no vazio", async () => {
+    const { unmount } = render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("crop-ranking");
+    const note = screen.getByText(/alguns minutos/);
+    expect(note.parentElement?.textContent).toContain("Volume previsto");
+    unmount();
+    vi.mocked(getManagerSummary).mockResolvedValue(
+      summary({ isEmpty: true, cropRanking: [], communities: [] }),
+    );
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByText("Nenhum plano de produção para este recorte");
+    expect(screen.queryByText(/alguns minutos/)).toBeNull();
+  });
+
+  it("UX-L5-08: erro com filtro ativo mostra 'Limpar filtros' e 'Tentar novamente', nessa ordem", async () => {
+    render(<ManagementDashboard role="MANAGER" />);
+    await screen.findByTestId("mgmt-scope-title");
+    await waitFor(() =>
+      expect(screen.getByRole("combobox", { name: "Comunidade" }).hasAttribute("disabled")).toBe(false),
+    );
+    vi.mocked(getManagerSummary).mockRejectedValue(new ApiError(500, "Falha no servidor", null));
+    await choose("Comunidade", "Vale Verde");
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Limpar filtros",
+      "Tentar novamente",
+    ]);
+
+    vi.mocked(getManagerSummary).mockResolvedValue(summary());
+    fireEvent.click(within(alert).getByRole("button", { name: "Limpar filtros" }));
+    await waitFor(() =>
+      expect(getManagerSummary).toHaveBeenLastCalledWith({ harvestId: undefined, communityId: undefined }),
+    );
+    expect(await screen.findByTestId("crop-ranking")).toBeTruthy();
+  });
+
+  it("'Erro 500' cru vira a mensagem padrão do painel", async () => {
+    vi.mocked(getManagerSummary).mockRejectedValue(new ApiError(500, "Erro 500", null));
+    render(<ManagementDashboard role="MANAGER" />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.textContent).toContain("Não foi possível carregar o painel de gestão.");
+    expect(within(alert).getByRole("button", { name: "Tentar novamente" })).toBeTruthy();
+  });
+
+  it("UX-L5-05: 1ª carga mostra skeleton no recorte da barra, não um título vazio", () => {
+    vi.mocked(getManagerSummary).mockReturnValue(new Promise(() => {}));
+    render(<ManagementDashboard role="MANAGER" />);
+    const bar = screen.getByTestId("dashboard-toolbar");
+    expect(within(bar).queryByTestId("mgmt-scope-title")).toBeNull();
+    expect(bar.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+  });
+
+  it("A11Y-L5-5: o skeleton do painel é uma região nomeada e ocupada", () => {
+    vi.mocked(getManagerSummary).mockReturnValue(new Promise(() => {}));
+    render(<ManagementDashboard role="MANAGER" />);
+    expect(
+      screen.getByRole("region", { name: "Carregando painel" }).getAttribute("aria-busy"),
+    ).toBe("true");
   });
 });

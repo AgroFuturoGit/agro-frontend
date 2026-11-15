@@ -108,3 +108,19 @@ describe("CropShareChart (UNIT-005)", () => {
     expect(html).not.toContain("<b>x");
   });
 });
+
+describe("CropShareChart — fonte e vazio", () => {
+  it("fonte do sistema no textStyle e no tooltip", () => {
+    const option = buildCropShareOption([crop("Milho", 100)], { ...COLORS, fontFamily: "Roboto" }) as {
+      textStyle: { fontFamily?: string };
+      tooltip: { textStyle: { fontFamily?: string } };
+    };
+    expect(option.textStyle.fontFamily).toBe("Roboto");
+    expect(option.tooltip.textStyle.fontFamily).toBe("Roboto");
+  });
+
+  it("vazio ocupa a altura do gráfico (sem pulo de layout)", () => {
+    render(<CropShareChart ranking={[]} />);
+    expect(screen.getByTestId("crop-share-empty").style.minHeight).toBe("320px");
+  });
+});

@@ -67,12 +67,20 @@ describe("KpiCard", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("loading com hint reserva a linha da dica (mesma altura do pronto)", () => {
+  it("loading com reserveHint reserva a linha da dica (mesma altura do pronto)", () => {
+    const { container } = render(
+      <KpiCard label="Agricultores" value={null} icon={Users} loading reserveHint />,
+    );
+
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(4);
+  });
+
+  it("loading com hint mas sem reserveHint não reserva nem mostra a dica", () => {
     const { container } = render(
       <KpiCard label="Agricultores" value="3" hint="em dia" icon={Users} loading />,
     );
 
-    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(4);
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBe(3);
     expect(screen.queryByText("em dia")).toBeNull();
   });
 
