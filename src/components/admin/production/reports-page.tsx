@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ClipboardList, Info } from "lucide-react";
 
+import {
+  DashboardToolbar,
+  FilterSelect,
+  type FilterOption,
+} from "@/components/admin/dashboard/dashboard-toolbar";
 import { EmptyState } from "@/components/admin/empty-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { SectionHeader } from "@/components/admin/section-header";
@@ -18,6 +23,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getFarmerSummary } from "@/lib/analytics";
 import { withFocusMove } from "@/lib/focus";
 import { harvestText } from "@/lib/harvest-label";
 import { apiErrorMessage } from "@/lib/api";
@@ -35,6 +41,62 @@ import { ComparisonSummary } from "./comparison-summary";
 
 const LOAD_ERROR = "Não foi possível carregar os relatórios.";
 const TITLE_ID = "reports-title";
+const HARVEST_FILTER_ID = "reports-harvest";
+/** Sentinela do filtro de safra: sem recorte (inclui planos sem safra). */
+const ALL = "__all__";
+/**
+ * Espera máxima pela safra vigente. Depois disso a tela abre em "Todas as
+ * safras" e a resposta tardia é ignorada (o filtro não muda sozinho).
+ */
+export const CURRENT_HARVEST_TIMEOUT_MS = 3000;
+
+/** `id` da safra vigente segundo o back, ou `null` (sem vigente, falha ou demora). */
+function currentHarvestIdWithin(ms: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    getFarmerSummary()
+      .then(
+        (summary) => summary.currentHarvest?.id ?? null,
+        () => null,
+      )
+      .then((id) => {
+        clearTimeout(timer);
+        resolve(id);
+      });
+  });
+}
+
+/**
+ * Safra do filtro depois de uma carga. A escolha anterior (`previous`) vale
+ * enquanto existir nos planos; na primeira carga (`null`) ou se ela sumiu,
+ * usa a vigente, desde que algum plano seja dela; senão, "Todas as safras".
+ */
+export function pickHarvestFilter(
+  previous: string | null,
+  plans: ProductionPlan[],
+  currentId: string | null,
+): string {
+  const hasPlanIn = (id: string) => plans.some((plan) => plan.harvest?.id === id);
+  if (previous !== null && (previous === ALL || hasPlanIn(previous))) return previous;
+  return currentId && hasPlanIn(currentId) ? currentId : ALL;
+}
+
+/** "2026-07-01" -> "07/2026". */
+const monthYear = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/** Rótulo da safra no seletor; com rótulo repetido, acrescenta o período. */
+function harvestOptionLabel(
+  harvest: NonNullable<ProductionPlan["harvest"]>,
+  duplicated: boolean,
+) {
+  const text = harvestText(harvest.label);
+  if (!duplicated) return text;
+  const period = [harvest.startDate, harvest.endDate]
+    .filter((d): d is string => Boolean(d))
+    .map(monthYear)
+    .join(" a ");
+  return period ? `${text} (${period})` : text;
+}
 
 const planTitle = (plan: ProductionPlan) =>
   plan.crop ? `${plan.crop.name} — ${plan.crop.variety}` : "Plano";
@@ -58,10 +120,17 @@ export function ReportsPage() {
   const [producer, setProducer] = useState<Producer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Filtro só na tela (sem URL). Abre na safra vigente do resumo do
+  // agricultor; sem vigente, com falha ou demora no resumo ou sem plano
+  // nela, "Todas". `null` = ainda sem carga bem-sucedida.
+  const [harvestFilter, setHarvestFilter] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // Em paralelo com a carga: quem decide a safra vigente é o back. Falha
+    // ou demora aqui não prende o relatório; só faz abrir em "Todas".
+    const currentHarvestId = currentHarvestIdWithin(CURRENT_HARVEST_TIMEOUT_MS);
     try {
       const producerData = await getMyProducer();
       setProducer(producerData);
@@ -76,6 +145,8 @@ export function ReportsPage() {
           }
         }),
       );
+      const currentId = await currentHarvestId;
+      setHarvestFilter((previous) => pickHarvestFilter(previous, plans, currentId));
       setReports(data);
     } catch (err) {
       setError(
@@ -91,13 +162,49 @@ export function ReportsPage() {
     refresh();
   }, [refresh]);
 
+  // Safras distintas dos planos (por `id`), da mais recente para a mais
+  // antiga; planos sem safra só aparecem em "Todas as safras".
+  const harvestOptions = useMemo<FilterOption[]>(() => {
+    const byId = new Map<string, NonNullable<ProductionPlan["harvest"]>>();
+    for (const { plan } of reports) {
+      if (plan.harvest?.id && !byId.has(plan.harvest.id)) {
+        byId.set(plan.harvest.id, plan.harvest);
+      }
+    }
+    const sorted = [...byId.values()].sort((a, b) =>
+      (b.startDate ?? "").localeCompare(a.startDate ?? ""),
+    );
+    const counts = new Map<string, number>();
+    for (const h of sorted) {
+      const text = harvestText(h.label);
+      counts.set(text, (counts.get(text) ?? 0) + 1);
+    }
+    return [
+      ...sorted.map((h) => ({
+        value: h.id,
+        label: harvestOptionLabel(h, (counts.get(harvestText(h.label)) ?? 0) > 1),
+      })),
+      { value: ALL, label: "Todas as safras" },
+    ];
+  }, [reports]);
+
+  // Filtro no cliente: as comparações já foram buscadas uma vez só.
+  const selectedHarvest = harvestFilter ?? ALL;
+  const filtered = useMemo(
+    () =>
+      selectedHarvest === ALL
+        ? reports
+        : reports.filter((r) => r.plan.harvest?.id === selectedHarvest),
+    [reports, selectedHarvest],
+  );
+
   const withComparison = useMemo(
     () =>
-      reports.filter(
+      filtered.filter(
         (r): r is { plan: ProductionPlan; comparison: ProductionComparison } =>
           r.comparison !== null,
       ),
-    [reports],
+    [filtered],
   );
 
   const totals = useMemo<ProductionComparison | null>(() => {
@@ -137,6 +244,20 @@ export function ReportsPage() {
   const producerBase = producer?.community?.organization
     ? `/admin/organizacoes/${producer.community.organization.id}/comunidades/${producer.community.id}/produtores/${producer.id}`
     : null;
+
+  // Cada opção vem de pelo menos um plano e a safra inicial só vale se algum
+  // plano for dela: com planos carregados, a lista filtrada nunca fica vazia.
+  const toolbar = (
+    <DashboardToolbar>
+      <FilterSelect
+        id={HARVEST_FILTER_ID}
+        label="Safra"
+        value={selectedHarvest}
+        onChange={setHarvestFilter}
+        options={harvestOptions}
+      />
+    </DashboardToolbar>
+  );
 
   let body: React.ReactNode;
   if (loading) {
@@ -186,6 +307,7 @@ export function ReportsPage() {
   } else {
     body = (
       <div className="flex flex-col gap-8">
+        {toolbar}
         {totals && (
           <section className="flex flex-col gap-4" aria-labelledby="reports-total">
             <SectionHeader
@@ -260,7 +382,7 @@ export function ReportsPage() {
         <section className="flex flex-col gap-4" aria-labelledby="reports-plans">
           <SectionHeader id="reports-plans" title="Por plano de produção" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {reports.map(({ plan, comparison }) => {
+            {filtered.map(({ plan, comparison }) => {
               const percentage = comparison?.percentageRealized ?? 0;
               return (
                 <Card key={plan.id} className="gap-4 py-6">
