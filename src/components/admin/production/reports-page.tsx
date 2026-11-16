@@ -12,6 +12,7 @@ import {
 import { EmptyState } from "@/components/admin/empty-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { SectionHeader } from "@/components/admin/section-header";
+import { PaginationBar } from "@/components/data-table/pagination-bar";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Card,
@@ -27,6 +28,7 @@ import { getFarmerSummary } from "@/lib/analytics";
 import { withFocusMove } from "@/lib/focus";
 import { harvestText } from "@/lib/harvest-label";
 import { apiErrorMessage } from "@/lib/api";
+import { CARD_PAGE_SIZE, usePagedItems } from "@/lib/use-paged-items";
 import { cn } from "@/lib/utils";
 import { getMyProducer, type Producer } from "@/lib/producers";
 import {
@@ -197,6 +199,16 @@ export function ReportsPage() {
         : reports.filter((r) => r.plan.harvest?.id === selectedHarvest),
     [reports, selectedHarvest],
   );
+  // Só os cards são paginados; o consolidado e as barras usam `filtered` inteiro.
+  const pagedCards = usePagedItems(filtered, CARD_PAGE_SIZE);
+  const { reset: resetCardsPage } = pagedCards;
+  const changeHarvest = useCallback(
+    (value: string) => {
+      setHarvestFilter(value);
+      resetCardsPage();
+    },
+    [resetCardsPage],
+  );
 
   const withComparison = useMemo(
     () =>
@@ -253,7 +265,7 @@ export function ReportsPage() {
         id={HARVEST_FILTER_ID}
         label="Safra"
         value={selectedHarvest}
-        onChange={setHarvestFilter}
+        onChange={changeHarvest}
         options={harvestOptions}
       />
     </DashboardToolbar>
@@ -382,7 +394,7 @@ export function ReportsPage() {
         <section className="flex flex-col gap-4" aria-labelledby="reports-plans">
           <SectionHeader id="reports-plans" title="Por plano de produção" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {filtered.map(({ plan, comparison }) => {
+            {pagedCards.pageItems.map(({ plan, comparison }) => {
               const percentage = comparison?.percentageRealized ?? 0;
               return (
                 <Card key={plan.id} className="gap-4 py-6">
@@ -453,6 +465,15 @@ export function ReportsPage() {
               );
             })}
           </div>
+          {pagedCards.showPagination && (
+            <PaginationBar
+              pageIndex={pagedCards.pageIndex}
+              pageCount={pagedCards.pageCount}
+              total={pagedCards.total}
+              pageSize={CARD_PAGE_SIZE}
+              onPageChange={pagedCards.setPageIndex}
+            />
+          )}
         </section>
       </div>
     );

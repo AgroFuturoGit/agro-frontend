@@ -398,6 +398,89 @@ describe("ReportsPage — filtro de safra (RF5)", () => {
   });
 });
 
+describe("ReportsPage — paginação dos cards (RF4)", () => {
+  const H_A = { id: "h-a", label: "2026", startDate: "2026-01-01", endDate: "2026-12-31" };
+  const H_B = { id: "h-b", label: "2025", startDate: "2025-01-01", endDate: "2025-12-31" };
+  const NAMES = Array.from({ length: 10 }, (_, i) => `Cultura ${i + 1}`);
+
+  beforeEach(() => {
+    // 10 planos na safra vigente (A) e 1 na safra B: 11 em "Todas".
+    vi.mocked(listProductionPlans).mockResolvedValue([
+      ...NAMES.map(
+        (name, i) => ({ ...(plan(`p-${i + 1}`, name) as object), harvest: H_A }) as never,
+      ),
+      { ...(plan("p-b", "Café") as object), harvest: H_B } as never,
+    ]);
+    vi.mocked(getProductionComparison).mockImplementation(async (id: string) => ({
+      productionPlanId: id,
+      expectedYield: 1000,
+      totalActualYield: 400,
+      difference: -600,
+      percentageRealized: 40,
+    }));
+    vi.mocked(getFarmerSummary).mockResolvedValue(summaryWith({ ...H_A }));
+  });
+
+  const cardsRegion = () =>
+    screen.getByRole("heading", { name: "Por plano de produção" }).closest("section") as HTMLElement;
+  const cardTitles = () =>
+    within(cardsRegion())
+      .getAllByRole("link", { name: /^Ver detalhes/ })
+      .map((link) => link.textContent?.split(" de ")[1]?.split(",")[0]);
+  const consolidated = () =>
+    screen.getByRole("heading", { name: "Consolidado" }).closest("section") as HTMLElement;
+  const chartRows = () =>
+    screen.getAllByText("Realizado 400 kg de 1.000 kg previstos").length;
+  const status = () => within(cardsRegion()).getByRole("status");
+
+  it("10 planos: 9 cards na página 1 e o 10º na página 2; totais e barras não mudam", async () => {
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Consolidado" });
+    expect(cardTitles()).toEqual(NAMES.slice(0, 9).map((n) => `${n} — Comum`));
+    expect(status().textContent).toBe("Exibindo 1–9 de 10");
+    expect(within(cardsRegion()).getByText("Página 1 de 2")).toBeTruthy();
+    expect(screen.getByText("Soma de 10 planos de produção.")).toBeTruthy();
+    expect(within(consolidated()).getByText("10.000 kg")).toBeTruthy();
+    expect(within(consolidated()).getByText("4.000 kg")).toBeTruthy();
+    expect(chartRows()).toBe(10);
+
+    fireEvent.click(within(cardsRegion()).getByRole("button", { name: "Próxima página" }));
+    await waitFor(() => expect(cardTitles()).toEqual(["Cultura 10 — Comum"]));
+    expect(status().textContent).toBe("Exibindo 10–10 de 10");
+    expect(within(cardsRegion()).getByText("Página 2 de 2")).toBeTruthy();
+    // O consolidado e as barras seguem com a lista filtrada inteira.
+    expect(screen.getByText("Soma de 10 planos de produção.")).toBeTruthy();
+    expect(within(consolidated()).getByText("10.000 kg")).toBeTruthy();
+    expect(within(consolidated()).getByText("4.000 kg")).toBeTruthy();
+    expect(chartRows()).toBe(10);
+    // Foco na última página: não cai no body.
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("trocar a safra volta à página 1", async () => {
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Consolidado" });
+    fireEvent.click(within(cardsRegion()).getByRole("button", { name: "Próxima página" }));
+    await waitFor(() => expect(status().textContent).toBe("Exibindo 10–10 de 10"));
+
+    // "Todas" tem 11 planos: a página 2 continuaria válida sem o reset.
+    await chooseHarvest("Todas as safras");
+    await waitFor(() => expect(status().textContent).toBe("Exibindo 1–9 de 11"));
+    expect(within(cardsRegion()).getByText("Página 1 de 2")).toBeTruthy();
+    expect(cardTitles()).toHaveLength(9);
+    expect(screen.getByText("Soma de 11 planos de produção.")).toBeTruthy();
+  });
+
+  it("com 9 cards ou menos não mostra a barra", async () => {
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Consolidado" });
+    await chooseHarvest("Safra 2025");
+    await waitFor(() => expect(cardTitles()).toEqual(["Café — Comum"]));
+    expect(within(cardsRegion()).queryByRole("navigation")).toBeNull();
+    expect(within(cardsRegion()).queryByRole("status")).toBeNull();
+  });
+});
+
 describe("pickHarvestFilter (safra depois de cada carga)", () => {
   const plans = [
     { id: "p-1", harvest: { id: "h-a" } },

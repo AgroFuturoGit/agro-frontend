@@ -120,11 +120,12 @@ const CARD_B1 = "Café — Catuaí";
 async function mockReports(
   page: Page,
   currentHarvest: typeof HARVEST_A | null,
+  plans: ReturnType<typeof plan>[] = PLANS,
 ) {
   const calls = { comparisons: 0 };
   await page.route("**/farmers/me", (route) => route.fulfill(json(PRODUCER)));
   await page.route(`**/farmers/${PRODUCER.id}/production-plans`, (route) =>
-    route.fulfill(json(PLANS)),
+    route.fulfill(json(plans)),
   );
   await page.route("**/production-plans/*/comparison", (route) => {
     calls.comparisons += 1;
@@ -244,5 +245,37 @@ test.describe("Relatórios — filtro de safra (FARMER)", () => {
     await expectCards(page, [CARD_A1, CARD_A2, CARD_B1], []);
     // O único `alert` da página é o anunciador de rota do Next, vazio.
     await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0);
+  });
+});
+
+test.describe("Relatórios — paginação dos cards (FARMER)", () => {
+  // 10 planos na mesma safra (a vigente): 9 cards na página 1 e o 10º na 2.
+  const TEN_PLANS = Array.from({ length: 10 }, (_, i) =>
+    plan(`plan-cultura-${i + 1}`, `Cultura ${i + 1}`, "Comum", HARVEST_A),
+  );
+
+  test("com 10 planos mostra 'Exibindo 1–9 de 10' e 'Próxima' leva ao 10º plano", async ({
+    page,
+  }) => {
+    await loginAsFarmer(page);
+    await mockReports(page, HARVEST_A, TEN_PLANS);
+
+    await page.goto("/admin/relatorios");
+
+    await expect(selectedHarvest(page)).toHaveText(/^Safra 2026$/);
+    const section = planCards(page);
+    const pager = section.getByRole("navigation");
+    await expect(pager.getByRole("status")).toHaveText(/^Exibindo 1–9 de 10$/);
+    await expect(section.getByRole("link", { name: /^Ver detalhes de / })).toHaveCount(9);
+    await expect(section.getByText("Cultura 10 — Comum", { exact: true })).toHaveCount(0);
+
+    await pager.getByRole("button", { name: "Próxima página", exact: true }).click();
+
+    await expect(pager.getByRole("status")).toHaveText(/^Exibindo 10–10 de 10$/);
+    await expect(pager.getByText(/^Página 2 de 2$/)).toBeVisible();
+    await expect(section.getByRole("link", { name: /^Ver detalhes de / })).toHaveCount(1);
+    await expect(section.getByText("Cultura 10 — Comum", { exact: true })).toBeVisible();
+    // O consolidado continua somando os 10 planos.
+    await expect(page.getByText("Soma de 10 planos de produção.", { exact: true })).toBeVisible();
   });
 });
