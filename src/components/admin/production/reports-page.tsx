@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ClipboardList, Info } from "lucide-react";
+import { ArrowRight, ClipboardList, Info, Sprout } from "lucide-react";
 
+import {
+  DashboardToolbar,
+  FilterSelect,
+  type FilterOption,
+} from "@/components/admin/dashboard/dashboard-toolbar";
 import { EmptyState } from "@/components/admin/empty-state";
 import { PageHeader } from "@/components/admin/page-header";
 import { SectionHeader } from "@/components/admin/section-header";
@@ -18,7 +23,8 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { withFocusMove } from "@/lib/focus";
+import { getFarmerSummary } from "@/lib/analytics";
+import { moveFocusTo, withFocusMove } from "@/lib/focus";
 import { harvestText } from "@/lib/harvest-label";
 import { apiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -35,6 +41,9 @@ import { ComparisonSummary } from "./comparison-summary";
 
 const LOAD_ERROR = "Não foi possível carregar os relatórios.";
 const TITLE_ID = "reports-title";
+const HARVEST_FILTER_ID = "reports-harvest";
+/** Sentinela do filtro de safra: sem recorte (inclui planos sem safra). */
+const ALL = "__all__";
 
 const planTitle = (plan: ProductionPlan) =>
   plan.crop ? `${plan.crop.name} — ${plan.crop.variety}` : "Plano";
@@ -58,10 +67,18 @@ export function ReportsPage() {
   const [producer, setProducer] = useState<Producer | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Filtro só na tela (sem URL). Abre na safra vigente do resumo do
+  // agricultor; sem vigente, com falha no resumo ou sem plano nela, "Todas".
+  const [harvestFilter, setHarvestFilter] = useState<string>(ALL);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // Em paralelo com a carga: quem decide a safra vigente é o back. Uma
+    // falha aqui não impede o relatório; só faz abrir em "Todas as safras".
+    const currentHarvestId = getFarmerSummary()
+      .then((summary) => summary.currentHarvest?.id ?? null)
+      .catch(() => null);
     try {
       const producerData = await getMyProducer();
       setProducer(producerData);
@@ -75,6 +92,12 @@ export function ReportsPage() {
             return { plan, comparison: null };
           }
         }),
+      );
+      const currentId = await currentHarvestId;
+      setHarvestFilter(
+        currentId && plans.some((plan) => plan.harvest?.id === currentId)
+          ? currentId
+          : ALL,
       );
       setReports(data);
     } catch (err) {
@@ -91,13 +114,40 @@ export function ReportsPage() {
     refresh();
   }, [refresh]);
 
+  // Safras distintas dos planos (por `id`), da mais recente para a mais
+  // antiga; planos sem safra só aparecem em "Todas as safras".
+  const harvestOptions = useMemo<FilterOption[]>(() => {
+    const byId = new Map<string, NonNullable<ProductionPlan["harvest"]>>();
+    for (const { plan } of reports) {
+      if (plan.harvest?.id && !byId.has(plan.harvest.id)) {
+        byId.set(plan.harvest.id, plan.harvest);
+      }
+    }
+    const sorted = [...byId.values()].sort((a, b) =>
+      (b.startDate ?? "").localeCompare(a.startDate ?? ""),
+    );
+    return [
+      ...sorted.map((h) => ({ value: h.id, label: harvestText(h.label) })),
+      { value: ALL, label: "Todas as safras" },
+    ];
+  }, [reports]);
+
+  // Filtro no cliente: as comparações já foram buscadas uma vez só.
+  const filtered = useMemo(
+    () =>
+      harvestFilter === ALL
+        ? reports
+        : reports.filter((r) => r.plan.harvest?.id === harvestFilter),
+    [reports, harvestFilter],
+  );
+
   const withComparison = useMemo(
     () =>
-      reports.filter(
+      filtered.filter(
         (r): r is { plan: ProductionPlan; comparison: ProductionComparison } =>
           r.comparison !== null,
       ),
-    [reports],
+    [filtered],
   );
 
   const totals = useMemo<ProductionComparison | null>(() => {
@@ -137,6 +187,19 @@ export function ReportsPage() {
   const producerBase = producer?.community?.organization
     ? `/admin/organizacoes/${producer.community.organization.id}/comunidades/${producer.community.id}/produtores/${producer.id}`
     : null;
+
+  // Fica montado enquanto houver planos: é o alvo do foco do vazio filtrado.
+  const toolbar = (
+    <DashboardToolbar>
+      <FilterSelect
+        id={HARVEST_FILTER_ID}
+        label="Safra"
+        value={harvestFilter}
+        onChange={setHarvestFilter}
+        options={harvestOptions}
+      />
+    </DashboardToolbar>
+  );
 
   let body: React.ReactNode;
   if (loading) {
@@ -183,9 +246,30 @@ export function ReportsPage() {
         }
       />
     );
+  } else if (filtered.length === 0) {
+    body = (
+      <div className="flex flex-col gap-8">
+        {toolbar}
+        <EmptyState
+          variant="dashed"
+          icon={Sprout}
+          title="Nenhum plano nesta safra"
+          hint="Escolha outra safra ou veja todas as safras."
+          action={{
+            label: "Ver todas as safras",
+            // O botão some com a troca: o foco vai para o seletor.
+            onClick: () => {
+              moveFocusTo(HARVEST_FILTER_ID);
+              setHarvestFilter(ALL);
+            },
+          }}
+        />
+      </div>
+    );
   } else {
     body = (
       <div className="flex flex-col gap-8">
+        {toolbar}
         {totals && (
           <section className="flex flex-col gap-4" aria-labelledby="reports-total">
             <SectionHeader
@@ -260,7 +344,7 @@ export function ReportsPage() {
         <section className="flex flex-col gap-4" aria-labelledby="reports-plans">
           <SectionHeader id="reports-plans" title="Por plano de produção" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {reports.map(({ plan, comparison }) => {
+            {filtered.map(({ plan, comparison }) => {
               const percentage = comparison?.percentageRealized ?? 0;
               return (
                 <Card key={plan.id} className="gap-4 py-6">
