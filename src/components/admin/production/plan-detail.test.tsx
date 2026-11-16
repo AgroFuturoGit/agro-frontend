@@ -14,7 +14,8 @@ import { ApiError } from "@/lib/api";
 import { readUserFromStorage, type AuthUser, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getHarvestTimeline } from "@/lib/analytics";
-import { getMyProducer, listProducers } from "@/lib/producers";
+import { getMyProducer, listProducers, type Producer } from "@/lib/producers";
+import { getMyAssignedProducers } from "@/lib/technicians";
 import { listAttachments } from "@/lib/attachments";
 import { listOccurrences } from "@/lib/occurrences";
 import {
@@ -101,6 +102,14 @@ vi.mock("@/lib/producers", async () => {
       "@/lib/producers",
     );
   return { ...actual, getMyProducer: vi.fn(), listProducers: vi.fn() };
+});
+
+vi.mock("@/lib/technicians", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/technicians")>(
+      "@/lib/technicians",
+    );
+  return { ...actual, getMyAssignedProducers: vi.fn() };
 });
 
 const PLAN: ProductionPlan = {
@@ -249,6 +258,9 @@ beforeEach(() => {
   vi.mocked(getCommunity).mockRejectedValue(new Error("not relevant here"));
   vi.mocked(listProducers).mockRejectedValue(new Error("not relevant here"));
   vi.mocked(getMyProducer).mockRejectedValue(new Error("not relevant here"));
+  vi.mocked(getMyAssignedProducers).mockRejectedValue(
+    new Error("not relevant here"),
+  );
 });
 
 afterEach(() => {
@@ -1267,5 +1279,162 @@ describe("PlanDetail — estados acessíveis (lote 4)", () => {
       document.querySelector("[data-slot=page-header] h2 [data-slot=skeleton]"),
     ).not.toBeNull();
     expect(screen.queryByRole("heading", { name: "Milho — BRS 1010" })).toBeNull();
+  });
+});
+
+/**
+ * RF2/D4: o breadcrumb só traz níveis que o papel pode abrir. Para o
+ * TECHNICIAN, `GET /communities/{id}` e `GET /farmers` dão 403 no back: o
+ * nome do agricultor vem de `GET /technicians/me/farmers`.
+ */
+describe("PlanDetail — breadcrumb por papel (RF2)", () => {
+  const PRODUCER_HREF =
+    "/admin/organizacoes/org-1/comunidades/community-1/produtores/producer-1";
+
+  const ASSIGNED: Producer = {
+    id: "producer-1",
+    fullName: "José da Silva",
+    cpf: null,
+    dateOfBirth: null,
+    motherName: null,
+    origin: null,
+    educationLevel: null,
+    phone: null,
+    localName: null,
+    street: null,
+    city: null,
+    state: null,
+    ibgeCode: null,
+    latitude: null,
+    longitude: null,
+    isCompliant: true,
+    registrationSource: null,
+    createdAt: null,
+    updatedAt: null,
+    user: null,
+    community: {
+      id: "community-1",
+      name: "Comunidade Alto da Serra",
+      organization: {
+        id: "org-1",
+        name: "Cooperativa Serra Azul",
+        taxId: "12345678000199",
+        type: "COOP",
+      },
+    },
+  };
+
+  function breadcrumbHrefs(nav: HTMLElement) {
+    return within(nav)
+      .queryAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+  }
+
+  it("TECHNICIAN: 'Agricultores atendidos' > agricultor > plano, sem chamar getCommunity nem listProducers", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(getMyAssignedProducers).mockResolvedValue([
+      { ...ASSIGNED, id: "producer-2", fullName: "Bruno do Vale" },
+      ASSIGNED,
+    ]);
+
+    renderPlanDetail();
+    await expectPlanIsReadable();
+
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(
+        within(nav).getByRole("link", { name: "José da Silva" }),
+      ).toHaveAttribute("href", PRODUCER_HREF),
+    );
+    expect(
+      within(nav).getByRole("link", { name: "Agricultores atendidos" }),
+    ).toHaveAttribute("href", "/admin/organizacoes");
+    expect(within(nav).getByText("Milho — BRS 1010", { exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(breadcrumbHrefs(nav)).toEqual(["/admin/organizacoes", PRODUCER_HREF]);
+
+    expect(getMyAssignedProducers).toHaveBeenCalledTimes(1);
+    expect(getCommunity).not.toHaveBeenCalled();
+    expect(listProducers).not.toHaveBeenCalled();
+  });
+
+  it("TECHNICIAN: se /technicians/me/farmers falhar, o agricultor vira 'Agricultor' e as rotas proibidas seguem sem chamada", async () => {
+    loginAs("TECHNICIAN");
+
+    renderPlanDetail();
+    await expectPlanIsReadable();
+
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() => expect(getMyAssignedProducers).toHaveBeenCalledTimes(1));
+    expect(
+      within(nav).getByRole("link", { name: "Agricultor" }),
+    ).toHaveAttribute("href", PRODUCER_HREF);
+    expect(breadcrumbHrefs(nav)).toEqual(["/admin/organizacoes", PRODUCER_HREF]);
+    expect(getCommunity).not.toHaveBeenCalled();
+    expect(listProducers).not.toHaveBeenCalled();
+  });
+
+  it("FARMER: 'Meus planos' > plano, com link para os próprios planos", async () => {
+    loginAs("FARMER");
+
+    renderPlanDetail();
+    await expectPlanIsReadable();
+
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    expect(
+      within(nav).getByRole("link", { name: "Meus planos" }),
+    ).toHaveAttribute("href", PRODUCER_HREF);
+    expect(within(nav).getByText("Milho — BRS 1010", { exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(breadcrumbHrefs(nav)).toEqual([PRODUCER_HREF]);
+    expect(getMyAssignedProducers).not.toHaveBeenCalled();
+    expect(getCommunity).not.toHaveBeenCalled();
+    expect(listProducers).not.toHaveBeenCalled();
+  });
+
+  it("MANAGER: breadcrumb completo, como antes", async () => {
+    loginAs("MANAGER");
+    vi.mocked(getCommunity).mockResolvedValue({
+      id: "community-1",
+      name: "Comunidade Alto da Serra",
+      organization: ASSIGNED.community!.organization!,
+    });
+    vi.mocked(listProducers).mockResolvedValue([ASSIGNED]);
+
+    renderPlanDetail();
+    await expectPlanIsReadable();
+
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(
+        within(nav).getByRole("link", { name: "José da Silva" }),
+      ).toHaveAttribute("href", PRODUCER_HREF),
+    );
+    expect(breadcrumbHrefs(nav)).toEqual([
+      "/admin/organizacoes",
+      "/admin/organizacoes/org-1",
+      "/admin/organizacoes/org-1/comunidades/community-1",
+      PRODUCER_HREF,
+    ]);
+    expect(
+      within(nav).getByRole("link", { name: "Cooperativa Serra Azul" }),
+    ).toBeTruthy();
+    expect(
+      within(nav).getByRole("link", { name: "Comunidade Alto da Serra" }),
+    ).toBeTruthy();
+    expect(getCommunity).toHaveBeenCalledWith("community-1");
+    expect(listProducers).toHaveBeenCalledWith("community-1");
+    expect(getMyAssignedProducers).not.toHaveBeenCalled();
+  });
+
+  it("role desconhecida: nenhum link de breadcrumb", async () => {
+    renderPlanDetail();
+    await expectPlanIsReadable();
+
+    expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
   });
 });

@@ -39,6 +39,7 @@ import { withFocusMove } from "@/lib/focus";
 import { userFacingErrorHint, apiDomainMessage, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
+import { buildPlanBreadcrumb } from "@/lib/plan-breadcrumb";
 import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
 import {
   PLAN_STATUS_LABELS,
@@ -50,6 +51,7 @@ import {
   type ProductionPlan,
 } from "@/lib/production";
 import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
+import { getMyAssignedProducers } from "@/lib/technicians";
 
 import { DeletePlanDialog } from "./delete-plan-dialog";
 import { PlanFormDrawer } from "./plan-form-drawer";
@@ -213,6 +215,34 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   useEffect(() => {
     if (!guardPassed || currentRole === "FARMER") return;
     let active = true;
+
+    if (currentRole === "TECHNICIAN") {
+      // `GET /communities/{id}` e `GET /farmers` dão 403 para o técnico: o
+      // nome sai da lista dos agricultores atendidos por ele. O breadcrumb do
+      // técnico não mostra organização nem comunidade.
+      getMyAssignedProducers()
+        .then((producers) => {
+          if (!active) return;
+          const producer = producers.find((item) => item.id === producerId);
+          setNames({
+            organizationName: "Organização",
+            communityName: "Comunidade",
+            producerLabel: producerDisplayName(producer),
+          });
+        })
+        .catch(() => {
+          if (active) {
+            setNames({
+              organizationName: "Organização",
+              communityName: "Comunidade",
+              producerLabel: "Agricultor",
+            });
+          }
+        });
+      return () => {
+        active = false;
+      };
+    }
 
     Promise.all([getCommunity(communityId), listProducers(communityId)])
       .then(([community, producers]) => {
@@ -466,6 +496,11 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     return (
       <div className="flex flex-col gap-section">
         <div className="flex flex-col gap-section-sm">
+          {/* Mesma posição do espaço reservado ao breadcrumb na tela
+              principal, para o PageHeader não remontar. */}
+          {currentRole === null ? (
+            <div aria-hidden="true" className="h-5" />
+          ) : null}
           <PageHeader title="Planos de produção" titleId={PLANS_TITLE_ID} />
           <InlineAlert
             variant="destructive"
@@ -486,20 +521,24 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     // gap-section (24px); dentro do bloco dos planos: gap-section-sm (16px).
     <div className="flex flex-col gap-section">
       <div className="flex flex-col gap-section-sm">
-        {/* Figma 129:569: breadcrumb de 4 níveis acima do título. */}
+        {/* Figma 129:569: breadcrumb acima do título, com os níveis que o
+            papel pode abrir. Antes de a role ser lida, só a altura dele fica
+            reservada (sem níveis que depois sumiriam); o gap do bloco é o
+            mesmo do PageHeader entre breadcrumb e título. */}
+        {currentRole === null ? (
+          <div aria-hidden="true" className="h-5" />
+        ) : null}
         <PageHeader
-          breadcrumb={[
-            { label: "Organizações", href: "/admin/organizacoes" },
-            {
-              label: names?.organizationName ?? "Organização",
-              href: `/admin/organizacoes/${orgId}`,
+          breadcrumb={buildPlanBreadcrumb({
+            role: currentRole,
+            page: "plans",
+            ids: { orgId, communityId, producerId },
+            names: names && {
+              org: names.organizationName,
+              community: names.communityName,
+              producer: names.producerLabel,
             },
-            {
-              label: names?.communityName ?? "Comunidade",
-              href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
-            },
-            { label: names?.producerLabel ?? "Agricultor" },
-          ]}
+          })}
           title="Planos de produção"
           titleId={PLANS_TITLE_ID}
           description={`Planos de ${names?.producerLabel ?? "produção"}.`}
