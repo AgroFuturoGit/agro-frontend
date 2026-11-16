@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ClipboardList, Info, Sprout } from "lucide-react";
+import { ArrowRight, ClipboardList, Info } from "lucide-react";
 
 import {
   DashboardToolbar,
@@ -24,7 +24,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getFarmerSummary } from "@/lib/analytics";
-import { moveFocusTo, withFocusMove } from "@/lib/focus";
+import { withFocusMove } from "@/lib/focus";
 import { harvestText } from "@/lib/harvest-label";
 import { apiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -188,7 +188,8 @@ export function ReportsPage() {
     ? `/admin/organizacoes/${producer.community.organization.id}/comunidades/${producer.community.id}/produtores/${producer.id}`
     : null;
 
-  // Fica montado enquanto houver planos: é o alvo do foco do vazio filtrado.
+  // Cada opção vem de pelo menos um plano e a safra inicial só vale se algum
+  // plano for dela: com planos carregados, a lista filtrada nunca fica vazia.
   const toolbar = (
     <DashboardToolbar>
       <FilterSelect
@@ -245,26 +246,6 @@ export function ReportsPage() {
             : undefined
         }
       />
-    );
-  } else if (filtered.length === 0) {
-    body = (
-      <div className="flex flex-col gap-8">
-        {toolbar}
-        <EmptyState
-          variant="dashed"
-          icon={Sprout}
-          title="Nenhum plano nesta safra"
-          hint="Escolha outra safra ou veja todas as safras."
-          action={{
-            label: "Ver todas as safras",
-            // O botão some com a troca: o foco vai para o seletor.
-            onClick: () => {
-              moveFocusTo(HARVEST_FILTER_ID);
-              setHarvestFilter(ALL);
-            },
-          }}
-        />
-      </div>
     );
   } else {
     body = (
