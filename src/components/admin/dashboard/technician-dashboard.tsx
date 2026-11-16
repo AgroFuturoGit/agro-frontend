@@ -39,6 +39,7 @@ import {
 import { WarningCard } from "@/components/admin/dashboard/warning-card";
 import { DataTable } from "@/components/data-table/data-table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { PaginationBar } from "@/components/data-table/pagination-bar";
 import { ExportMenu } from "@/components/admin/dashboard/export-menu";
 import { EmptyState } from "@/components/admin/empty-state";
 import { KpiCard, KpiGrid } from "@/components/admin/kpi-card";
@@ -66,6 +67,7 @@ import { listCrops, type Crop } from "@/lib/crops";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { formatNumber, formatPlanDate } from "@/lib/production";
 import { getMyAssignedProducers } from "@/lib/technicians";
+import { CARD_PAGE_SIZE, usePagedItems } from "@/lib/use-paged-items";
 
 /** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
 const FILTER_FOCUS_ID = "tech-harvest";
@@ -295,6 +297,13 @@ export function TechnicianDashboard() {
     };
   }, []);
 
+  const warnings = useMemo(
+    () => sortWarnings(summary?.warnings ?? []),
+    [summary],
+  );
+  const pagedWarnings = usePagedItems(warnings, CARD_PAGE_SIZE);
+  const { reset: resetWarningsPage } = pagedWarnings;
+
   // Só a resposta da consulta mais recente vale.
   const requestSeq = useRef(0);
 
@@ -334,8 +343,10 @@ export function TechnicianDashboard() {
           setCommunityOptions(options);
           optionsKey.current = key;
           if (!options.some((o) => o.value === c)) {
-            // A comunidade não existe neste recorte: volta para "Todas".
+            // A comunidade não existe neste recorte: volta para "Todas"
+            // (troca de filtro: os cartões voltam para a página 1).
             setCommunityId(ALL);
+            resetWarningsPage();
             return;
           }
         }
@@ -359,18 +370,33 @@ export function TechnicianDashboard() {
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, []);
+  }, [resetWarningsPage]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(harvestId, communityId, cropId);
   }, [load, harvestId, communityId, cropId]);
 
+  // Trocar qualquer filtro volta os cartões de alerta para a página 1.
+  const changeHarvest = (next: string) => {
+    setHarvestId(next);
+    resetWarningsPage();
+  };
+  const changeCommunity = (next: string) => {
+    setCommunityId(next);
+    resetWarningsPage();
+  };
+  const changeCrop = (next: string) => {
+    setCropId(next);
+    resetWarningsPage();
+  };
+
   const hasFilters = harvestId !== CURRENT || communityId !== ALL || cropId !== ALL;
   const clearFilters = () => {
     setHarvestId(CURRENT);
     setCommunityId(ALL);
     setCropId(ALL);
+    resetWarningsPage();
   };
   // O botão some com a nova carga: o foco vai para o seletor de safra.
   const clearFiltersAndFocus = () => {
@@ -378,18 +404,13 @@ export function TechnicianDashboard() {
     clearFilters();
   };
 
-  const warnings = useMemo(
-    () => sortWarnings(summary?.warnings ?? []),
-    [summary],
-  );
-
   const filters = (
     <>
       <FilterSelect
         id={FILTER_FOCUS_ID}
         label="Safra"
         value={harvestId}
-        onChange={setHarvestId}
+        onChange={changeHarvest}
         options={[
           { value: CURRENT, label: "Safra vigente" },
           ...harvests.map((h) => ({ value: h.id, label: h.label })),
@@ -399,14 +420,14 @@ export function TechnicianDashboard() {
         id={COMMUNITY_FOCUS_ID}
         label="Comunidade"
         value={communityId}
-        onChange={setCommunityId}
+        onChange={changeCommunity}
         options={[{ value: ALL, label: "Todas" }, ...communityOptions]}
       />
       <FilterSelect
         id="tech-crop"
         label="Cultura"
         value={cropId}
-        onChange={setCropId}
+        onChange={changeCrop}
         options={[
           { value: ALL, label: "Todas" },
           ...crops.map((c) => ({ value: c.id, label: c.name })),
@@ -467,7 +488,7 @@ export function TechnicianDashboard() {
                   label: "Voltar para Todas",
                   onClick: () => {
                     moveFocusTo(COMMUNITY_FOCUS_ID);
-                    setCommunityId(ALL);
+                    changeCommunity(ALL);
                   },
                 },
               ]
@@ -553,11 +574,23 @@ export function TechnicianDashboard() {
                 <p>Nenhum alerta na carteira</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {warnings.map((w) => (
-                  <WarningCard key={w.planId} warning={w} href={planHref(paths, w)} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {pagedWarnings.pageItems.map((w) => (
+                    <WarningCard key={w.planId} warning={w} href={planHref(paths, w)} />
+                  ))}
+                </div>
+                {pagedWarnings.showPagination && (
+                  <PaginationBar
+                    pageIndex={pagedWarnings.pageIndex}
+                    pageCount={pagedWarnings.pageCount}
+                    total={pagedWarnings.total}
+                    pageSize={CARD_PAGE_SIZE}
+                    onPageChange={pagedWarnings.setPageIndex}
+                    label="Paginação dos alertas"
+                  />
+                )}
+              </>
             )}
           </section>
 

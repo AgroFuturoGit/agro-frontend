@@ -813,3 +813,138 @@ describe("TechnicianDashboard — revisão r1 do lote 5", () => {
     expect(screen.getAllByRole("list", { name: "Tipos de alerta" }).length).toBeGreaterThan(0);
   });
 });
+
+describe("TechnicianDashboard — paginação dos cartões de alerta", () => {
+  const manyWarnings = (n: number) =>
+    Array.from({ length: n }, (_, i) => warning(`p-${String(i + 1).padStart(2, "0")}`));
+  const alerts = async () => screen.findByRole("region", { name: /^Alertas/ });
+
+  it("10 alertas produzem 2 páginas (9 + 1)", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(
+      summary({ warnings: manyWarnings(10), totalWarningsCount: 10 }),
+    );
+    render(<TechnicianDashboard />);
+    const section = await alerts();
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
+    expect(within(section).getByRole("status").textContent).toBe("Exibindo 1–9 de 10");
+    expect(within(section).getByText("Página 1 de 2")).toBeTruthy();
+    // Nome próprio: não se confunde com a paginação da tabela de agricultores.
+    expect(within(section).getByRole("navigation", { name: "Paginação dos alertas" })).toBeTruthy();
+
+    fireEvent.click(within(section).getByRole("button", { name: "Próxima página" }));
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(1);
+    expect(within(section).getByRole("status").textContent).toBe("Exibindo 10–10 de 10");
+    expect(within(section).getByText("Página 2 de 2")).toBeTruthy();
+  });
+
+  const tenWarnings = () => summary({ warnings: manyWarnings(10), totalWarningsCount: 10 });
+  const alertsPager = (section: HTMLElement) =>
+    within(section).getByRole("navigation", { name: "Paginação dos alertas" });
+  /** Vai para a página 2 e confere que está nela. */
+  const goToPage2 = async () => {
+    const section = await alerts();
+    fireEvent.click(within(section).getByRole("button", { name: "Próxima página" }));
+    expect(within(section).getByText("Página 2 de 2")).toBeTruthy();
+  };
+  const expectPage1 = async () =>
+    waitFor(async () => {
+      const section = await alerts();
+      expect(within(section).getByText("Página 1 de 2")).toBeTruthy();
+      expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
+    });
+
+  it("na última página o foco vai para 'Página 2 de 2', não para o body", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(tenWarnings());
+    render(<TechnicianDashboard />);
+    const section = await alerts();
+    const next = within(section).getByRole("button", { name: "Próxima página" });
+    next.focus();
+    fireEvent.click(next);
+    const label = within(alertsPager(section)).getByText("Página 2 de 2", { exact: true });
+    expect((next as HTMLButtonElement).disabled).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(label);
+  });
+
+  it.each([
+    ["Safra", "Safra 2025", { harvestId: "h-old", communityId: undefined, cropId: undefined }],
+    ["Cultura", "Milho", { harvestId: undefined, communityId: undefined, cropId: "k-1" }],
+  ])("trocar %s volta para a página 1", async (filter, option, params) => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(tenWarnings());
+    render(<TechnicianDashboard />);
+    await goToPage2();
+
+    await choose(filter, option);
+    await waitFor(() => expect(getTechnicianSummary).toHaveBeenLastCalledWith(params));
+    await expectPage1();
+  });
+
+  it("'Limpar filtros' volta para a página 1", async () => {
+    vi.mocked(getTechnicianSummary).mockImplementation(async (p) =>
+      p?.cropId ? summary({ isEmpty: true, warnings: [], communities: [], farmers: [] }) : tenWarnings(),
+    );
+    render(<TechnicianDashboard />);
+    await goToPage2();
+
+    await choose("Cultura", "Feijão");
+    fireEvent.click(await screen.findByRole("button", { name: "Limpar filtros" }));
+    await waitFor(() =>
+      expect(getTechnicianSummary).toHaveBeenLastCalledWith({
+        harvestId: undefined,
+        communityId: undefined,
+        cropId: undefined,
+      }),
+    );
+    await expectPage1();
+  });
+
+  it("'Voltar para Todas' volta para a página 1", async () => {
+    vi.mocked(getTechnicianSummary).mockImplementation(async (p) => {
+      if (p?.communityId) {
+        throw new ApiError(403, "Comunidade não assistida pelo técnico logado.", null);
+      }
+      return tenWarnings();
+    });
+    render(<TechnicianDashboard />);
+    await goToPage2();
+
+    await choose("Comunidade", "Vale Verde");
+    await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "Voltar para Todas" }));
+    await expectPage1();
+  });
+
+  it("9 alertas ou menos ficam sem barra", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(
+      summary({ warnings: manyWarnings(9), totalWarningsCount: 9 }),
+    );
+    render(<TechnicianDashboard />);
+    const section = await alerts();
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
+    expect(within(section).queryByRole("navigation", { name: "Paginação dos alertas" })).toBeNull();
+  });
+
+  it("trocar a comunidade volta para a página 1", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(
+      summary({ warnings: manyWarnings(10), totalWarningsCount: 10 }),
+    );
+    render(<TechnicianDashboard />);
+    let section = await alerts();
+    fireEvent.click(within(section).getByRole("button", { name: "Próxima página" }));
+    expect(within(section).getByText("Página 2 de 2")).toBeTruthy();
+
+    await choose("Comunidade", "Vale Verde");
+    await waitFor(() =>
+      expect(getTechnicianSummary).toHaveBeenLastCalledWith({
+        harvestId: undefined,
+        communityId: "c-2",
+        cropId: undefined,
+      }),
+    );
+    await waitFor(async () => {
+      section = await alerts();
+      expect(within(section).getByText("Página 1 de 2")).toBeTruthy();
+    });
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
+  });
+});

@@ -97,6 +97,29 @@ describe("DataTablePagination — resumo e navegação", () => {
     expect(next.disabled).toBe(true);
   });
 
+  it("na última e na primeira página, o foco vai para 'Página A de B', não para o body", async () => {
+    const user = userEvent.setup();
+    render(<TestHost />);
+
+    const next = screen.getByRole("button", { name: "Próxima página" });
+    const previous = screen.getByRole("button", { name: "Página anterior" });
+    next.focus();
+    await user.keyboard("{Enter}"); // página 2: o foco fica em "Próxima"
+    expect(document.activeElement).toBe(next);
+    await user.keyboard("{Enter}"); // página 3 (última): "Próxima" desabilita
+
+    const lastLabel = screen.getByText("Página 3 de 3", { exact: true });
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(lastLabel);
+    expect(lastLabel.getAttribute("tabindex")).toBe("-1");
+
+    previous.focus();
+    await user.keyboard("{Enter}"); // página 2
+    await user.keyboard("{Enter}"); // página 1: "Página anterior" desabilita
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(screen.getByText("Página 1 de 3", { exact: true }));
+  });
+
   it("troca itens por página via Select e reflete o novo tamanho na paginação", async () => {
     render(<TestHost />);
 
