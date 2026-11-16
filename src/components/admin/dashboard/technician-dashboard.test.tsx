@@ -828,6 +828,8 @@ describe("TechnicianDashboard — paginação dos cartões de alerta", () => {
     expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
     expect(within(section).getByRole("status").textContent).toBe("Exibindo 1–9 de 10");
     expect(within(section).getByText("Página 1 de 2")).toBeTruthy();
+    // Nome próprio: não se confunde com a paginação da tabela de agricultores.
+    expect(within(section).getByRole("navigation", { name: "Paginação dos alertas" })).toBeTruthy();
 
     fireEvent.click(within(section).getByRole("button", { name: "Próxima página" }));
     expect(within(section).getAllByTestId("warning-card")).toHaveLength(1);
@@ -842,7 +844,7 @@ describe("TechnicianDashboard — paginação dos cartões de alerta", () => {
     render(<TechnicianDashboard />);
     const section = await alerts();
     expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
-    expect(within(section).queryByRole("navigation", { name: "Paginação" })).toBeNull();
+    expect(within(section).queryByRole("navigation", { name: "Paginação dos alertas" })).toBeNull();
   });
 
   it("trocar a comunidade volta para a página 1", async () => {

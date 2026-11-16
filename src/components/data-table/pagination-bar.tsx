@@ -30,6 +30,11 @@ type PaginationBarProps = {
   /** Com `onPageSizeChange`, mostra o seletor "Itens por página:". */
   pageSizeOptions?: number[];
   onPageSizeChange?: (pageSize: number) => void;
+  /**
+   * Nome acessível da `<nav>`. Dê um nome específico quando houver mais de
+   * uma paginação na mesma tela (ex.: "Paginação dos alertas").
+   */
+  label?: string;
 };
 
 /**
@@ -49,6 +54,7 @@ export function PaginationBar({
   onPageChange,
   pageSizeOptions,
   onPageSizeChange,
+  label = "Paginação",
 }: PaginationBarProps) {
   const perPageId = useId();
   const pageLabelRef = useRef<HTMLSpanElement>(null);
@@ -69,7 +75,7 @@ export function PaginationBar({
 
   return (
     <nav
-      aria-label="Paginação"
+      aria-label={label}
       className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-border bg-card px-6 py-4 text-sm text-muted-foreground"
     >
       <p role="status" aria-live="polite">

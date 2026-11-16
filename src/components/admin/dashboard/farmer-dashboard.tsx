@@ -398,6 +398,7 @@ export function FarmerDashboard() {
                 total={plans.total}
                 pageSize={CARD_PAGE_SIZE}
                 onPageChange={plans.setPageIndex}
+                label="Paginação dos planos"
               />
             )}
           </section>

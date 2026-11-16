@@ -355,7 +355,7 @@ describe("FarmerDashboard — revisão r1 do lote 5", () => {
 describe("FarmerDashboard — paginação dos cartões de plano", () => {
   const manyCards = (n: number) =>
     Array.from({ length: n }, (_, i) => card(`p-${String(i + 1).padStart(2, "0")}`, "ON_TRACK"));
-  const pager = () => screen.queryByRole("navigation", { name: "Paginação" });
+  const pager = () => screen.queryByRole("navigation", { name: "Paginação dos planos" });
 
   it("10 planos produzem 2 páginas (9 + 1)", async () => {
     vi.mocked(getFarmerSummary).mockResolvedValue({ ...SUMMARY, plans: manyCards(10) });

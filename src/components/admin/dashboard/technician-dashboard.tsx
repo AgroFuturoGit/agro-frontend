@@ -585,6 +585,7 @@ export function TechnicianDashboard() {
                     total={pagedWarnings.total}
                     pageSize={CARD_PAGE_SIZE}
                     onPageChange={pagedWarnings.setPageIndex}
+                    label="Paginação dos alertas"
                   />
                 )}
               </>
