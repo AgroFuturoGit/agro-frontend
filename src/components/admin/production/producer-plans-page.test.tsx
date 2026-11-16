@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 
 import { ProducerPlansPage } from "@/components/admin/production/producer-plans-page";
 import { ApiError } from "@/lib/api";
@@ -13,6 +20,7 @@ import {
   type ProductionPlan,
 } from "@/lib/production";
 import type { Organization } from "@/lib/organizations";
+import { getMyAssignedProducers } from "@/lib/technicians";
 import { resetNavigationMock, router } from "@/test/next-navigation";
 
 vi.mock("next/navigation", async () => {
@@ -32,6 +40,14 @@ vi.mock("@/lib/producers", async () => {
   const actual =
     await vi.importActual<typeof import("@/lib/producers")>("@/lib/producers");
   return { ...actual, getMyProducer: vi.fn(), listProducers: vi.fn() };
+});
+
+vi.mock("@/lib/technicians", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/technicians")>(
+      "@/lib/technicians",
+    );
+  return { ...actual, getMyAssignedProducers: vi.fn() };
 });
 
 vi.mock("@/lib/production", async () => {
@@ -166,6 +182,10 @@ beforeEach(() => {
   vi.mocked(getMyProducer).mockResolvedValue(MY_PRODUCER);
   vi.mocked(getCommunity).mockResolvedValue(COMMUNITY);
   vi.mocked(listProducers).mockResolvedValue([MY_PRODUCER, OTHER_PRODUCER]);
+  vi.mocked(getMyAssignedProducers).mockResolvedValue([
+    OTHER_PRODUCER,
+    MY_PRODUCER,
+  ]);
   vi.mocked(listProductionPlans).mockResolvedValue([]);
   vi.mocked(listFamilyMembers).mockResolvedValue([]);
   vi.mocked(listFinancings).mockResolvedValue([]);
@@ -500,5 +520,149 @@ describe("ProducerPlansPage — seções de dados sociais (UNIT-002 / UNIT-007)"
     await waitFor(() => expect(router.replace).toHaveBeenCalled());
     expect(listFamilyMembers).not.toHaveBeenCalled();
     expect(listFinancings).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * RF2/D4: o breadcrumb só traz níveis que o papel pode abrir. Para o
+ * TECHNICIAN, `GET /communities/{id}` e `GET /farmers` dão 403 no back: o
+ * nome do agricultor vem de `GET /technicians/me/farmers`.
+ */
+describe("ProducerPlansPage — breadcrumb por papel (RF2)", () => {
+  function breadcrumbHrefs(nav: HTMLElement) {
+    return within(nav)
+      .queryAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+  }
+
+  it("TECHNICIAN: não chama getCommunity nem listProducers e mostra o nome vindo de /technicians/me/farmers", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(within(nav).getByText("José da Silva", { exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      ),
+    );
+    expect(
+      within(nav).getByRole("link", { name: "Agricultores atendidos" }),
+    ).toHaveAttribute("href", "/admin/organizacoes");
+    expect(breadcrumbHrefs(nav)).toEqual(["/admin/organizacoes"]);
+    expect(screen.getByText("Planos de José da Silva.")).toBeTruthy();
+
+    expect(getMyAssignedProducers).toHaveBeenCalledTimes(1);
+    expect(getCommunity).not.toHaveBeenCalled();
+    expect(listProducers).not.toHaveBeenCalled();
+  });
+
+  it("TECHNICIAN: se /technicians/me/farmers falhar, cai no rótulo 'Agricultor' sem chamar as rotas proibidas", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(getMyAssignedProducers).mockRejectedValue(
+      new ApiError(403, "Forbidden", null),
+    );
+
+    renderPage();
+
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(within(nav).getByText("Agricultor", { exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      ),
+    );
+    expect(breadcrumbHrefs(nav)).toEqual(["/admin/organizacoes"]);
+    expect(getCommunity).not.toHaveBeenCalled();
+    expect(listProducers).not.toHaveBeenCalled();
+  });
+
+  it("TECHNICIAN: agricultor fora da lista de atendidos cai no rótulo 'Agricultor'", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(getMyAssignedProducers).mockResolvedValue([OTHER_PRODUCER]);
+
+    renderPage();
+
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(within(nav).getByText("Agricultor", { exact: true })).toBeTruthy(),
+    );
+    expect(within(nav).queryByText("Bruno do Vale")).toBeNull();
+  });
+
+  it("FARMER: a página de planos não tem breadcrumb", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(screen.getByText("Planos de José da Silva.")).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
+    expect(getMyAssignedProducers).not.toHaveBeenCalled();
+    expect(getCommunity).not.toHaveBeenCalled();
+    expect(listProducers).not.toHaveBeenCalled();
+  });
+
+  it("MANAGER: breadcrumb completo, como antes (organização e comunidade com link)", async () => {
+    loginAs("MANAGER");
+
+    renderPage();
+
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(
+        within(nav).getByRole("link", { name: "Cooperativa Serra Azul" }),
+      ).toBeTruthy(),
+    );
+    expect(breadcrumbHrefs(nav)).toEqual([
+      "/admin/organizacoes",
+      "/admin/organizacoes/org-1",
+      "/admin/organizacoes/org-1/comunidades/community-1",
+    ]);
+    expect(within(nav).getByText("José da Silva", { exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(getCommunity).toHaveBeenCalledWith("community-1");
+    expect(listProducers).toHaveBeenCalledWith("community-1");
+    expect(getMyAssignedProducers).not.toHaveBeenCalled();
+  });
+
+  it("ADMIN: breadcrumb completo, como o MANAGER, sem chamar /technicians/me/farmers", async () => {
+    loginAs("ADMIN");
+
+    renderPage();
+
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(
+        within(nav).getByRole("link", { name: "Cooperativa Serra Azul" }),
+      ).toBeTruthy(),
+    );
+    expect(breadcrumbHrefs(nav)).toEqual([
+      "/admin/organizacoes",
+      "/admin/organizacoes/org-1",
+      "/admin/organizacoes/org-1/comunidades/community-1",
+    ]);
+    expect(
+      within(nav).getByRole("link", { name: "Comunidade Alto da Serra" }),
+    ).toBeTruthy();
+    expect(within(nav).getByText("José da Silva", { exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(getMyAssignedProducers).not.toHaveBeenCalled();
+  });
+
+  it("role desconhecida: nenhum link de breadcrumb", async () => {
+    renderPage();
+
+    expect(
+      await screen.findByText("Nenhum plano de produção cadastrado ainda."),
+    ).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
   });
 });

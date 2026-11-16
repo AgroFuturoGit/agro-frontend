@@ -500,10 +500,14 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     // `hasRole('MANAGER') or hasRole('ADMIN')` no backend real — o
     // breadcrumb da página de planos precisa tolerar o 403 e cair em
     // rótulos genéricos, sem impedir a listagem de planos de carregar.
+    // Desde o RF2 a tela nem as chama para o técnico.
+    const forbiddenRequests: string[] = [];
     await page.route(`**/communities/${COMMUNITY.id}`, async (route) => {
+      forbiddenRequests.push(route.request().url());
       await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
     });
     await page.route("**/farmers?*", async (route) => {
+      forbiddenRequests.push(route.request().url());
       await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
     });
 
@@ -516,9 +520,68 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
       ),
     );
     await expect(page.getByRole("cell", { name: /^Café — Catuaí/ })).toBeVisible();
+
+    // RF2: "Agricultores atendidos" > agricultor (página atual), e nenhuma
+    // chamada às rotas que dão 403 para o técnico.
+    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
+    await expect(
+      breadcrumb.getByRole("link", { name: "Agricultores atendidos", exact: true }),
+    ).toHaveAttribute("href", "/admin/organizacoes");
+    await expect(
+      breadcrumb.getByText(PRODUCER.fullName, { exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(breadcrumb.getByRole("link")).toHaveCount(1);
+    expect(forbiddenRequests).toEqual([]);
   });
 
-  test("FARMER acessando /admin/organizacoes cai direto nos próprios planos, com breadcrumb real", async ({
+  test("TECHNICIAN no detalhe do plano: breadcrumb só com 'Agricultores atendidos' > agricultor > plano, sem link para organização ou comunidade (RF2)", async ({
+    page,
+  }) => {
+    await loginAs(page, "TECHNICIAN", TECHNICIAN_USER);
+    await mockMyAssignedProducers(page);
+    await mockPlanDetail(page);
+    // `GET /communities/{id}` e `GET /farmers` dão 403 para o técnico no back
+    // real: a tela não pode chamá-las.
+    const forbiddenRequests: string[] = [];
+    await page.route(`**/communities/${COMMUNITY.id}`, async (route) => {
+      forbiddenRequests.push(route.request().url());
+      await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
+    });
+    await page.route("**/farmers?*", async (route) => {
+      forbiddenRequests.push(route.request().url());
+      await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
+    });
+
+    const producerPath = `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY.id}/produtores/${PRODUCER.id}`;
+    await page.goto(`${producerPath}/planos/${PLAN.id}`);
+
+    await expect(page.getByRole("heading", { name: "Café — Catuaí", exact: true })).toBeVisible();
+    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
+    await expect(
+      breadcrumb.getByRole("link", { name: "Agricultores atendidos", exact: true }),
+    ).toHaveAttribute("href", "/admin/organizacoes");
+    await expect(
+      breadcrumb.getByRole("link", { name: PRODUCER.fullName, exact: true }),
+    ).toHaveAttribute("href", producerPath);
+
+    const hrefs = await breadcrumb
+      .getByRole("link")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+    expect(hrefs).toEqual(["/admin/organizacoes", producerPath]);
+    for (const href of hrefs) {
+      expect(href).not.toMatch(/\/organizacoes\/[^/]+$/);
+      expect(href).not.toMatch(/\/comunidades\/[^/]+$/);
+    }
+    await expect(
+      breadcrumb.getByRole("link", { name: ORGANIZATION.name, exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      breadcrumb.getByRole("link", { name: COMMUNITY.name, exact: true }),
+    ).toHaveCount(0);
+    expect(forbiddenRequests).toEqual([]);
+  });
+
+  test("FARMER acessando /admin/organizacoes cai direto nos próprios planos, sem breadcrumb (RF2)", async ({
     page,
   }) => {
     await loginAs(page, "FARMER", PRODUCER_USER);
@@ -535,11 +598,17 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     );
     await expect(page.getByRole("cell", { name: /^Café — Catuaí/ })).toBeVisible();
 
-    await expectBreadcrumbContains(page, [
-      "Organizações",
-      ORGANIZATION.name,
-      COMMUNITY.name,
-    ]);
+    // RF2/D4: na página de planos, o agricultor não tem breadcrumb (os níveis
+    // de organização e comunidade não abrem para ele). "Novo plano" só
+    // aparece depois de a role ser lida e a guarda passar: a asserção
+    // negativa abaixo não passa antes da hora.
+    await expect(
+      page.getByRole("heading", { name: "Planos de produção", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Novo plano", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveCount(0);
   });
 
   test("estados vazios: organização sem comunidades, comunidade sem produtores e produtor sem planos mostram mensagem de vazio (não erro)", async ({

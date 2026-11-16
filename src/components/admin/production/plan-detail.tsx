@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Check,
   FileQuestion,
@@ -45,7 +51,9 @@ import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { unitLabel } from "@/lib/crops";
+import { buildPlanBreadcrumb } from "@/lib/plan-breadcrumb";
 import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
+import { getMyAssignedProducers } from "@/lib/technicians";
 import {
   PLAN_STATUS_LABELS,
   formatNumber,
@@ -80,9 +88,10 @@ type Props = {
   planId: string;
 };
 
+/** Organização e comunidade ficam ausentes quando o papel não as exibe (TECHNICIAN). */
 type BreadcrumbNames = {
-  organizationName: string;
-  communityName: string;
+  organizationName?: string;
+  communityName?: string;
   producerLabel: string;
 };
 
@@ -227,17 +236,20 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     pageSize: 10,
   });
 
-  useEffect(() => {
+  // Layout effect: a role é lida antes da primeira pintura (breadcrumb sem
+  // o frame com a role nula). Até lá, nada de escrita renderiza (RN4).
+  useLayoutEffect(() => {
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
   // Resolução dos nomes do breadcrumb — best-effort e independente dos 3 GET
   // principais da tela (que já são liberados às 4 roles). FARMER usa
-  // `GET /farmers/me` (já traz comunidade+organização aninhadas); as
-  // demais roles usam `GET /communities/{id}` + `GET /farmers`, ambos
-  // `hasRole('MANAGER') or hasRole('ADMIN')` no backend — se recusarem (ex.
-  // TECHNICIAN), o breadcrumb cai em rótulos genéricos sem bloquear o resto
-  // da tela.
+  // `GET /farmers/me` (já traz comunidade+organização aninhadas);
+  // MANAGER e ADMIN usam `GET /communities/{id}` + `GET /farmers`, ambos
+  // `hasRole('MANAGER') or hasRole('ADMIN')` no backend — se essas chamadas
+  // falharem, o breadcrumb cai em rótulos genéricos sem bloquear o resto da
+  // tela. TECHNICIAN não chama essas duas rotas (403 para ele): o nome do
+  // agricultor sai de `GET /technicians/me/farmers`.
   useEffect(() => {
     if (currentRole === null) return;
     let active = true;
@@ -254,6 +266,14 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             producerLabel:
               producerDisplayName(producer),
           });
+          return;
+        }
+
+        if (currentRole === "TECHNICIAN") {
+          const assigned = await getMyAssignedProducers();
+          if (!active) return;
+          const producer = assigned.find((item) => item.id === producerId);
+          setNames({ producerLabel: producerDisplayName(producer) });
           return;
         }
 
@@ -639,31 +659,34 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     // Entre blocos maiores (cabeçalho → resumo → gráfico → apontamentos):
     // gap-section (24px), como no Figma 156:29.
     <div className="flex flex-col gap-section">
-      {/* Figma 156:29: breadcrumb com ">" + "← Voltar para planos" + título. */}
-      <PageHeader
-        breadcrumb={[
-          { label: "Organizações", href: "/admin/organizacoes" },
-          {
-            label: names?.organizationName ?? "Organização",
-            href: `/admin/organizacoes/${orgId}`,
-          },
-          {
-            label: names?.communityName ?? "Comunidade",
-            href: `/admin/organizacoes/${orgId}/comunidades/${communityId}`,
-          },
-          {
-            label: names?.producerLabel ?? "Agricultor",
-            href: backToPlansHref,
-          },
-          { label: planTitle },
-        ]}
-        back={{ href: backToPlansHref, label: "Voltar para planos" }}
-        loading={loading}
-        // O <h2> fica montado no loading: alvo do "Tentar novamente".
-        titleId={PLAN_TITLE_ID}
-        title={planTitle}
-        description={plan ? <PlanMeta plan={plan} /> : undefined}
-      />
+      {/* Figma 156:29: breadcrumb com ">" + "← Voltar para planos" + título.
+          O breadcrumb só traz os níveis que o papel pode abrir. Antes de a
+          role ser lida, só a altura dele fica reservada (sem níveis que
+          depois sumiriam), com o mesmo gap-4 do PageHeader. */}
+      <div className="flex flex-col gap-4">
+        {currentRole === null ? (
+          <div aria-hidden="true" className="h-5" />
+        ) : null}
+        <PageHeader
+          breadcrumb={buildPlanBreadcrumb({
+            role: currentRole,
+            page: "detail",
+            ids: { orgId, communityId, producerId },
+            names: {
+              org: names?.organizationName,
+              community: names?.communityName,
+              producer: names?.producerLabel,
+              plan: planTitle,
+            },
+          })}
+          back={{ href: backToPlansHref, label: "Voltar para planos" }}
+          loading={loading}
+          // O <h2> fica montado no loading: alvo do "Tentar novamente".
+          titleId={PLAN_TITLE_ID}
+          title={planTitle}
+          description={plan ? <PlanMeta plan={plan} /> : undefined}
+        />
+      </div>
 
       {/* O role="alert" do InlineAlert já anuncia: sem aria-live em volta. */}
       {error && (
