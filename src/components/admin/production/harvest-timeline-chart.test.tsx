@@ -130,6 +130,18 @@ async function renderChart(
   return utils;
 }
 
+/**
+ * Option aplicada ao gráfico. O skeleton sumir não garante que o `setOption`
+ * já rodou (o rótulo também some no vazio e no erro): espera a chamada antes
+ * de ler, em vez de presumir `mock.calls[0]` (falha intermitente na suíte).
+ */
+async function appliedOption() {
+  await waitFor(() => expect(chart.setOption).toHaveBeenCalled());
+  return chart.setOption.mock.calls.at(-1)![0];
+}
+
+const seriesNames = (option: { series: { name: string }[] }) => option.series.map((s) => s.name);
+
 describe("ContinuousHarvestChart", () => {
   it("UNIT-007: abre em WEEK chamando o endpoint e o alternador refaz a chamada com MONTH", async () => {
     await renderChart();
@@ -195,7 +207,7 @@ describe("ContinuousHarvestChart", () => {
       screen.getByText("Defina o início e o fim previstos da colheita para ver a curva prevista."),
     ).toBeInTheDocument();
     expect(screen.getByRole("img")).toHaveAttribute("data-has-window", "false");
-    expect(chart.setOption.mock.calls[0][0].series.map((s: { name: string }) => s.name)).not.toContain("Previsto");
+    expect(seriesNames(await appliedOption())).not.toContain("Previsto");
     unmount();
 
     vi.mocked(getHarvestTimeline).mockResolvedValue(timeline({ points: [] }));
@@ -208,7 +220,7 @@ describe("ContinuousHarvestChart", () => {
 
   it("UNIT-007: com janela válida e meta > 0 a curva prevista aparece", async () => {
     await renderChart();
-    expect(chart.setOption.mock.calls[0][0].series.map((s: { name: string }) => s.name)).toContain("Previsto");
+    expect(seriesNames(await appliedOption())).toContain("Previsto");
     expect(screen.getByRole("img")).toHaveAttribute("data-has-window", "true");
   });
 
@@ -272,7 +284,7 @@ describe("ContinuousHarvestChart", () => {
     expect(echarts.init).toHaveBeenCalledTimes(1);
     expect(echarts.init.mock.calls[0][2]).toEqual({ renderer: "canvas" });
     expect(chart.setOption).toHaveBeenCalledTimes(1);
-    expect(chart.setOption.mock.calls[0][0].xAxis.data).toHaveLength(9);
+    expect((await appliedOption()).xAxis.data).toHaveLength(9);
 
     vi.mocked(getHarvestTimeline).mockResolvedValue(timeline({ granularity: "MONTH", points: weeks(2) }));
     fireEvent.click(screen.getByRole("button", { name: "Mês" }));
