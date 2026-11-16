@@ -351,3 +351,44 @@ describe("FarmerDashboard — revisão r1 do lote 5", () => {
     expect(alert.textContent).toContain("Não foi possível carregar o resumo da sua safra.");
   });
 });
+
+describe("FarmerDashboard — paginação dos cartões de plano", () => {
+  const manyCards = (n: number) =>
+    Array.from({ length: n }, (_, i) => card(`p-${String(i + 1).padStart(2, "0")}`, "ON_TRACK"));
+  const pager = () => screen.queryByRole("navigation", { name: "Paginação" });
+
+  it("10 planos produzem 2 páginas (9 + 1)", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({ ...SUMMARY, plans: manyCards(10) });
+    render(<FarmerDashboard />);
+    expect(await screen.findAllByTestId("farmer-plan-card")).toHaveLength(9);
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 1–9 de 10");
+    expect(screen.getByText("Página 1 de 2")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(screen.getAllByTestId("farmer-plan-card")).toHaveLength(1);
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 10–10 de 10");
+    expect(screen.getByText("Página 2 de 2")).toBeTruthy();
+  });
+
+  it("9 planos ou menos ficam sem barra", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({ ...SUMMARY, plans: manyCards(9) });
+    render(<FarmerDashboard />);
+    expect(await screen.findAllByTestId("farmer-plan-card")).toHaveLength(9);
+    expect(pager()).toBeNull();
+  });
+
+  it("trocar a safra volta para a página 1", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({ ...SUMMARY, plans: manyCards(10) });
+    render(<FarmerDashboard />);
+    await screen.findAllByTestId("farmer-plan-card");
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(screen.getByText("Página 2 de 2")).toBeTruthy();
+
+    await waitFor(() => expect(listHarvests).toHaveBeenCalled());
+    await chooseHarvest("Safra 2025");
+    await waitFor(() => expect(getFarmerSummary).toHaveBeenLastCalledWith("h-0"));
+    expect(await screen.findByText("Página 1 de 2")).toBeTruthy();
+    expect(screen.getAllByTestId("farmer-plan-card")).toHaveLength(9);
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 1–9 de 10");
+  });
+});

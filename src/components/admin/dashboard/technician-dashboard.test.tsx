@@ -813,3 +813,59 @@ describe("TechnicianDashboard — revisão r1 do lote 5", () => {
     expect(screen.getAllByRole("list", { name: "Tipos de alerta" }).length).toBeGreaterThan(0);
   });
 });
+
+describe("TechnicianDashboard — paginação dos cartões de alerta", () => {
+  const manyWarnings = (n: number) =>
+    Array.from({ length: n }, (_, i) => warning(`p-${String(i + 1).padStart(2, "0")}`));
+  const alerts = async () => screen.findByRole("region", { name: /^Alertas/ });
+
+  it("10 alertas produzem 2 páginas (9 + 1)", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(
+      summary({ warnings: manyWarnings(10), totalWarningsCount: 10 }),
+    );
+    render(<TechnicianDashboard />);
+    const section = await alerts();
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
+    expect(within(section).getByRole("status").textContent).toBe("Exibindo 1–9 de 10");
+    expect(within(section).getByText("Página 1 de 2")).toBeTruthy();
+
+    fireEvent.click(within(section).getByRole("button", { name: "Próxima página" }));
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(1);
+    expect(within(section).getByRole("status").textContent).toBe("Exibindo 10–10 de 10");
+    expect(within(section).getByText("Página 2 de 2")).toBeTruthy();
+  });
+
+  it("9 alertas ou menos ficam sem barra", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(
+      summary({ warnings: manyWarnings(9), totalWarningsCount: 9 }),
+    );
+    render(<TechnicianDashboard />);
+    const section = await alerts();
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
+    expect(within(section).queryByRole("navigation", { name: "Paginação" })).toBeNull();
+  });
+
+  it("trocar a comunidade volta para a página 1", async () => {
+    vi.mocked(getTechnicianSummary).mockResolvedValue(
+      summary({ warnings: manyWarnings(10), totalWarningsCount: 10 }),
+    );
+    render(<TechnicianDashboard />);
+    let section = await alerts();
+    fireEvent.click(within(section).getByRole("button", { name: "Próxima página" }));
+    expect(within(section).getByText("Página 2 de 2")).toBeTruthy();
+
+    await choose("Comunidade", "Vale Verde");
+    await waitFor(() =>
+      expect(getTechnicianSummary).toHaveBeenLastCalledWith({
+        harvestId: undefined,
+        communityId: "c-2",
+        cropId: undefined,
+      }),
+    );
+    await waitFor(async () => {
+      section = await alerts();
+      expect(within(section).getByText("Página 1 de 2")).toBeTruthy();
+    });
+    expect(within(section).getAllByTestId("warning-card")).toHaveLength(9);
+  });
+});

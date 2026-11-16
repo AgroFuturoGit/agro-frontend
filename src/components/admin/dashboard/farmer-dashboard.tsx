@@ -23,6 +23,7 @@ import {
   FilterSelect,
 } from "@/components/admin/dashboard/dashboard-toolbar";
 import { ExportMenu } from "@/components/admin/dashboard/export-menu";
+import { PaginationBar } from "@/components/data-table/pagination-bar";
 import { EmptyState } from "@/components/admin/empty-state";
 import { KpiCard, KpiGrid } from "@/components/admin/kpi-card";
 import { SectionHeader } from "@/components/admin/section-header";
@@ -49,6 +50,7 @@ import { harvestText } from "@/lib/harvest-label";
 import { FOCUS_RING_LINK, moveFocusTo } from "@/lib/focus";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { getMyProducer } from "@/lib/producers";
+import { CARD_PAGE_SIZE, usePagedItems } from "@/lib/use-paged-items";
 import {
   formatNumber,
   formatPlanDate,
@@ -179,6 +181,8 @@ function PlanCard({ card, href }: { card: FarmerPlanCard; href: string | null })
   );
 }
 
+const NO_PLANS: FarmerPlanCard[] = [];
+
 /**
  * Visão geral do agricultor (Feature 6.1): números de
  * `GET /analytics/farmers/me/summary`, sem recalcular nada no front.
@@ -190,6 +194,16 @@ export function FarmerDashboard() {
   const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [harvestId, setHarvestId] = useState<string>(CURRENT);
   const [paths, setPaths] = useState<Paths>(null);
+  const plans = usePagedItems(summary?.plans ?? NO_PLANS, CARD_PAGE_SIZE);
+  const { reset: resetPlansPage } = plans;
+  // Trocar a safra volta os cartões para a página 1.
+  const changeHarvest = useCallback(
+    (next: string) => {
+      setHarvestId(next);
+      resetPlansPage();
+    },
+    [resetPlansPage],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -250,7 +264,7 @@ export function FarmerDashboard() {
       id={FILTER_FOCUS_ID}
       label="Safra"
       value={harvestId}
-      onChange={setHarvestId}
+      onChange={changeHarvest}
       options={[
         { value: CURRENT, label: "Safra vigente" },
         ...harvests.map((h) => ({ value: h.id, label: h.label })),
@@ -320,7 +334,7 @@ export function FarmerDashboard() {
               label: "Voltar para a safra vigente",
               onClick: () => {
                 moveFocusTo(FILTER_FOCUS_ID);
-                setHarvestId(CURRENT);
+                changeHarvest(CURRENT);
               },
             }}
           />
@@ -369,7 +383,7 @@ export function FarmerDashboard() {
           <section className="flex min-w-0 flex-col gap-4" aria-labelledby="farmer-plans">
             <SectionHeader id="farmer-plans" title="Meus planos de produção" />
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {summary.plans.map((card) => (
+              {plans.pageItems.map((card) => (
                 <PlanCard
                   key={card.planId}
                   card={card}
@@ -377,6 +391,15 @@ export function FarmerDashboard() {
                 />
               ))}
             </div>
+            {plans.showPagination && (
+              <PaginationBar
+                pageIndex={plans.pageIndex}
+                pageCount={plans.pageCount}
+                total={plans.total}
+                pageSize={CARD_PAGE_SIZE}
+                onPageChange={plans.setPageIndex}
+              />
+            )}
           </section>
         </div>
       );
