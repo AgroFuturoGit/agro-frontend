@@ -29,7 +29,7 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { userFacingErrorHint, apiDomainMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
@@ -111,7 +111,7 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         } catch (err) {
           setOrganization(null);
           setCommunities([]);
-          const hint = apiErrorMessage(err, "");
+          const hint = apiDomainMessage(err);
           setError(
             hint
               ? `Não foi possível identificar a sua organização: ${hint}`
@@ -145,10 +145,7 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
     } catch (err) {
       setOrganization(null);
       setCommunities([]);
-      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
-      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
-      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
-      setError(apiErrorMessage(err, ""));
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }

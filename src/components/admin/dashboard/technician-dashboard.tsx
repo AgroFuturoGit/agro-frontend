@@ -67,7 +67,6 @@ import { listHarvests, type Harvest } from "@/lib/harvests";
 import { formatNumber, formatPlanDate } from "@/lib/production";
 import { getMyAssignedProducers } from "@/lib/technicians";
 
-
 /** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
 const FILTER_FOCUS_ID = "tech-harvest";
 /** "Voltar para Todas" muda a Comunidade: o foco vai para esse seletor (UX-L6-05). */
@@ -76,7 +75,6 @@ const ALL = "__all__";
 const CURRENT = "__current__";
 
 type Paths = Record<string, { org: string; community: string }>;
-
 
 const LOAD_ERROR = "Não foi possível carregar o resumo da carteira.";
 

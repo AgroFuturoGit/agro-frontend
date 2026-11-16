@@ -109,6 +109,15 @@ describe("FinancingSection — leitura (UNIT-003)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(await screen.findByText("PRONAF Custeio")).toBeInTheDocument();
   });
+
+  it("G-2: 'Erro 500' cru cai no texto padrão, sem frase duplicada", async () => {
+    vi.mocked(listFinancings).mockRejectedValueOnce(new ApiError(500, "Erro 500", null));
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.textContent?.match(/Tente novamente em/g)).toHaveLength(1);
+    expect(alert.textContent?.match(/Não foi possível/g)).toHaveLength(1);
+  });
 });
 
 describe("FinancingSection — RBAC (UNIT-004)", () => {

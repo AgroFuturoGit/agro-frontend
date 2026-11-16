@@ -48,7 +48,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiDomainMessage, apiErrorMessage } from "@/lib/api";
 import {
   FINANCING_STATUSES,
   FINANCING_STATUS_LABELS,
@@ -136,10 +136,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
     try {
       setItems(await listFinancings(farmerId));
     } catch (err) {
-      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
-      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
-      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
-      setError(apiErrorMessage(err, ""));
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }

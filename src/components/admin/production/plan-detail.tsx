@@ -93,10 +93,16 @@ const columnHelper = createColumnHelper<ProductionExecution>();
  * lista de botões e no comando de voz (A11Y-L4-4, A11Y-L6-7), sempre DEPOIS
  * do texto visível ("Validar apontamento de 05/03/2026"), por causa do 2.5.3.
  */
-function executionActionLabel(action: string, execution: ProductionExecution) {
+function executionActionLabel(
+  action: string,
+  execution: ProductionExecution,
+  quantityText: string,
+) {
+  // Sem data, a quantidade (que a linha também mostra) diferencia os
+  // apontamentos, para não repetir o mesmo nome em várias linhas.
   return execution.harvestedAt
     ? `${action} de ${formatPlanDate(execution.harvestedAt)}`
-    : action;
+    : `${action} de ${quantityText} (sem data)`;
 }
 
 /** `id` do título da página: alvo do foco do "Tentar novamente" (A11Y-L6-5). */
@@ -363,7 +369,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   const rowActions = useCallback(
     (execution: ProductionExecution): DataTableRowAction[] => {
       // "Editar apontamento de 05/03/2026" (A11Y-L4-4).
-      const named = (action: string) => executionActionLabel(action, execution);
+      const named = (action: string) =>
+        executionActionLabel(action, execution, formatQuantity(execution.quantity));
       const actions: DataTableRowAction[] = [
         {
           label: named("Ocorrências do apontamento"),
@@ -415,7 +422,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       return actions;
     },
-    [canDelete, currentRole],
+    [canDelete, currentRole, formatQuantity],
   );
 
   const columns = useMemo(() => {
@@ -506,7 +513,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     const decide = canDecideExecution(currentRole, execution);
     // Mesmos nomes do desktop, com a data (A11Y-L6-7); o texto visível do
     // botão abre o nome (2.5.3).
-    const named = (action: string) => executionActionLabel(action, execution);
+    const named = (action: string) =>
+      executionActionLabel(action, execution, formatQuantity(execution.quantity));
     return (
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3">

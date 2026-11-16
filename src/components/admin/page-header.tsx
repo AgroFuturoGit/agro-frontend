@@ -74,11 +74,7 @@ export function PageHeader({
                   {loading ? (
                     <>
                       {/* <span> (não o <div> do Skeleton): conteúdo de heading. */}
-                      <span
-                        aria-hidden="true"
-                        data-slot="skeleton"
-                        className="block h-9 w-64 max-w-full animate-pulse rounded-md bg-muted"
-                      />
+                      <Skeleton as="span" aria-hidden="true" className="block h-9 w-64 max-w-full" />
                       <span className="sr-only">Carregando…</span>
                     </>
                   ) : (

@@ -138,6 +138,17 @@ describe("FarmerDashboard (UNIT-003..006)", () => {
     expect(screen.queryByText(/Safra: /)).toBeNull();
   });
 
+  it("G-4: safra sem rótulo aparece como 'Safra —' na toolbar", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({
+      ...SUMMARY,
+      currentHarvest: { ...SUMMARY.currentHarvest!, label: "" },
+    });
+    render(<FarmerDashboard />);
+
+    await screen.findAllByTestId("farmer-plan-card");
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe("Safra —");
+  });
+
   it("UNIT-004: cartão com barra limitada a 100%, número real, rótulo e cor por status, e link", async () => {
     render(<FarmerDashboard />);
     const cards = await screen.findAllByTestId("farmer-plan-card");

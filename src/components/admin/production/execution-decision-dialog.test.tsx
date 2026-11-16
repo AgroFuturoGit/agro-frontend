@@ -144,5 +144,9 @@ describe("ExecutionDecisionDialog — userFacingErrorHint (lote 4)", () => {
     expect(alert.textContent).toContain(text);
     expect(alert.textContent).not.toContain("Erro 500");
     expect(alert.getAttribute("data-slot")).toBe("inline-alert");
+    // G-2: o próximo passo vem uma vez só, sem frase duplicada.
+    expect(alert.textContent).toContain(`${text} Tente novamente em alguns instantes.`);
+    expect(alert.textContent?.match(/Tente novamente/g)).toHaveLength(1);
+    expect(alert.textContent?.match(/Não foi possível/g)).toHaveLength(1);
   });
 });

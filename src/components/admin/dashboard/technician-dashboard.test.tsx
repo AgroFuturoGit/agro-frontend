@@ -646,6 +646,16 @@ describe("TechnicianDashboard — estados (UNIT-009)", () => {
     expect(document.activeElement?.id).toBe("tech-harvest");
   });
 
+  it("G-4: safra sem rótulo aparece como 'Safra —' na toolbar", async () => {
+    const base = summary();
+    vi.mocked(getTechnicianSummary).mockResolvedValue(
+      summary({ currentHarvest: { ...base.currentHarvest!, label: "" } }),
+    );
+    render(<TechnicianDashboard />);
+    expect(await screen.findByText("Comunidades atendidas")).toBeTruthy();
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe("Safra —");
+  });
+
   it("erro que não é ApiError usa a mensagem genérica", async () => {
     vi.mocked(getTechnicianSummary).mockRejectedValue(new Error("boom"));
     render(<TechnicianDashboard />);

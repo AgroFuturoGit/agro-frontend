@@ -134,6 +134,11 @@ describe.each(CASES)("diálogo de exclusão de $name (UNIT-007)", (c) => {
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/Não foi possível excluir/);
     expect(screen.queryByText("Erro 500")).toBeNull();
+    expect(alert.textContent).not.toMatch(/Erro 500/);
+    // G-2: o próximo passo aparece uma vez só, sem frase duplicada.
+    expect(alert.textContent).toContain("Tente novamente em alguns instantes.");
+    expect(alert.textContent?.match(/Tente novamente/g)).toHaveLength(1);
+    expect(alert.textContent?.match(/Não foi possível/g)).toHaveLength(1);
   });
 
   it("depois de um 'não encontrado' a lista é recarregada", async () => {

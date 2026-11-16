@@ -315,6 +315,20 @@ describe("CropFormDrawer — concorrência (UNIT-001 / UNIT-002)", () => {
     expect(await screen.findByText("Operação conflita com dados existentes")).toBeTruthy();
     expect(onSaved).not.toHaveBeenCalled();
   });
+
+  it("G-2: 'Erro 500' cru vira o texto padrão com o próximo passo, uma vez só", async () => {
+    updateCropMock.mockRejectedValue(new ApiError(500, "Erro 500", null));
+    const { onSaved } = renderForm("edit", BOX_CROP);
+    fireEvent.change(await screen.findByLabelText("Nome da cultura"), { target: { value: "Tomate X" } });
+    submit();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toMatch(/Erro 500/);
+    expect(alert.textContent).toContain(
+      "Não foi possível salvar a cultura. Tente novamente em alguns instantes.",
+    );
+    expect(alert.textContent?.match(/Tente novamente/g)).toHaveLength(1);
+    expect(onSaved).not.toHaveBeenCalled();
+  });
 });
 
 describe("CropFormDrawer — limites do back (UNIT-005)", () => {

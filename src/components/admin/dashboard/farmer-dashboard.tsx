@@ -60,7 +60,6 @@ import {
 } from "@/lib/status-variants";
 import { cn } from "@/lib/utils";
 
-
 /** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
 const FILTER_FOCUS_ID = "farmer-harvest";
 const CURRENT = "__current__";

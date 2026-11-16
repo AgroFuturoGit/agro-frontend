@@ -62,13 +62,11 @@ import { listHarvests, type Harvest } from "@/lib/harvests";
 import { listOrganizations, type Organization } from "@/lib/organizations";
 import { formatNumber, formatPlanDate } from "@/lib/production";
 
-
 /** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
 const FILTER_FOCUS_ID = "mgmt-harvest";
 const ALL = "__all__";
 const CURRENT = "__current__";
 const LOAD_ERROR = "Não foi possível carregar o painel de gestão.";
-
 
 const pct = (value: number) => `${formatNumber(value)}%`;
 

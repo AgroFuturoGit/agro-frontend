@@ -69,6 +69,18 @@ export function apiErrorMessage(err: unknown, fallback: string): string {
   return withRetryHint(fallback);
 }
 
+/**
+ * Só a mensagem de domínio do back (ex.: "Agricultor não encontrado."), ou
+ * `null` quando não há uma: "Erro NNN" cru, mensagem vazia ou erro que não
+ * veio da API. Para telas que já mostram um texto padrão de erro com o
+ * "Tente novamente" (ex.: o `DataTable`) e só acrescentam a dica do back,
+ * sem repetir "Não foi possível…".
+ */
+export function apiDomainMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null;
+  return userFacingErrorHint(err.message) ?? null;
+}
+
 function isClientError(status: number): boolean {
   return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }

@@ -632,6 +632,23 @@ describe("PlanDetail — status e unidades (UNIT-014 / UNIT-015)", () => {
     expect(edit[0].getAttribute("title")).toBe("Editar");
   });
 
+  it("L4: sem data, a quantidade diferencia o nome das ações de cada apontamento", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionExecutions).mockResolvedValue([
+      { ...EXECUTIONS[0], harvestedAt: null },
+      { ...EXECUTIONS[0], id: "execution-2", harvestedAt: null, quantity: 1, quantityKg: 20 },
+    ]);
+
+    renderPlanDetail();
+
+    expect(
+      await screen.findByRole("button", { name: "Editar apontamento de 12 caixas (sem data)" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Editar apontamento de 1 caixa (sem data)" }),
+    ).toBeTruthy();
+  });
+
   it("FARMER: edita pendente e rejeitado, exclui só o pendente, validado travado (UNIT-005)", async () => {
     loginAs("FARMER");
     vi.mocked(listProductionExecutions).mockResolvedValue(ALL_STATUSES);

@@ -301,11 +301,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
           id={titleId}
           title={TITLE}
           description={
-            <span
-              aria-hidden="true"
-              data-slot="skeleton"
-              className="block h-6 w-64 max-w-full animate-pulse rounded-md bg-muted"
-            />
+            <Skeleton as="span" aria-hidden="true" className="block h-6 w-64 max-w-full" />
           }
         />
         <Skeleton aria-hidden="true" className="w-full" style={{ height: CHART_HEIGHT }} />

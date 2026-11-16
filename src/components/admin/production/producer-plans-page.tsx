@@ -36,7 +36,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
 import { FinancingSection } from "@/components/admin/producers/financing-section";
 import { withFocusMove } from "@/lib/focus";
-import { userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { userFacingErrorHint, apiDomainMessage, apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
 import { getMyProducer, listProducers, producerDisplayName } from "@/lib/producers";
@@ -252,10 +252,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       const data = await listProductionPlans(producerId);
       setPlans(data);
     } catch (err) {
-      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
-      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
-      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
-      setError(apiErrorMessage(err, ""));
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }

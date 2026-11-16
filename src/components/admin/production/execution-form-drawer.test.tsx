@@ -362,7 +362,10 @@ describe("ExecutionFormDrawer — erros (lote 4)", () => {
     });
     submit();
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("Não foi possível salvar o apontamento.");
+    expect(alert.textContent).toContain(
+      "Não foi possível salvar o apontamento. Tente novamente em alguns instantes.",
+    );
+    expect(alert.textContent?.match(/Tente novamente/g)).toHaveLength(1);
     expect(alert.textContent).not.toContain("Erro 500");
     expect(alert.parentElement?.closest("[aria-live]")).toBeNull();
   });

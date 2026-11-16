@@ -318,6 +318,19 @@ describe("OrganizationsPage — redirecionamento do GESTOR", () => {
     expect(listOrganizations).not.toHaveBeenCalled();
   });
 
+  it("G-2: 'Erro 500' cru ao identificar a organização não vira dica", async () => {
+    loginAs("MANAGER");
+    vi.mocked(getMyManager).mockRejectedValueOnce(new ApiError(500, "Erro 500", null));
+
+    render(<OrganizationsPage />);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("Não foi possível identificar a sua organização.");
+    expect(alert.textContent).not.toContain("Erro 500");
+    expect(alert.textContent).not.toContain("organização:");
+    expect(alert.textContent?.match(/Não foi possível/g)).toHaveLength(1);
+  });
+
   it("A11Y-L6-5: 'Tentar novamente' leva o foco ao título, que fica montado", async () => {
     loginAs("MANAGER");
     vi.mocked(getMyManager)
@@ -440,6 +453,9 @@ describe("OrganizationsPage — erro sem mensagem de domínio (UX-L3-05)", () =>
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toContain("Tente novamente em alguns instantes.");
     expect(alert.textContent).not.toContain("Erro 500");
+    // G-2 (apiDomainMessage): sem dica do back, nada de frase duplicada.
+    expect(alert.textContent?.match(/Tente novamente em/g)).toHaveLength(1);
+    expect(alert.textContent?.match(/Não foi possível/g)).toHaveLength(1);
   });
 
   it("UX-L6-06: erro de rede não repete 'Não foi possível…' e mantém o próximo passo", async () => {

@@ -367,6 +367,30 @@ describe("ManagementDashboard — estados (UNIT-008)", () => {
     expect(await screen.findByTestId("crop-ranking")).toBeTruthy();
   });
 
+  it("G-3: 'Tentar novamente' leva o foco ao seletor de safra, que fica montado", async () => {
+    vi.mocked(getManagerSummary)
+      .mockRejectedValueOnce(new ApiError(500, "Erro 500", null))
+      .mockResolvedValueOnce(summary());
+    render(<ManagementDashboard role="MANAGER" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByTestId("crop-ranking")).toBeTruthy();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement?.id).toBe("mgmt-harvest");
+  });
+
+  it.each([
+    ["2026/27", "Safra 2026/27"],
+    ["", "Safra —"],
+  ])("G-4: rótulo de safra %j aparece como %j na toolbar", async (label, expected) => {
+    const base = summary();
+    vi.mocked(getManagerSummary).mockResolvedValue(
+      summary({ currentHarvest: { ...base.currentHarvest!, label } }),
+    );
+    render(<ManagementDashboard role="MANAGER" />);
+    expect(await screen.findByTestId("crop-ranking")).toBeTruthy();
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe(expected);
+  });
+
   it("primeira consulta falha: comunidade desabilitada até o 'Tentar novamente' funcionar", async () => {
     vi.mocked(getManagerSummary)
       .mockRejectedValueOnce(new ApiError(500, "Falha no servidor", null))

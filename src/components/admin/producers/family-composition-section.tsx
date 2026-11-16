@@ -45,7 +45,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiDomainMessage, apiErrorMessage } from "@/lib/api";
 import {
   createFamilyMember,
   deleteFamilyMember,
@@ -112,10 +112,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
     try {
       setMembers(await listFamilyMembers(farmerId));
     } catch (err) {
-      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
-      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
-      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
-      setError(apiErrorMessage(err, ""));
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }

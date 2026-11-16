@@ -36,7 +36,7 @@ import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { withFocusMove } from "@/lib/focus";
-import { userFacingErrorHint, apiErrorMessage } from "@/lib/api";
+import { userFacingErrorHint, apiDomainMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCnpj } from "@/lib/cnpj";
 import { getMyManager } from "@/lib/managers";
@@ -167,7 +167,7 @@ export function OrganizationsPage() {
         const manager = await getMyManager();
         router.replace(`/admin/organizacoes/${manager.organization.id}`);
       } catch (err) {
-        const hint = apiErrorMessage(err, "");
+        const hint = apiDomainMessage(err);
         setRedirectError(
           hint
             ? `Não foi possível identificar a sua organização: ${hint}`
@@ -192,7 +192,7 @@ export function OrganizationsPage() {
           `/admin/organizacoes/${community.organization.id}/comunidades/${community.id}/produtores/${producer.id}`,
         );
       } catch (err) {
-        const hint = apiErrorMessage(err, "");
+        const hint = apiDomainMessage(err);
         setRedirectError(
           hint
             ? `Não foi possível identificar o seu agricultor: ${hint}`
@@ -209,10 +209,7 @@ export function OrganizationsPage() {
         const data = await getMyAssignedProducers();
         setAssignedProducers(data);
       } catch (err) {
-        // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
-        // erro (error !== null) e o DataTable mostra o "Tente novamente…"
-        // padrão, sem repetir "Não foi possível…" (UX-L6-06).
-        setError(apiErrorMessage(err, ""));
+        setError(apiDomainMessage(err) ?? "");
       } finally {
         setLoading(false);
       }
@@ -226,10 +223,7 @@ export function OrganizationsPage() {
       const data = await listOrganizations();
       setOrganizations(data);
     } catch (err) {
-      // Só a mensagem de domínio do back vira dica; sem ela, "" mantém o
-      // erro (error !== null) e o DataTable mostra o "Tente novamente…"
-      // padrão, sem repetir "Não foi possível…" (UX-L6-06).
-      setError(apiErrorMessage(err, ""));
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }

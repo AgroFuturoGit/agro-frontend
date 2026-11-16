@@ -82,6 +82,9 @@ export function DataTableToolbar<TData>({
     if (prevAppliedSearch && !appliedSearch && rawSearch) setRawSearch("");
   }
 
+  const searchRef = useRef<HTMLInputElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
+
   function clearSearch() {
     setRawSearch("");
     table.setGlobalFilter("");
@@ -109,12 +112,13 @@ export function DataTableToolbar<TData>({
 
   // O chip removido desmonta: antes, o foco vai para o chip seguinte (ou o
   // anterior, se era o último da linha); sem outro chip, para a busca. Nunca
-  // cai no <body> (A11Y-L2-R2-2, A11Y-L6-4, UX-L6-03).
-  const searchRef = useRef<HTMLInputElement>(null);
+  // cai no <body> (A11Y-L2-R2-2, A11Y-L6-4, UX-L6-03). Os vizinhos são
+  // buscados no contêiner dos chips, não no pai direto: um wrapper em volta
+  // de um chip não quebra a ordem.
   function removeChip(event: React.MouseEvent<HTMLButtonElement>, remove: () => void) {
     const current = event.currentTarget;
     const chips = Array.from(
-      current.parentElement?.querySelectorAll<HTMLButtonElement>("[data-filter-chip]") ?? [],
+      chipsRef.current?.querySelectorAll<HTMLButtonElement>("[data-filter-chip]") ?? [],
     );
     const index = chips.indexOf(current);
     const neighbor = chips[index + 1] ?? chips[index - 1];
@@ -165,7 +169,7 @@ export function DataTableToolbar<TData>({
       </div>
 
       {hasAnyActiveFilter && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div ref={chipsRef} className="flex flex-wrap items-center gap-2">
           {appliedSearch && (
             <button
               type="button"
