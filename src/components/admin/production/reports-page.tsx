@@ -472,6 +472,7 @@ export function ReportsPage() {
               total={pagedCards.total}
               pageSize={CARD_PAGE_SIZE}
               onPageChange={pagedCards.setPageIndex}
+              label="Paginação dos relatórios"
             />
           )}
         </section>

@@ -439,6 +439,9 @@ describe("ReportsPage — paginação dos cards (RF4)", () => {
     expect(cardTitles()).toEqual(NAMES.slice(0, 9).map((n) => `${n} — Comum`));
     expect(status().textContent).toBe("Exibindo 1–9 de 10");
     expect(within(cardsRegion()).getByText("Página 1 de 2")).toBeTruthy();
+    expect(
+      within(cardsRegion()).getByRole("navigation", { name: "Paginação dos relatórios" }),
+    ).toBeTruthy();
     expect(screen.getByText("Soma de 10 planos de produção.")).toBeTruthy();
     expect(within(consolidated()).getByText("10.000 kg")).toBeTruthy();
     expect(within(consolidated()).getByText("4.000 kg")).toBeTruthy();
