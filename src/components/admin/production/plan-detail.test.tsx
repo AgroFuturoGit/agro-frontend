@@ -1376,6 +1376,26 @@ describe("PlanDetail — breadcrumb por papel (RF2)", () => {
     expect(listProducers).not.toHaveBeenCalled();
   });
 
+  it("TECHNICIAN: agricultor fora de /technicians/me/farmers vira 'Agricultor' sem chamar as rotas proibidas", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(getMyAssignedProducers).mockResolvedValue([
+      { ...ASSIGNED, id: "producer-2", fullName: "Bruno do Vale" },
+    ]);
+
+    renderPlanDetail();
+    await expectPlanIsReadable();
+
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() => expect(getMyAssignedProducers).toHaveBeenCalledTimes(1));
+    expect(
+      within(nav).getByRole("link", { name: "Agricultor" }),
+    ).toHaveAttribute("href", PRODUCER_HREF);
+    expect(within(nav).queryByText("Bruno do Vale")).toBeNull();
+    expect(breadcrumbHrefs(nav)).toEqual(["/admin/organizacoes", PRODUCER_HREF]);
+    expect(getCommunity).not.toHaveBeenCalled();
+    expect(listProducers).not.toHaveBeenCalled();
+  });
+
   it("FARMER: 'Meus planos' > plano, com link para os próprios planos", async () => {
     loginAs("FARMER");
 
@@ -1426,6 +1446,39 @@ describe("PlanDetail — breadcrumb por papel (RF2)", () => {
     expect(
       within(nav).getByRole("link", { name: "Comunidade Alto da Serra" }),
     ).toBeTruthy();
+    expect(getCommunity).toHaveBeenCalledWith("community-1");
+    expect(listProducers).toHaveBeenCalledWith("community-1");
+    expect(getMyAssignedProducers).not.toHaveBeenCalled();
+  });
+
+  it("ADMIN: breadcrumb completo, como o MANAGER, sem chamar /technicians/me/farmers", async () => {
+    loginAs("ADMIN");
+    vi.mocked(getCommunity).mockResolvedValue({
+      id: "community-1",
+      name: "Comunidade Alto da Serra",
+      organization: ASSIGNED.community!.organization!,
+    });
+    vi.mocked(listProducers).mockResolvedValue([ASSIGNED]);
+
+    renderPlanDetail();
+    await expectPlanIsReadable();
+
+    const nav = screen.getByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(
+        within(nav).getByRole("link", { name: "José da Silva" }),
+      ).toHaveAttribute("href", PRODUCER_HREF),
+    );
+    expect(breadcrumbHrefs(nav)).toEqual([
+      "/admin/organizacoes",
+      "/admin/organizacoes/org-1",
+      "/admin/organizacoes/org-1/comunidades/community-1",
+      PRODUCER_HREF,
+    ]);
+    expect(within(nav).getByText("Milho — BRS 1010", { exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     expect(getCommunity).toHaveBeenCalledWith("community-1");
     expect(listProducers).toHaveBeenCalledWith("community-1");
     expect(getMyAssignedProducers).not.toHaveBeenCalled();

@@ -500,10 +500,14 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     // `hasRole('MANAGER') or hasRole('ADMIN')` no backend real — o
     // breadcrumb da página de planos precisa tolerar o 403 e cair em
     // rótulos genéricos, sem impedir a listagem de planos de carregar.
+    // Desde o RF2 a tela nem as chama para o técnico.
+    const forbiddenRequests: string[] = [];
     await page.route(`**/communities/${COMMUNITY.id}`, async (route) => {
+      forbiddenRequests.push(route.request().url());
       await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
     });
     await page.route("**/farmers?*", async (route) => {
+      forbiddenRequests.push(route.request().url());
       await route.fulfill({ status: 403, contentType: "application/json", body: "{}" });
     });
 
@@ -516,6 +520,18 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
       ),
     );
     await expect(page.getByRole("cell", { name: /^Café — Catuaí/ })).toBeVisible();
+
+    // RF2: "Agricultores atendidos" > agricultor (página atual), e nenhuma
+    // chamada às rotas que dão 403 para o técnico.
+    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
+    await expect(
+      breadcrumb.getByRole("link", { name: "Agricultores atendidos", exact: true }),
+    ).toHaveAttribute("href", "/admin/organizacoes");
+    await expect(
+      breadcrumb.getByText(PRODUCER.fullName, { exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+    await expect(breadcrumb.getByRole("link")).toHaveCount(1);
+    expect(forbiddenRequests).toEqual([]);
   });
 
   test("TECHNICIAN no detalhe do plano: breadcrumb só com 'Agricultores atendidos' > agricultor > plano, sem link para organização ou comunidade (RF2)", async ({
@@ -583,9 +599,14 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await expect(page.getByRole("cell", { name: /^Café — Catuaí/ })).toBeVisible();
 
     // RF2/D4: na página de planos, o agricultor não tem breadcrumb (os níveis
-    // de organização e comunidade não abrem para ele).
+    // de organização e comunidade não abrem para ele). "Novo plano" só
+    // aparece depois de a role ser lida e a guarda passar: a asserção
+    // negativa abaixo não passa antes da hora.
     await expect(
       page.getByRole("heading", { name: "Planos de produção", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Novo plano", exact: true }),
     ).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveCount(0);
   });

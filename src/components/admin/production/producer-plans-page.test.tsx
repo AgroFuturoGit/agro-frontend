@@ -631,6 +631,32 @@ describe("ProducerPlansPage — breadcrumb por papel (RF2)", () => {
     expect(getMyAssignedProducers).not.toHaveBeenCalled();
   });
 
+  it("ADMIN: breadcrumb completo, como o MANAGER, sem chamar /technicians/me/farmers", async () => {
+    loginAs("ADMIN");
+
+    renderPage();
+
+    const nav = await screen.findByRole("navigation", { name: "Breadcrumb" });
+    await waitFor(() =>
+      expect(
+        within(nav).getByRole("link", { name: "Cooperativa Serra Azul" }),
+      ).toBeTruthy(),
+    );
+    expect(breadcrumbHrefs(nav)).toEqual([
+      "/admin/organizacoes",
+      "/admin/organizacoes/org-1",
+      "/admin/organizacoes/org-1/comunidades/community-1",
+    ]);
+    expect(
+      within(nav).getByRole("link", { name: "Comunidade Alto da Serra" }),
+    ).toBeTruthy();
+    expect(within(nav).getByText("José da Silva", { exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(getMyAssignedProducers).not.toHaveBeenCalled();
+  });
+
   it("role desconhecida: nenhum link de breadcrumb", async () => {
     renderPage();
 

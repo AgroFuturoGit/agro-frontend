@@ -359,9 +359,11 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
     ).toHaveCount(0);
     expect(listProducersRequests).toHaveLength(0);
 
-    // Sem regressão do fluxo do próprio produtor.
+    // Sem regressão do fluxo do próprio produtor. "Novo plano" só aparece
+    // depois de a role ser lida e a guarda passar: é o sinal que as
+    // asserções negativas do breadcrumb abaixo esperam.
     await expect(
-      page.getByRole("button", { name: "Novo plano" }),
+      page.getByRole("button", { name: "Novo plano", exact: true }),
     ).toBeVisible();
 
     // RF2/D4: na página de planos, o agricultor não tem breadcrumb, e nada na
