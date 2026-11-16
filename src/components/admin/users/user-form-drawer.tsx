@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api";
+import { ApiError, apiErrorMessage, parseFieldErrors } from "@/lib/api";
 import { persistSession, readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
@@ -44,6 +44,7 @@ import {
   registerUser,
   type User,
 } from "@/lib/users";
+import { useFieldValidation } from "@/lib/use-field-validation";
 
 type Mode = "create" | "edit";
 
@@ -69,6 +70,54 @@ const EMPTY = {
   role: "" as Role | "",
 };
 
+type Values = typeof EMPTY;
+type Field = keyof Values;
+type FieldErrors = Partial<Record<Field, string>>;
+
+const FIELDS = Object.keys(EMPTY) as Field[];
+
+/** Id da mensagem de erro do campo, para o `aria-describedby`. */
+function errorId(field: Field) {
+  return `${field}-error`;
+}
+
+/**
+ * Regras do formulário. Tudo o que depende dos valores sai de `values`
+ * (inclusive se é técnico), para o blur e a digitação usarem os valores atuais.
+ */
+function validate(values: Values, mode: Mode): FieldErrors {
+  const errors: FieldErrors = {};
+  const isTechnician = mode === "create" && values.role === "TECHNICIAN";
+  const name = values.fullName.trim();
+  if (name.length === 1) errors.fullName = NAME_MIN_LENGTH_MESSAGE;
+  if (!values.role) errors.role = "Selecione o papel.";
+  if (mode !== "create") return errors;
+  if (!isValidEmail(values.email)) errors.email = "Informe um e-mail válido";
+  const cpf = values.cpf.trim();
+  if (isTechnician && !cpf) errors.cpf = "Informe o CPF";
+  else if (cpf && !isValidCpf(cpf)) errors.cpf = "CPF inválido";
+  if (isTechnician) {
+    // O back grava o número do registro como obrigatório (coluna NOT NULL).
+    if (!values.registrationType) {
+      errors.registrationType = "Informe o tipo do registro";
+    }
+    if (!values.registrationNumber.trim()) {
+      errors.registrationNumber = "Informe o número do registro";
+    }
+  }
+  return errors;
+}
+
+/** Erros por campo do 400 do back, só dos campos deste formulário. */
+function serverFieldErrors(payload: unknown): FieldErrors {
+  const parsed = parseFieldErrors(payload);
+  const errors: FieldErrors = {};
+  for (const field of FIELDS) {
+    if (parsed[field]) errors[field] = parsed[field];
+  }
+  return errors;
+}
+
 export function UserFormDrawer({
   mode,
   open,
@@ -79,13 +128,21 @@ export function UserFormDrawer({
   const [values, setValues] = useState(EMPTY);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const {
+    errors: fieldErrors,
+    onBlur,
+    onChange,
+    setErrors,
+    reset,
+  } = useFieldValidation<Field, Values>(
+    (field, current) => validate(current, mode)[field],
+  );
 
   useEffect(() => {
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setError(null);
-    setFieldErrors({});
+    reset();
     if (mode === "edit" && user) {
       setValues({
         ...EMPTY,
@@ -97,20 +154,29 @@ export function UserFormDrawer({
     } else {
       setValues(EMPTY);
     }
-  }, [open, mode, user]);
+  }, [open, mode, user, reset]);
 
-  function update<K extends keyof typeof values>(
-    key: K,
-    value: (typeof values)[K],
-  ) {
-    setValues((prev) => ({ ...prev, [key]: value }));
-    if (fieldErrors[key]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
+  function update<K extends Field>(key: K, value: Values[K]) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onChange(key, next);
+  }
+
+  /**
+   * Select: o blur do trigger dispara ao abrir a lista, antes da escolha,
+   * então o campo é validado ao escolher (os outros erros locais também são
+   * recalculados, como na digitação).
+   */
+  function choose<K extends Field>(key: K, value: Values[K]) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onChange(key, next);
+    onBlur(key, next);
+  }
+
+  /** `aria-describedby` do campo: aponta para a mensagem só quando há erro. */
+  function describedBy(field: Field) {
+    return fieldErrors[field] ? errorId(field) : undefined;
   }
 
   const isTechnician = mode === "create" && values.role === "TECHNICIAN";
@@ -122,34 +188,12 @@ export function UserFormDrawer({
     );
   }, [mode, user, values.fullName, values.role]);
 
-  function validate(): Record<string, string> {
-    const errors: Record<string, string> = {};
-    const name = values.fullName.trim();
-    if (name.length === 1) errors.fullName = NAME_MIN_LENGTH_MESSAGE;
-    if (!values.role) errors.role = "Selecione o papel.";
-    if (mode !== "create") return errors;
-    if (!isValidEmail(values.email)) errors.email = "Informe um e-mail válido";
-    const cpf = values.cpf.trim();
-    if (isTechnician && !cpf) errors.cpf = "Informe o CPF";
-    else if (cpf && !isValidCpf(cpf)) errors.cpf = "CPF inválido";
-    if (isTechnician) {
-      // O back grava o número do registro como obrigatório (coluna NOT NULL).
-      if (!values.registrationType) {
-        errors.registrationType = "Informe o tipo do registro";
-      }
-      if (!values.registrationNumber.trim()) {
-        errors.registrationNumber = "Informe o número do registro";
-      }
-    }
-    return errors;
-  }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    const clientErrors = validate();
+    const clientErrors = validate(values, mode);
     if (Object.keys(clientErrors).length > 0) {
-      setFieldErrors(clientErrors);
+      setErrors(clientErrors, "client");
       return;
     }
     setSubmitting(true);
@@ -206,6 +250,12 @@ export function UserFormDrawer({
       onSaved();
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError) {
+        const apiFieldErrors = serverFieldErrors(err.payload);
+        if (Object.keys(apiFieldErrors).length > 0) {
+          setErrors(apiFieldErrors, "server");
+        }
+      }
       setError(
         apiErrorMessage(err, "Não foi possível salvar o usuário."),
       );
@@ -254,10 +304,14 @@ export function UserFormDrawer({
                 maxLength={LIMITS.FULL_NAME}
                 disabled={submitting}
                 autoComplete="name"
+                onBlur={() => onBlur("fullName", values)}
                 aria-invalid={Boolean(fieldErrors.fullName)}
+                aria-describedby={describedBy("fullName")}
               />
               {fieldErrors.fullName && (
-                <p className="text-sm text-destructive">{fieldErrors.fullName}</p>
+                <p id={errorId("fullName")} className="text-sm text-destructive">
+                  {fieldErrors.fullName}
+                </p>
               )}
             </div>
 
@@ -274,10 +328,14 @@ export function UserFormDrawer({
                     maxLength={LIMITS.EMAIL}
                     disabled={submitting}
                     autoComplete="email"
+                    onBlur={() => onBlur("email", values)}
                     aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={describedBy("email")}
                   />
                   {fieldErrors.email && (
-                    <p className="text-sm text-destructive">{fieldErrors.email}</p>
+                    <p id={errorId("email")} className="text-sm text-destructive">
+                      {fieldErrors.email}
+                    </p>
                   )}
                 </div>
 
@@ -309,10 +367,14 @@ export function UserFormDrawer({
                     maxLength={14}
                     placeholder="000.000.000-00"
                     disabled={submitting}
+                    onBlur={() => onBlur("cpf", values)}
                     aria-invalid={Boolean(fieldErrors.cpf)}
+                    aria-describedby={describedBy("cpf")}
                   />
                   {fieldErrors.cpf && (
-                    <p className="text-sm text-destructive">{fieldErrors.cpf}</p>
+                    <p id={errorId("cpf")} className="text-sm text-destructive">
+                      {fieldErrors.cpf}
+                    </p>
                   )}
                 </div>
               </>
@@ -344,12 +406,13 @@ export function UserFormDrawer({
               <Label htmlFor="role">Papel</Label>
               <Select
                 value={values.role || null}
-                onValueChange={(v) => update("role", v as Role)}
+                onValueChange={(v) => choose("role", v as Role)}
               >
                 <SelectTrigger
                   id="role"
                   className="w-full"
                   aria-invalid={Boolean(fieldErrors.role)}
+                  aria-describedby={describedBy("role")}
                 >
                   <SelectValue placeholder="Selecione o papel">
                     {(v) =>
@@ -366,7 +429,9 @@ export function UserFormDrawer({
                 </SelectContent>
               </Select>
               {fieldErrors.role && (
-                <p className="text-sm text-destructive">{fieldErrors.role}</p>
+                <p id={errorId("role")} className="text-sm text-destructive">
+                  {fieldErrors.role}
+                </p>
               )}
               <p className="text-xs text-muted-foreground">
                 {isCreate
@@ -382,7 +447,7 @@ export function UserFormDrawer({
                   <Select
                     value={values.registrationType || "NONE"}
                     onValueChange={(v) =>
-                      update(
+                      choose(
                         "registrationType",
                         v === "NONE" ? "" : (v as TechnicianRegistrationType),
                       )
@@ -393,6 +458,7 @@ export function UserFormDrawer({
                       id="registrationType"
                       className="w-full"
                       aria-invalid={Boolean(fieldErrors.registrationType)}
+                      aria-describedby={describedBy("registrationType")}
                     >
                       <SelectValue placeholder="Não informar">
                         {(v) => (v && v !== "NONE" ? v : "Não informar")}
@@ -408,7 +474,10 @@ export function UserFormDrawer({
                     </SelectContent>
                   </Select>
                   {fieldErrors.registrationType && (
-                    <p className="text-sm text-destructive">
+                    <p
+                      id={errorId("registrationType")}
+                      className="text-sm text-destructive"
+                    >
                       {fieldErrors.registrationType}
                     </p>
                   )}
@@ -422,10 +491,15 @@ export function UserFormDrawer({
                     onChange={(e) => update("registrationNumber", e.target.value)}
                     maxLength={LIMITS.REGISTRATION_NUMBER}
                     disabled={submitting}
+                    onBlur={() => onBlur("registrationNumber", values)}
                     aria-invalid={Boolean(fieldErrors.registrationNumber)}
+                    aria-describedby={describedBy("registrationNumber")}
                   />
                   {fieldErrors.registrationNumber && (
-                    <p className="text-sm text-destructive">
+                    <p
+                      id={errorId("registrationNumber")}
+                      className="text-sm text-destructive"
+                    >
                       {fieldErrors.registrationNumber}
                     </p>
                   )}
