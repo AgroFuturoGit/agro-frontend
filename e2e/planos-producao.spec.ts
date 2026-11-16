@@ -364,13 +364,16 @@ test.describe("Planos de produção — navegação em cascata por role", () => 
       page.getByRole("button", { name: "Novo plano" }),
     ).toBeVisible();
 
-    // Breadcrumb mostra a hierarquia real do produtor, resolvida via
-    // `GET /farmers/me` — não navegável para outro recurso (só o último
-    // nível é não-clicável; os anteriores levam sempre aos próprios
-    // recursos do produtor).
-    const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb" });
-    await expect(breadcrumb).toContainText(ORGANIZATION.name);
-    await expect(breadcrumb).toContainText(COMMUNITY_A.name);
+    // RF2/D4: na página de planos, o agricultor não tem breadcrumb, e nada na
+    // tela leva à organização ou à comunidade (telas que ele não abre).
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveCount(0);
+    const hrefs = await page
+      .getByRole("link")
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href") ?? ""));
+    for (const href of hrefs) {
+      expect(href).not.toMatch(/^\/admin\/organizacoes\/[^/]+$/);
+      expect(href).not.toMatch(/\/comunidades\/[^/]+$/);
+    }
   });
 
   test("FARMER exclui o próprio plano: vê o botão, confirma no dialog e a lista recarrega sem ele", async ({
@@ -637,6 +640,11 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(PRODUCER_ANA) }),
     );
     await page.route("**/farmers?*", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCER_ANA]) }),
+    );
+    // Nome do agricultor no breadcrumb do TECHNICIAN (RF2): sem mock, a
+    // chamada iria ao back real e o 401 encerraria a sessão.
+    await page.route("**/technicians/me/farmers", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCER_ANA]) }),
     );
     await page.route(`**/production-plans/${PLAN_ID}`, (route) =>
