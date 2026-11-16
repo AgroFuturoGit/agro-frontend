@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getFarmerSummary, type FarmerSummary } from "@/lib/analytics";
@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/api";
 import { getMyProducer } from "@/lib/producers";
 import { getProductionComparison, listProductionPlans } from "@/lib/production";
 
-import { ReportsPage } from "./reports-page";
+import { CURRENT_HARVEST_TIMEOUT_MS, pickHarvestFilter, ReportsPage } from "./reports-page";
 
 vi.mock("@/lib/analytics", async () => {
   const actual = await vi.importActual<typeof import("@/lib/analytics")>("@/lib/analytics");
@@ -298,5 +298,125 @@ describe("ReportsPage — filtro de safra (RF5)", () => {
     expect(getProductionComparison).toHaveBeenCalledTimes(comparisonCalls);
     expect(listProductionPlans).toHaveBeenCalledTimes(1);
     expect(getFarmerSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumo pendurado não prende o skeleton: após o limite abre em 'Todas' e ignora a resposta tardia", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let resolveSummary: (value: FarmerSummary) => void = () => {};
+      vi.mocked(getFarmerSummary).mockReturnValue(
+        new Promise((resolve) => {
+          resolveSummary = resolve;
+        }),
+      );
+      render(<ReportsPage />);
+      // Planos e comparações já chegaram; só o resumo está pendente.
+      await waitFor(() => expect(getProductionComparison).toHaveBeenCalledTimes(3));
+      expect(screen.getByRole("region", { name: "Carregando relatórios" })).toBeTruthy();
+
+      await act(() => vi.advanceTimersByTimeAsync(CURRENT_HARVEST_TIMEOUT_MS));
+      expect(await screen.findByRole("heading", { name: "Consolidado" })).toBeTruthy();
+      expect(selected()).toBe("Todas as safras");
+      expect(cardTitles()).toEqual(["Feijão — Comum", "Milho — Comum", "Arroz — Comum"]);
+
+      // A vigente chega depois: o filtro não muda sozinho.
+      await act(async () => {
+        resolveSummary(summaryWith({ ...H_A }));
+      });
+      expect(selected()).toBe("Todas as safras");
+      expect(cardTitles()).toHaveLength(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("plano com safra sem id ou sem safra só aparece em 'Todas as safras'", async () => {
+    vi.mocked(listProductionPlans).mockResolvedValue([
+      harvestPlan("p-1", "Milho", H_A),
+      harvestPlan("p-3", "Arroz", null),
+      { ...(plan("p-4", "Soja") as object), harvest: { label: "2024" } } as never,
+    ]);
+    vi.mocked(getProductionComparison).mockRejectedValue(new Error("x"));
+    vi.mocked(getFarmerSummary).mockResolvedValue(summaryWith({ ...H_A }));
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Por plano de produção" });
+    expect(selected()).toBe("Safra 2026/2027");
+    expect(cardTitles()).toEqual(["Milho — Comum"]);
+
+    fireEvent.click(trigger());
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+    // Nenhuma opção para a safra sem id ("Safra 2024").
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Safra 2026/2027",
+      "Todas as safras",
+    ]);
+    fireEvent.keyDown(screen.getByRole("listbox"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+
+    await chooseHarvest("Todas as safras");
+    await waitFor(() =>
+      expect(cardTitles()).toEqual(["Milho — Comum", "Arroz — Comum", "Soja — Comum"]),
+    );
+  });
+
+  it("safras diferentes com o mesmo rótulo ganham o período no seletor", async () => {
+    vi.mocked(listProductionPlans).mockResolvedValue([
+      harvestPlan("p-1", "Milho", { ...H_A, label: "2026" }),
+      harvestPlan("p-2", "Feijão", {
+        id: "h-c",
+        label: "Safra 2026",
+        startDate: "2026-01-01",
+        endDate: "2026-12-31",
+      }),
+    ]);
+    render(<ReportsPage />);
+    await screen.findByRole("heading", { name: "Consolidado" });
+    fireEvent.click(trigger());
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(3));
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Safra 2026 (07/2026 a 06/2027)",
+      "Safra 2026 (01/2026 a 12/2026)",
+      "Todas as safras",
+    ]);
+  });
+
+  it("'Tentar novamente' depois de erro na primeira carga abre na safra vigente", async () => {
+    vi.mocked(getMyProducer)
+      .mockRejectedValueOnce(new ApiError(500, "Erro 500", null))
+      .mockResolvedValue({
+        id: "f-1",
+        community: { id: "com-1", organization: { id: "org-1" } },
+      } as never);
+    vi.mocked(getFarmerSummary).mockResolvedValue(summaryWith({ ...H_B }));
+    render(<ReportsPage />);
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("combobox", { name: "Safra" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await screen.findByRole("heading", { name: "Consolidado" });
+    expect(selected()).toBe("Safra 2025/2026");
+    expect(cardTitles()).toEqual(["Feijão — Comum"]);
+  });
+});
+
+describe("pickHarvestFilter (safra depois de cada carga)", () => {
+  const plans = [
+    { id: "p-1", harvest: { id: "h-a" } },
+    { id: "p-2", harvest: null },
+  ] as never[];
+
+  it("primeira carga: vigente com plano; senão 'Todas'", () => {
+    expect(pickHarvestFilter(null, plans, "h-a")).toBe("h-a");
+    expect(pickHarvestFilter(null, plans, "h-z")).toBe("__all__");
+    expect(pickHarvestFilter(null, plans, null)).toBe("__all__");
+  });
+
+  it("recarga preserva a escolha que ainda existe nos planos, inclusive 'Todas'", () => {
+    expect(pickHarvestFilter("__all__", plans, "h-a")).toBe("__all__");
+    expect(pickHarvestFilter("h-a", plans, null)).toBe("h-a");
+  });
+
+  it("recarga em que a escolha sumiu recalcula pela vigente", () => {
+    expect(pickHarvestFilter("h-old", plans, "h-a")).toBe("h-a");
+    expect(pickHarvestFilter("h-old", plans, null)).toBe("__all__");
   });
 });

@@ -44,6 +44,59 @@ const TITLE_ID = "reports-title";
 const HARVEST_FILTER_ID = "reports-harvest";
 /** Sentinela do filtro de safra: sem recorte (inclui planos sem safra). */
 const ALL = "__all__";
+/**
+ * Espera máxima pela safra vigente. Depois disso a tela abre em "Todas as
+ * safras" e a resposta tardia é ignorada (o filtro não muda sozinho).
+ */
+export const CURRENT_HARVEST_TIMEOUT_MS = 3000;
+
+/** `id` da safra vigente segundo o back, ou `null` (sem vigente, falha ou demora). */
+function currentHarvestIdWithin(ms: number): Promise<string | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    getFarmerSummary()
+      .then(
+        (summary) => summary.currentHarvest?.id ?? null,
+        () => null,
+      )
+      .then((id) => {
+        clearTimeout(timer);
+        resolve(id);
+      });
+  });
+}
+
+/**
+ * Safra do filtro depois de uma carga. A escolha anterior (`previous`) vale
+ * enquanto existir nos planos; na primeira carga (`null`) ou se ela sumiu,
+ * usa a vigente, desde que algum plano seja dela; senão, "Todas as safras".
+ */
+export function pickHarvestFilter(
+  previous: string | null,
+  plans: ProductionPlan[],
+  currentId: string | null,
+): string {
+  const hasPlanIn = (id: string) => plans.some((plan) => plan.harvest?.id === id);
+  if (previous !== null && (previous === ALL || hasPlanIn(previous))) return previous;
+  return currentId && hasPlanIn(currentId) ? currentId : ALL;
+}
+
+/** "2026-07-01" -> "07/2026". */
+const monthYear = (iso: string) => `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
+
+/** Rótulo da safra no seletor; com rótulo repetido, acrescenta o período. */
+function harvestOptionLabel(
+  harvest: NonNullable<ProductionPlan["harvest"]>,
+  duplicated: boolean,
+) {
+  const text = harvestText(harvest.label);
+  if (!duplicated) return text;
+  const period = [harvest.startDate, harvest.endDate]
+    .filter((d): d is string => Boolean(d))
+    .map(monthYear)
+    .join(" a ");
+  return period ? `${text} (${period})` : text;
+}
 
 const planTitle = (plan: ProductionPlan) =>
   plan.crop ? `${plan.crop.name} — ${plan.crop.variety}` : "Plano";
@@ -68,17 +121,16 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Filtro só na tela (sem URL). Abre na safra vigente do resumo do
-  // agricultor; sem vigente, com falha no resumo ou sem plano nela, "Todas".
-  const [harvestFilter, setHarvestFilter] = useState<string>(ALL);
+  // agricultor; sem vigente, com falha ou demora no resumo ou sem plano
+  // nela, "Todas". `null` = ainda sem carga bem-sucedida.
+  const [harvestFilter, setHarvestFilter] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // Em paralelo com a carga: quem decide a safra vigente é o back. Uma
-    // falha aqui não impede o relatório; só faz abrir em "Todas as safras".
-    const currentHarvestId = getFarmerSummary()
-      .then((summary) => summary.currentHarvest?.id ?? null)
-      .catch(() => null);
+    // Em paralelo com a carga: quem decide a safra vigente é o back. Falha
+    // ou demora aqui não prende o relatório; só faz abrir em "Todas".
+    const currentHarvestId = currentHarvestIdWithin(CURRENT_HARVEST_TIMEOUT_MS);
     try {
       const producerData = await getMyProducer();
       setProducer(producerData);
@@ -94,11 +146,7 @@ export function ReportsPage() {
         }),
       );
       const currentId = await currentHarvestId;
-      setHarvestFilter(
-        currentId && plans.some((plan) => plan.harvest?.id === currentId)
-          ? currentId
-          : ALL,
-      );
+      setHarvestFilter((previous) => pickHarvestFilter(previous, plans, currentId));
       setReports(data);
     } catch (err) {
       setError(
@@ -126,19 +174,28 @@ export function ReportsPage() {
     const sorted = [...byId.values()].sort((a, b) =>
       (b.startDate ?? "").localeCompare(a.startDate ?? ""),
     );
+    const counts = new Map<string, number>();
+    for (const h of sorted) {
+      const text = harvestText(h.label);
+      counts.set(text, (counts.get(text) ?? 0) + 1);
+    }
     return [
-      ...sorted.map((h) => ({ value: h.id, label: harvestText(h.label) })),
+      ...sorted.map((h) => ({
+        value: h.id,
+        label: harvestOptionLabel(h, (counts.get(harvestText(h.label)) ?? 0) > 1),
+      })),
       { value: ALL, label: "Todas as safras" },
     ];
   }, [reports]);
 
   // Filtro no cliente: as comparações já foram buscadas uma vez só.
+  const selectedHarvest = harvestFilter ?? ALL;
   const filtered = useMemo(
     () =>
-      harvestFilter === ALL
+      selectedHarvest === ALL
         ? reports
-        : reports.filter((r) => r.plan.harvest?.id === harvestFilter),
-    [reports, harvestFilter],
+        : reports.filter((r) => r.plan.harvest?.id === selectedHarvest),
+    [reports, selectedHarvest],
   );
 
   const withComparison = useMemo(
@@ -195,7 +252,7 @@ export function ReportsPage() {
       <FilterSelect
         id={HARVEST_FILTER_ID}
         label="Safra"
-        value={harvestFilter}
+        value={selectedHarvest}
         onChange={setHarvestFilter}
         options={harvestOptions}
       />

@@ -227,4 +227,22 @@ test.describe("Relatórios — filtro de safra (FARMER)", () => {
     await expect(selectedHarvest(page)).toHaveText(/^Todas as safras$/);
     await expectCards(page, [CARD_A1, CARD_A2, CARD_B1], []);
   });
+
+  test("resumo do agricultor com erro 500 abre em 'Todas as safras', sem alerta", async ({
+    page,
+  }) => {
+    await loginAsFarmer(page);
+    await mockReports(page, HARVEST_A);
+    // Registrada depois, esta rota tem prioridade sobre a do `mockReports`.
+    await page.route("**/analytics/farmers/me/summary*", (route) =>
+      route.fulfill(json({ message: "Erro interno" }, 500)),
+    );
+
+    await page.goto("/admin/relatorios");
+
+    await expect(selectedHarvest(page)).toHaveText(/^Todas as safras$/);
+    await expectCards(page, [CARD_A1, CARD_A2, CARD_B1], []);
+    // O único `alert` da página é o anunciador de rota do Next, vazio.
+    await expect(page.getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0);
+  });
 });
