@@ -757,6 +757,43 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
     await expect(dialog).toBeVisible();
   });
 
+  test("ADMIN abre a exclusão de um apontamento, lê o aviso de fotos e ocorrências e cancela", async ({
+    page,
+  }) => {
+    await loginAs(page, "ADMIN", {
+      id: "cccccccc-1111-0000-0000-000000000009",
+      fullName: "Admin E2E",
+      email: "admin@example.com",
+      cpf: "11122233344",
+      role: "ADMIN",
+      dateOfBirth: null,
+    });
+    await mockPlan(page, [makeExecution("ex-a", "2026-05-10")]);
+
+    // Qualquer DELETE aqui seria um bug: o teste só cancela.
+    let deleted = false;
+    page.on("request", (request) => {
+      if (request.method() === "DELETE") deleted = true;
+    });
+
+    await page.goto(PLAN_URL);
+    await page.getByRole("button", { name: /^Excluir apontamento/ }).click();
+
+    const dialog = page.getByRole("alertdialog", { name: "Excluir apontamento" });
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByText("As fotos e as ocorrências registradas neste apontamento deixarão de aparecer.", {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(dialog.getByText(/do histórico de colheita\. Não é possível desfazer\.$/)).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await expect(dialog).toBeHidden();
+    expect(deleted).toBe(false);
+    await expect(page.getByRole("button", { name: /^Excluir apontamento/ })).toHaveCount(1);
+  });
+
   test("FARMER nunca vê Validar/Rejeitar e corrige o apontamento rejeitado, que volta a Pendente", async ({
     page,
   }) => {

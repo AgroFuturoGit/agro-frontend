@@ -151,3 +151,23 @@ describe.each(CASES)("diálogo de exclusão de $name (UNIT-007)", (c) => {
     expect(onDeleted).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("diálogo de exclusão de apontamento: aviso de fotos e ocorrências (RF3)", () => {
+  const AVISO = "As fotos e as ocorrências registradas neste apontamento deixarão de aparecer.";
+
+  it("mostra o aviso logo abaixo da frase original, e os dois descrevem o diálogo", async () => {
+    render(
+      <DeleteExecutionDialog execution={EXECUTION} open onOpenChange={vi.fn()} onDeleted={vi.fn()} />,
+    );
+
+    const dialog = await screen.findByRole("alertdialog", { name: "Excluir apontamento" });
+    expect(screen.getByText(AVISO)).toBeInTheDocument();
+    // A frase original continua inteira, inclusive o "não dá para desfazer".
+    expect(screen.getByText(/do histórico de colheita\. Não é possível desfazer\.$/)).toBeInTheDocument();
+    expect(dialog).toHaveAccessibleDescription(
+      /^Esta ação removerá o apontamento de .+ do histórico de colheita\. Não é possível desfazer\.\s*As fotos e as ocorrências registradas neste apontamento deixarão de aparecer\.$/,
+    );
+    // Não promete apagar nada de forma definitiva.
+    expect(dialog.textContent).not.toMatch(/definitiv|permanente|apagad|removidas/i);
+  });
+});
