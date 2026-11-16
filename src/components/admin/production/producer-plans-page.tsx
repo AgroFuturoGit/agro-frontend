@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -62,9 +68,10 @@ type Props = {
   producerId: string;
 };
 
+/** Organização e comunidade ficam ausentes quando o papel não as exibe (TECHNICIAN). */
 type BreadcrumbNames = {
-  organizationName: string;
-  communityName: string;
+  organizationName?: string;
+  communityName?: string;
   producerLabel: string;
 };
 
@@ -135,7 +142,11 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
     pageSize: 10,
   });
 
-  useEffect(() => {
+  // Layout effect: a role é lida antes da primeira pintura, então o
+  // breadcrumb já sai com os níveis do papel, sem o frame com a role nula
+  // (e sem o salto do espaço reservado para o FARMER). Até a leitura, a
+  // role é nula e nenhuma afordância de escrita renderiza (RN4).
+  useLayoutEffect(() => {
     setCurrentRole(readUserFromStorage()?.role ?? null);
     setRoleResolved(true);
   }, []);
@@ -221,23 +232,12 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
       // nome sai da lista dos agricultores atendidos por ele. O breadcrumb do
       // técnico não mostra organização nem comunidade.
       getMyAssignedProducers()
-        .then((producers) => {
-          if (!active) return;
-          const producer = producers.find((item) => item.id === producerId);
-          setNames({
-            organizationName: "Organização",
-            communityName: "Comunidade",
-            producerLabel: producerDisplayName(producer),
-          });
-        })
-        .catch(() => {
-          if (active) {
-            setNames({
-              organizationName: "Organização",
-              communityName: "Comunidade",
-              producerLabel: "Agricultor",
-            });
-          }
+        .then((producers) =>
+          producerDisplayName(producers.find((item) => item.id === producerId)),
+        )
+        .catch(() => "Agricultor")
+        .then((producerLabel) => {
+          if (active) setNames({ producerLabel });
         });
       return () => {
         active = false;

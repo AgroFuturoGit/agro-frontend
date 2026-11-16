@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Check,
   FileQuestion,
@@ -82,9 +88,10 @@ type Props = {
   planId: string;
 };
 
+/** Organização e comunidade ficam ausentes quando o papel não as exibe (TECHNICIAN). */
 type BreadcrumbNames = {
-  organizationName: string;
-  communityName: string;
+  organizationName?: string;
+  communityName?: string;
   producerLabel: string;
 };
 
@@ -229,7 +236,9 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     pageSize: 10,
   });
 
-  useEffect(() => {
+  // Layout effect: a role é lida antes da primeira pintura (breadcrumb sem
+  // o frame com a role nula). Até lá, nada de escrita renderiza (RN4).
+  useLayoutEffect(() => {
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
@@ -264,11 +273,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
           const assigned = await getMyAssignedProducers();
           if (!active) return;
           const producer = assigned.find((item) => item.id === producerId);
-          setNames({
-            organizationName: "Organização",
-            communityName: "Comunidade",
-            producerLabel: producerDisplayName(producer),
-          });
+          setNames({ producerLabel: producerDisplayName(producer) });
           return;
         }
 
