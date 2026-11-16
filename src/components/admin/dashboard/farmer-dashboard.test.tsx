@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { FarmerDashboard } from "@/components/admin/dashboard/farmer-dashboard";
 import {
@@ -368,6 +368,39 @@ describe("FarmerDashboard — paginação dos cartões de plano", () => {
     expect(screen.getAllByTestId("farmer-plan-card")).toHaveLength(1);
     expect(screen.getByRole("status").textContent).toBe("Exibindo 10–10 de 10");
     expect(screen.getByText("Página 2 de 2")).toBeTruthy();
+  });
+
+  it("na última página o foco vai para 'Página 2 de 2', não para o body", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({ ...SUMMARY, plans: manyCards(10) });
+    render(<FarmerDashboard />);
+    await screen.findAllByTestId("farmer-plan-card");
+    const next = screen.getByRole("button", { name: "Próxima página" }) as HTMLButtonElement;
+    next.focus();
+    fireEvent.click(next);
+    const label = within(pager()!).getByText("Página 2 de 2", { exact: true });
+    expect(next.disabled).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(label);
+  });
+
+  it("'Voltar para a safra vigente' volta para a página 1", async () => {
+    vi.mocked(getFarmerSummary).mockImplementation(async (harvestId?: string) =>
+      harvestId
+        ? { ...SUMMARY, isEmpty: true, plans: [] }
+        : { ...SUMMARY, plans: manyCards(10) },
+    );
+    render(<FarmerDashboard />);
+    await screen.findAllByTestId("farmer-plan-card");
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(screen.getByText("Página 2 de 2")).toBeTruthy();
+
+    await waitFor(() => expect(listHarvests).toHaveBeenCalled());
+    await chooseHarvest("Safra 2025");
+    fireEvent.click(await screen.findByRole("button", { name: "Voltar para a safra vigente" }));
+    await waitFor(() => expect(getFarmerSummary).toHaveBeenLastCalledWith(undefined));
+    expect(await screen.findByText("Página 1 de 2")).toBeTruthy();
+    expect(screen.getAllByTestId("farmer-plan-card")).toHaveLength(9);
+    expect(screen.getByRole("status").textContent).toBe("Exibindo 1–9 de 10");
   });
 
   it("9 planos ou menos ficam sem barra", async () => {
