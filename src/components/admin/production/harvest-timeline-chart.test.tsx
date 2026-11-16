@@ -127,6 +127,14 @@ async function renderChart(
 ) {
   const utils = render(<ContinuousHarvestChart plan={plan} executions={executions} />);
   await waitFor(() => expect(screen.queryByLabelText("Carregando gráfico")).toBeNull());
+  // O skeleton some no commit do DOM, mas o ECharts é iniciado e recebe a
+  // option num useEffect, que o React 19 pode rodar logo depois desse commit.
+  // Sob carga, ler `echarts.init`/`setOption` aqui pegava o intervalo entre os
+  // dois (falhas intermitentes em BR-015, CR-001 e na curva prevista). Com o
+  // contêiner do gráfico na tela, espera a primeira option ser aplicada.
+  if (screen.queryByRole("img")) {
+    await waitFor(() => expect(chart.setOption).toHaveBeenCalled());
+  }
   return utils;
 }
 
