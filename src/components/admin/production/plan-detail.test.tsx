@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 
 import { PlanDetail } from "@/components/admin/production/plan-detail";
@@ -426,6 +427,40 @@ describe("PlanDetail — exclusão de apontamento pelo FARMER", () => {
     ).toBeTruthy();
     expect(vi.mocked(listProductionExecutions).mock.calls.length).toBe(1);
   });
+});
+
+/**
+ * RF3: o aviso de fotos e ocorrências aparece para todo papel que pode excluir
+ * o apontamento. `EXECUTIONS` tem um apontamento PENDING, que os 3 papéis
+ * podem excluir (`canDeleteExecution`).
+ */
+describe("PlanDetail — aviso de fotos e ocorrências na exclusão (RF3)", () => {
+  it.each(["ADMIN", "TECHNICIAN", "FARMER"] as const)(
+    "%s: o diálogo de exclusão avisa que fotos e ocorrências deixarão de aparecer",
+    async (role) => {
+      loginAs(role);
+
+      renderPlanDetail();
+
+      await expectPlanIsReadable();
+      fireEvent.click(
+        screen.getByRole("button", { name: /^Excluir apontamento/ }),
+      );
+      const dialog = await screen.findByRole("alertdialog", {
+        name: "Excluir apontamento",
+      });
+
+      expect(
+        within(dialog).getByText(
+          "As fotos e as ocorrências registradas neste apontamento deixarão de aparecer.",
+        ),
+      ).toBeTruthy();
+      expect(dialog).toHaveAccessibleDescription(
+        "Esta ação removerá o apontamento de 10/05/2026 (12 caixas) do histórico de colheita. Não é possível desfazer. As fotos e as ocorrências registradas neste apontamento deixarão de aparecer.",
+      );
+      expect(deleteProductionExecution).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("PlanDetail — erro de API e recuperação", () => {

@@ -74,20 +74,29 @@ export function DeleteExecutionDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Excluir apontamento</AlertDialogTitle>
-          <AlertDialogDescription>
-            Esta ação removerá o apontamento de{" "}
-            <span className="font-medium text-foreground">
-              {formatPlanDate(execution?.harvestedAt)}
-            </span>
-            {execution && (
-              <>
-                {" "}
-                (
-                {formatNumber(execution.quantity)}{" "}
-                {unitLabel(unit, execution.quantity)})
-              </>
-            )}{" "}
-            do histórico de colheita. Não é possível desfazer.
+          {/* `div` em vez do `p` padrão: a descrição tem dois parágrafos e os
+              dois entram no nome acessível do diálogo (aria-describedby). */}
+          <AlertDialogDescription render={<div />} className="space-y-2">
+            <p>
+              Esta ação removerá o apontamento de{" "}
+              <span className="font-medium text-foreground">
+                {formatPlanDate(execution?.harvestedAt)}
+              </span>
+              {execution && (
+                <>
+                  {" "}
+                  (
+                  {formatNumber(execution.quantity)}{" "}
+                  {unitLabel(unit, execution.quantity)})
+                </>
+              )}{" "}
+              do histórico de colheita. Não é possível desfazer.
+            </p>
+            {/* Fiel ao back: a exclusão é lógica e só do apontamento; fotos e
+                ocorrências só são lidas através dele, por isso somem da tela. */}
+            <p>
+              As fotos e as ocorrências registradas neste apontamento deixarão de aparecer.
+            </p>
           </AlertDialogDescription>
         </AlertDialogHeader>
 
