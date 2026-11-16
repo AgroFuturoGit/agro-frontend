@@ -164,10 +164,10 @@ describe("diálogo de exclusão de apontamento: aviso de fotos e ocorrências (R
     expect(screen.getByText(AVISO)).toBeInTheDocument();
     // A frase original continua inteira, inclusive o "não dá para desfazer".
     expect(screen.getByText(/do histórico de colheita\. Não é possível desfazer\.$/)).toBeInTheDocument();
+    // A descrição acessível é exatamente as duas frases, nesta ordem: o aviso
+    // diz que fotos e ocorrências deixam de aparecer, sem prometer exclusão.
     expect(dialog).toHaveAccessibleDescription(
-      /^Esta ação removerá o apontamento de .+ do histórico de colheita\. Não é possível desfazer\.\s*As fotos e as ocorrências registradas neste apontamento deixarão de aparecer\.$/,
+      `Esta ação removerá o apontamento de 10/05/2026 (3 kg) do histórico de colheita. Não é possível desfazer. ${AVISO}`,
     );
-    // Não promete apagar nada de forma definitiva.
-    expect(dialog.textContent).not.toMatch(/definitiv|permanente|apagad|removidas/i);
   });
 });

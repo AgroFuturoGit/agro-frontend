@@ -770,16 +770,22 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
     });
     await mockPlan(page, [makeExecution("ex-a", "2026-05-10")]);
 
-    // Qualquer DELETE aqui seria um bug: o teste só cancela.
-    let deleted = false;
-    page.on("request", (request) => {
-      if (request.method() === "DELETE") deleted = true;
+    // Qualquer DELETE aqui seria um bug: o teste só cancela. A rota aborta a
+    // chamada, para nada chegar ao back mesmo se o teste regredir.
+    let deleteAttempted = false;
+    await page.route("**/production-executions/ex-a", async (route) => {
+      if (route.request().method() !== "DELETE") {
+        await route.fallback();
+        return;
+      }
+      deleteAttempted = true;
+      await route.abort();
     });
 
     await page.goto(PLAN_URL);
     await page.getByRole("button", { name: /^Excluir apontamento/ }).click();
 
-    const dialog = page.getByRole("alertdialog", { name: "Excluir apontamento" });
+    const dialog = page.getByRole("alertdialog", { name: "Excluir apontamento", exact: true });
     await expect(dialog).toBeVisible();
     await expect(
       dialog.getByText("As fotos e as ocorrências registradas neste apontamento deixarão de aparecer.", {
@@ -790,7 +796,7 @@ test.describe("Detalhe do plano — validação de apontamentos (mockado)", () =
 
     await dialog.getByRole("button", { name: "Cancelar", exact: true }).click();
     await expect(dialog).toBeHidden();
-    expect(deleted).toBe(false);
+    expect(deleteAttempted).toBe(false);
     await expect(page.getByRole("button", { name: /^Excluir apontamento/ })).toHaveCount(1);
   });
 
