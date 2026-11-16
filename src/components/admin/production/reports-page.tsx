@@ -127,6 +127,19 @@ export function ReportsPage() {
   // nela, "Todas". `null` = ainda sem carga bem-sucedida.
   const [harvestFilter, setHarvestFilter] = useState<string | null>(null);
 
+  // Filtro no cliente: as comparações já foram buscadas uma vez só.
+  const selectedHarvest = harvestFilter ?? ALL;
+  const filtered = useMemo(
+    () =>
+      selectedHarvest === ALL
+        ? reports
+        : reports.filter((r) => r.plan.harvest?.id === selectedHarvest),
+    [reports, selectedHarvest],
+  );
+  // Só os cards são paginados; o consolidado e as barras usam `filtered` inteiro.
+  const pagedCards = usePagedItems(filtered, CARD_PAGE_SIZE);
+  const { reset: resetCardsPage } = pagedCards;
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -150,6 +163,8 @@ export function ReportsPage() {
       const currentId = await currentHarvestId;
       setHarvestFilter((previous) => pickHarvestFilter(previous, plans, currentId));
       setReports(data);
+      // Nova carga (o recorte pode ter mudado): os cards voltam à página 1.
+      resetCardsPage();
     } catch (err) {
       setError(
         apiErrorMessage(err, LOAD_ERROR),
@@ -157,7 +172,7 @@ export function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [resetCardsPage]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -190,18 +205,6 @@ export function ReportsPage() {
     ];
   }, [reports]);
 
-  // Filtro no cliente: as comparações já foram buscadas uma vez só.
-  const selectedHarvest = harvestFilter ?? ALL;
-  const filtered = useMemo(
-    () =>
-      selectedHarvest === ALL
-        ? reports
-        : reports.filter((r) => r.plan.harvest?.id === selectedHarvest),
-    [reports, selectedHarvest],
-  );
-  // Só os cards são paginados; o consolidado e as barras usam `filtered` inteiro.
-  const pagedCards = usePagedItems(filtered, CARD_PAGE_SIZE);
-  const { reset: resetCardsPage } = pagedCards;
   const changeHarvest = useCallback(
     (value: string) => {
       setHarvestFilter(value);

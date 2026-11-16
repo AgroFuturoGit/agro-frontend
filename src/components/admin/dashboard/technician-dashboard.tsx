@@ -297,6 +297,13 @@ export function TechnicianDashboard() {
     };
   }, []);
 
+  const warnings = useMemo(
+    () => sortWarnings(summary?.warnings ?? []),
+    [summary],
+  );
+  const pagedWarnings = usePagedItems(warnings, CARD_PAGE_SIZE);
+  const { reset: resetWarningsPage } = pagedWarnings;
+
   // Só a resposta da consulta mais recente vale.
   const requestSeq = useRef(0);
 
@@ -336,8 +343,10 @@ export function TechnicianDashboard() {
           setCommunityOptions(options);
           optionsKey.current = key;
           if (!options.some((o) => o.value === c)) {
-            // A comunidade não existe neste recorte: volta para "Todas".
+            // A comunidade não existe neste recorte: volta para "Todas"
+            // (troca de filtro: os cartões voltam para a página 1).
             setCommunityId(ALL);
+            resetWarningsPage();
             return;
           }
         }
@@ -361,19 +370,12 @@ export function TechnicianDashboard() {
     } finally {
       if (seq === requestSeq.current) setLoading(false);
     }
-  }, []);
+  }, [resetWarningsPage]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load(harvestId, communityId, cropId);
   }, [load, harvestId, communityId, cropId]);
-
-  const warnings = useMemo(
-    () => sortWarnings(summary?.warnings ?? []),
-    [summary],
-  );
-  const pagedWarnings = usePagedItems(warnings, CARD_PAGE_SIZE);
-  const { reset: resetWarningsPage } = pagedWarnings;
 
   // Trocar qualquer filtro volta os cartões de alerta para a página 1.
   const changeHarvest = (next: string) => {
