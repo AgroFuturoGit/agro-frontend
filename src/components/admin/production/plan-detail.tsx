@@ -38,8 +38,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
+import { withFocusMove } from "@/lib/focus";
 import { harvestText } from "@/lib/harvest-label";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { PLAN_STATUS_VARIANT } from "@/lib/status-variants";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity } from "@/lib/communities";
@@ -86,6 +87,26 @@ type BreadcrumbNames = {
 };
 
 const columnHelper = createColumnHelper<ProductionExecution>();
+
+/**
+ * Nome acessível das ações de um apontamento: a data identifica o registro na
+ * lista de botões e no comando de voz (A11Y-L4-4, A11Y-L6-7), sempre DEPOIS
+ * do texto visível ("Validar apontamento de 05/03/2026"), por causa do 2.5.3.
+ */
+function executionActionLabel(
+  action: string,
+  execution: ProductionExecution,
+  quantityText: string,
+) {
+  // Sem data, a quantidade (que a linha também mostra) diferencia os
+  // apontamentos, para não repetir o mesmo nome em várias linhas.
+  return execution.harvestedAt
+    ? `${action} de ${formatPlanDate(execution.harvestedAt)}`
+    : `${action} de ${quantityText} (sem data)`;
+}
+
+/** `id` do título da página: alvo do foco do "Tentar novamente" (A11Y-L6-5). */
+const PLAN_TITLE_ID = "plan-title";
 
 // Matriz de ações por role × status (segue o back `develop`):
 // - PENDING: ADMIN/TECHNICIAN/FARMER editam e excluem; ADMIN/TECHNICIAN/MANAGER
@@ -325,8 +346,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       // "Erro 500" cru não ajuda: cai na mensagem genérica.
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível carregar o plano de produção.",
+        apiErrorMessage(err, "Não foi possível carregar o plano de produção."),
       );
     } finally {
       setLoading(false);
@@ -348,15 +368,18 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
   // (leitura → decisão → edição → exclusão).
   const rowActions = useCallback(
     (execution: ProductionExecution): DataTableRowAction[] => {
+      // "Editar apontamento de 05/03/2026" (A11Y-L4-4).
+      const named = (action: string) =>
+        executionActionLabel(action, execution, formatQuantity(execution.quantity));
       const actions: DataTableRowAction[] = [
         {
-          label: "Ocorrências do apontamento",
+          label: named("Ocorrências do apontamento"),
           title: "Ocorrências",
           icon: MessageSquareWarning,
           onClick: () => setOccurrencesTarget(execution),
         },
         {
-          label: "Fotos do apontamento",
+          label: named("Fotos do apontamento"),
           title: "Fotos",
           icon: Images,
           onClick: () => setAttachmentsTarget(execution),
@@ -365,14 +388,14 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       if (canDecideExecution(currentRole, execution)) {
         actions.push(
           {
-            label: "Validar apontamento",
+            label: named("Validar apontamento"),
             title: "Validar",
             icon: Check,
             tone: "primary",
             onClick: () => setDecision({ mode: "validate", execution }),
           },
           {
-            label: "Rejeitar apontamento",
+            label: named("Rejeitar apontamento"),
             title: "Rejeitar",
             icon: X,
             tone: "destructive",
@@ -382,7 +405,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       if (canEditExecution(currentRole, execution)) {
         actions.push({
-          label: "Editar apontamento",
+          label: named("Editar apontamento"),
           title: "Editar",
           icon: Pencil,
           onClick: () => setEditTarget(execution),
@@ -390,7 +413,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       if (canDelete && canDeleteExecution(currentRole, execution)) {
         actions.push({
-          label: "Excluir apontamento",
+          label: named("Excluir apontamento"),
           title: "Excluir",
           icon: Trash2,
           tone: "destructive",
@@ -399,7 +422,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       }
       return actions;
     },
-    [canDelete, currentRole],
+    [canDelete, currentRole, formatQuantity],
   );
 
   const columns = useMemo(() => {
@@ -488,6 +511,10 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
     const edit = canEditExecution(currentRole, execution);
     const remove = canDelete && canDeleteExecution(currentRole, execution);
     const decide = canDecideExecution(currentRole, execution);
+    // Mesmos nomes do desktop, com a data (A11Y-L6-7); o texto visível do
+    // botão abre o nome (2.5.3).
+    const named = (action: string) =>
+      executionActionLabel(action, execution, formatQuantity(execution.quantity));
     return (
       <Card className="p-4">
         <div className="flex items-center justify-between gap-3">
@@ -512,6 +539,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               type="button"
               variant="outline"
               size="sm"
+              aria-label={named("Ocorrências do apontamento")}
               onClick={() => setOccurrencesTarget(execution)}
             >
               <MessageSquareWarning />
@@ -521,6 +549,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
               type="button"
               variant="outline"
               size="sm"
+              aria-label={named("Fotos do apontamento")}
               onClick={() => setAttachmentsTarget(execution)}
             >
               <Images />
@@ -532,6 +561,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
                   type="button"
                   variant="outline"
                   size="sm"
+                  aria-label={named("Validar apontamento")}
                   onClick={() => setDecision({ mode: "validate", execution })}
                 >
                   <Check />
@@ -541,6 +571,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
                   type="button"
                   variant="outline"
                   size="sm"
+                  aria-label={named("Rejeitar apontamento")}
                   onClick={() => setDecision({ mode: "reject", execution })}
                 >
                   <X />
@@ -553,6 +584,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
                 type="button"
                 variant="outline"
                 size="sm"
+                aria-label={named("Editar apontamento")}
                 onClick={() => setEditTarget(execution)}
               >
                 <Pencil />
@@ -564,7 +596,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
                 type="button"
                 variant="outline"
                 size="icon-sm"
-                aria-label="Excluir apontamento"
+                aria-label={named("Excluir apontamento")}
                 onClick={() => setDeleteTarget(execution)}
               >
                 <Trash2 />
@@ -627,6 +659,8 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
         ]}
         back={{ href: backToPlansHref, label: "Voltar para planos" }}
         loading={loading}
+        // O <h2> fica montado no loading: alvo do "Tentar novamente".
+        titleId={PLAN_TITLE_ID}
         title={planTitle}
         description={plan ? <PlanMeta plan={plan} /> : undefined}
       />
@@ -635,7 +669,11 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
       {error && (
         <InlineAlert
           variant="destructive"
-          action={{ label: "Tentar novamente", onClick: () => refresh() }}
+          // O alerta desmonta com a nova carga (A11Y-L6-5).
+          action={{
+            label: "Tentar novamente",
+            onClick: withFocusMove(PLAN_TITLE_ID, () => refresh()),
+          }}
         >
           {error}
         </InlineAlert>
@@ -675,6 +713,7 @@ export function PlanDetail({ orgId, communityId, producerId, planId }: Props) {
             o DataTable não recebe `hasError`.
           */}
           <DataTable
+            label="Lista de apontamentos"
             table={table}
             columns={columns}
             isLoading={loading}

@@ -29,7 +29,7 @@ import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { userFacingErrorHint, apiDomainMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { listCommunities, type Community } from "@/lib/communities";
 import { getMyManager } from "@/lib/managers";
@@ -111,9 +111,10 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
         } catch (err) {
           setOrganization(null);
           setCommunities([]);
+          const hint = apiDomainMessage(err);
           setError(
-            err instanceof ApiError
-              ? `Não foi possível identificar a sua organização: ${err.message}`
+            hint
+              ? `Não foi possível identificar a sua organização: ${hint}`
               : "Não foi possível identificar a sua organização. Sem ela, as comunidades não podem ser listadas.",
           );
           return;
@@ -144,11 +145,7 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
     } catch (err) {
       setOrganization(null);
       setCommunities([]);
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar as comunidades desta organização.",
-      );
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }
@@ -289,10 +286,11 @@ export function OrganizationCommunitiesPage({ orgId }: Props) {
       <DataTableToolbar table={table} searchPlaceholder="Buscar por nome…" />
 
       <DataTable
+        label="Lista de comunidades"
         table={table}
         columns={columns}
         isLoading={loading}
-        hasError={Boolean(error)}
+        hasError={error !== null}
         onRetry={refresh}
         errorHint={userFacingErrorHint(error)}
         hasActiveFilters={Boolean(table.getState().globalFilter)}

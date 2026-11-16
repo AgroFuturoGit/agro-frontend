@@ -35,7 +35,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { withFocusMove } from "@/lib/focus";
+import { userFacingErrorHint, apiDomainMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCnpj } from "@/lib/cnpj";
 import { getMyManager } from "@/lib/managers";
@@ -50,6 +51,9 @@ import { getMyAssignedProducers } from "@/lib/technicians";
 
 import { ManagerRegisterDrawer } from "./manager-register-drawer";
 import { OrganizationFormDrawer } from "./organization-form-drawer";
+
+/** `id` do título na passagem GESTOR/AGRICULTOR: alvo do "Tentar novamente" (A11Y-L6-5). */
+const REDIRECT_TITLE_ID = "organizations-redirect-title";
 
 /** Busca livre por nome ou CNPJ (com ou sem máscara), case-insensitive. */
 function organizationsGlobalFilter(
@@ -163,9 +167,10 @@ export function OrganizationsPage() {
         const manager = await getMyManager();
         router.replace(`/admin/organizacoes/${manager.organization.id}`);
       } catch (err) {
+        const hint = apiDomainMessage(err);
         setRedirectError(
-          err instanceof ApiError
-            ? `Não foi possível identificar a sua organização: ${err.message}`
+          hint
+            ? `Não foi possível identificar a sua organização: ${hint}`
             : "Não foi possível identificar a sua organização.",
         );
       }
@@ -187,9 +192,10 @@ export function OrganizationsPage() {
           `/admin/organizacoes/${community.organization.id}/comunidades/${community.id}/produtores/${producer.id}`,
         );
       } catch (err) {
+        const hint = apiDomainMessage(err);
         setRedirectError(
-          err instanceof ApiError
-            ? `Não foi possível identificar o seu agricultor: ${err.message}`
+          hint
+            ? `Não foi possível identificar o seu agricultor: ${hint}`
             : "Não foi possível identificar o seu agricultor.",
         );
       }
@@ -203,11 +209,7 @@ export function OrganizationsPage() {
         const data = await getMyAssignedProducers();
         setAssignedProducers(data);
       } catch (err) {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Não foi possível carregar os agricultores atendidos.",
-        );
+        setError(apiDomainMessage(err) ?? "");
       } finally {
         setLoading(false);
       }
@@ -221,11 +223,7 @@ export function OrganizationsPage() {
       const data = await listOrganizations();
       setOrganizations(data);
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar as organizações.",
-      );
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }
@@ -443,12 +441,18 @@ export function OrganizationsPage() {
       <div className="flex flex-col gap-section-sm">
         <PageHeader
           title="Organizações"
+          titleId={REDIRECT_TITLE_ID}
           description={redirectError ? undefined : redirectDescription}
         />
         {redirectError ? (
           <InlineAlert
             variant="destructive"
-            action={{ label: "Tentar novamente", onClick: () => resolveAndLoad() }}
+            // O alerta desmonta com a nova tentativa: o foco vai ao título,
+            // que fica montado (A11Y-L6-5).
+            action={{
+              label: "Tentar novamente",
+              onClick: withFocusMove(REDIRECT_TITLE_ID, () => resolveAndLoad()),
+            }}
           >
             {redirectError}
           </InlineAlert>
@@ -471,10 +475,11 @@ export function OrganizationsPage() {
         />
 
         <DataTable
+          label="Lista de agricultores atendidos"
           table={producersTable}
           columns={producerColumns}
           isLoading={loading}
-          hasError={Boolean(error)}
+          hasError={error !== null}
           onRetry={resolveAndLoad}
           errorHint={userFacingErrorHint(error)}
           emptyTitle="Nenhum agricultor atribuído a você ainda."
@@ -484,7 +489,7 @@ export function OrganizationsPage() {
 
         {/* Como no Figma (135:898), sem paginação para listas curtas. Acima
             do menor tamanho de página, a lista passa a ser paginada (13.2). */}
-        {!loading && !error && needsPagination(sortedAssignedProducers.length) ? (
+        {!loading && error === null && needsPagination(sortedAssignedProducers.length) ? (
           <DataTablePagination table={producersTable} />
         ) : null}
       </div>
@@ -524,10 +529,11 @@ export function OrganizationsPage() {
       />
 
       <DataTable
+        label="Lista de organizações"
         table={table}
         columns={columns}
         isLoading={loading}
-        hasError={Boolean(error)}
+        hasError={error !== null}
         onRetry={resolveAndLoad}
         errorHint={userFacingErrorHint(error)}
         hasActiveFilters={

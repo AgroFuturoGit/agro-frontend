@@ -16,7 +16,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
 import { unitLabel, type MeasurementUnit } from "@/lib/crops";
 import {
   formatNumber,
@@ -80,10 +80,12 @@ export function ExecutionDecisionDialog({
       onOpenChange(false);
     } catch (err) {
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          (isReject
+        apiErrorMessage(
+          err,
+          isReject
             ? "Não foi possível rejeitar o apontamento."
-            : "Não foi possível validar o apontamento."),
+            : "Não foi possível validar o apontamento.",
+        ),
       );
     } finally {
       setSubmitting(false);

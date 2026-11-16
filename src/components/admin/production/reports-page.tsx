@@ -18,8 +18,9 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { withFocusMove } from "@/lib/focus";
 import { harvestText } from "@/lib/harvest-label";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { getMyProducer, type Producer } from "@/lib/producers";
 import {
@@ -33,6 +34,7 @@ import {
 import { ComparisonSummary } from "./comparison-summary";
 
 const LOAD_ERROR = "Não foi possível carregar os relatórios.";
+const TITLE_ID = "reports-title";
 
 const planTitle = (plan: ProductionPlan) =>
   plan.crop ? `${plan.crop.name} — ${plan.crop.variety}` : "Plano";
@@ -77,8 +79,7 @@ export function ReportsPage() {
       setReports(data);
     } catch (err) {
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          LOAD_ERROR,
+        apiErrorMessage(err, LOAD_ERROR),
       );
     } finally {
       setLoading(false);
@@ -339,11 +340,18 @@ export function ReportsPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="Relatórios"
+        titleId={TITLE_ID}
         description="Comparativo de previsto vs realizado (em kg) por plano de produção. Somente apontamentos validados contam no realizado."
       />
 
       {error && (
-        <InlineAlert action={{ label: "Tentar novamente", onClick: () => refresh() }}>
+        <InlineAlert
+          action={{
+            label: "Tentar novamente",
+            // O alerta some com a nova carga: o foco vai para o título.
+            onClick: withFocusMove(TITLE_ID, () => refresh()),
+          }}
+        >
           {error}
         </InlineAlert>
       )}

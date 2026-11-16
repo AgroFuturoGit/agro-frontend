@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ExternalLink, Loader2, MessageSquareWarning, Pencil, Plus, Trash2 } from "lucide-react";
 
 import {
@@ -32,7 +32,9 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { FOCUS_TARGET, moveFocusTo } from "@/lib/focus";
+import { cn } from "@/lib/utils";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import {
   OCCURRENCE_TYPES,
   OCCURRENCE_TYPE_LABELS,
@@ -107,6 +109,8 @@ export function ExecutionOccurrencesSheet({
   const [items, setItems] = useState<FieldOccurrence[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Alvo do foco do "Tentar novamente" (A11Y-L6-5).
+  const titleId = useId();
 
   const [formVisible, setFormVisible] = useState(false);
   const [editTarget, setEditTarget] = useState<FieldOccurrence | null>(null);
@@ -149,8 +153,7 @@ export function ExecutionOccurrencesSheet({
     } catch (err) {
       if (seq !== loadSeq.current) return;
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível carregar as ocorrências.",
+        apiErrorMessage(err, "Não foi possível carregar as ocorrências."),
       );
     } finally {
       if (seq === loadSeq.current) setLoading(false);
@@ -229,7 +232,7 @@ export function ExecutionOccurrencesSheet({
           setFieldErrors(fromApi);
         } else {
           setFormError(
-            userFacingErrorHint(err.message) ?? "Não foi possível salvar a ocorrência.",
+            apiErrorMessage(err, "Não foi possível salvar a ocorrência."),
           );
         }
       } else {
@@ -250,8 +253,7 @@ export function ExecutionOccurrencesSheet({
       await refresh();
     } catch (err) {
       setDeleteError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          "Não foi possível excluir a ocorrência.",
+        apiErrorMessage(err, "Não foi possível excluir a ocorrência."),
       );
     } finally {
       setDeleting(false);
@@ -271,7 +273,15 @@ export function ExecutionOccurrencesSheet({
       return (
         <InlineAlert
           variant="destructive"
-          action={{ label: "Tentar novamente", onClick: () => refresh() }}
+          // O alerta desmonta com a nova carga: o foco vai para o título do
+          // sheet, que fica montado (A11Y-L6-5).
+          action={{
+            label: "Tentar novamente",
+            onClick: () => {
+              moveFocusTo(titleId);
+              refresh();
+            },
+          }}
         >
           {error}
         </InlineAlert>
@@ -375,7 +385,9 @@ export function ExecutionOccurrencesSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Ocorrências do apontamento</SheetTitle>
+          <SheetTitle id={titleId} className={cn("rounded-sm", FOCUS_TARGET)}>
+            Ocorrências do apontamento
+          </SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
 

@@ -240,6 +240,26 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("FARMER: erro na guarda — 'Tentar novamente' leva o foco ao título (A11Y-L6-5)", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(getMyProducer).mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    renderPage();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain(
+      "Não foi possível verificar o acesso a este agricultor. Tente novamente em alguns instantes.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+
+    await screen.findByText("Milho — BRS 1010");
+    expect(document.activeElement?.id).toBe("producer-plans-title");
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { level: 2, name: "Planos de produção" }),
+    );
+  });
+
   it("blocos da página separados por gap-section (planos × seções sociais)", async () => {
     loginAs("ADMIN");
     vi.mocked(listProductionPlans).mockResolvedValue(PLANS);

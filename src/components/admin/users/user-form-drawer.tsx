@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
 import { persistSession, readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
@@ -207,9 +207,7 @@ export function UserFormDrawer({
       onOpenChange(false);
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível salvar o usuário.",
+        apiErrorMessage(err, "Não foi possível salvar o usuário."),
       );
     } finally {
       setSubmitting(false);

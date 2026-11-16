@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { BarChart, LineChart } from "echarts/charts";
 import {
   AriaComponent,
@@ -24,8 +24,9 @@ import {
 import { Card } from "@/components/ui/card";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { moveFocusTo } from "@/lib/focus";
 import { getHarvestTimeline } from "@/lib/analytics";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
   hasValidExpectedWindow,
@@ -119,14 +120,14 @@ function useThemeVersion(
  */
 export function HarvestChartSkeleton() {
   return (
-    <Card aria-busy="true" aria-label="Carregando gráfico" className="p-6">
+    <Card role="group" aria-busy="true" aria-label="Carregando gráfico" className="p-6">
       <div className="flex flex-col gap-1">
         <Skeleton className="h-7 w-48" />
         <Skeleton className="h-6 w-64 max-w-full" />
       </div>
       <Skeleton className="w-full" style={{ height: CHART_HEIGHT }} />
       <Skeleton className="h-4 w-56" />
-      <span className="sr-only">Carregando gráfico…</span>
+      <span role="status" className="sr-only">Carregando gráfico…</span>
     </Card>
   );
 }
@@ -152,6 +153,9 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
+  // Alvo do foco do "Tentar novamente" (A11Y-L6-5): o <h3> do card fica
+  // montado de erro → carregando → gráfico (mesma raiz <Card>).
+  const titleId = useId();
 
   // BR-008: recarrega quando a lista de apontamentos (ou a granularidade) muda.
   const load = useCallback(async () => {
@@ -166,8 +170,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
       setData(null);
       // "Erro 500" cru não ajuda o usuário: cai na mensagem genérica.
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          LOAD_ERROR,
+        apiErrorMessage(err, LOAD_ERROR),
       );
     } finally {
       if (request === requestRef.current) setLoading(false);
@@ -269,10 +272,17 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   if (error) {
     return (
       <Card className="p-6">
-        <SectionHeader title={TITLE} />
+        <SectionHeader id={titleId} title={TITLE} />
         <InlineAlert
           variant="destructive"
-          action={{ label: "Tentar novamente", onClick: () => load() }}
+          // O alerta desmonta com a nova carga: o foco vai ao título do card.
+          action={{
+            label: "Tentar novamente",
+            onClick: () => {
+              moveFocusTo(titleId);
+              load();
+            },
+          }}
         >
           {error}
         </InlineAlert>
@@ -281,13 +291,30 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   }
 
   if (loading && data === null) {
-    return <HarvestChartSkeleton />;
+    // Recarga depois do erro: mesma raiz <Card> com o título real, para o
+    // foco do "Tentar novamente" não se perder. Na primeira carga também.
+    return (
+      // role="group": nome em <div> genérico é proibido (A11Y-L6-R2-2). A
+      // descrição em skeleton evita o salto quando o gráfico chega (UX-L6-R2-1).
+      <Card role="group" aria-busy="true" aria-label="Carregando gráfico" className="p-6">
+        <SectionHeader
+          id={titleId}
+          title={TITLE}
+          description={
+            <Skeleton as="span" aria-hidden="true" className="block h-6 w-64 max-w-full" />
+          }
+        />
+        <Skeleton aria-hidden="true" className="w-full" style={{ height: CHART_HEIGHT }} />
+        <Skeleton aria-hidden="true" className="h-4 w-56" />
+        <span role="status" className="sr-only">Carregando gráfico…</span>
+      </Card>
+    );
   }
 
   if (isEmpty) {
     return (
       <Card className="p-6">
-        <SectionHeader title={TITLE} />
+        <SectionHeader id={titleId} title={TITLE} />
         <EmptyState icon={ChartNoAxesColumn} title={EMPTY_MESSAGE} className="py-8" />
       </Card>
     );
@@ -299,6 +326,7 @@ export function ContinuousHarvestChart({ plan, executions }: Props) {
   return (
     <Card className="p-6">
       <SectionHeader
+        id={titleId}
         title={TITLE}
         description={
           isContinuous

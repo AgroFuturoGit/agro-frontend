@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import { ContinuousHarvestChart } from "@/components/admin/production/harvest-timeline-chart";
 import { getHarvestTimeline, type HarvestTimelineResponse } from "@/lib/analytics";
@@ -336,6 +336,29 @@ describe("ContinuousHarvestChart — revisão r1 do lote 4", () => {
     render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
     const skeleton = screen.getByLabelText("Carregando gráfico");
     expect(skeleton.getAttribute("data-slot")).toBe("card");
-    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(4);
+    // A11Y-L6-5: o título real já aparece (alvo estável do foco); o gráfico
+    // e a legenda seguem como skeleton.
+    expect(skeleton).toContainElement(
+      screen.getByRole("heading", { level: 3, name: "Previsto × realizado" }),
+    );
+    // UX-L6-R2-1: descrição em skeleton para o card não saltar quando o
+    // gráfico chega (título + descrição + gráfico + legenda).
+    expect(skeleton.querySelectorAll("[data-slot=skeleton]").length).toBe(3);
+    // A11Y-L6-R2-2: grupo nomeado (não <div> genérico) e o carregamento
+    // anunciado numa região viva.
+    expect(skeleton.getAttribute("role")).toBe("group");
+    expect(within(skeleton).getByRole("status")).toHaveTextContent("Carregando gráfico…");
+  });
+
+  it("A11Y-L6-5: 'Tentar novamente' leva o foco ao título do card, que fica montado", async () => {
+    vi.mocked(getHarvestTimeline)
+      .mockRejectedValueOnce(new Error("rede"))
+      .mockReturnValue(new Promise(() => {}));
+    render(<ContinuousHarvestChart plan={makePlan()} executions={EXECS} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Tentar novamente" }));
+    const title = screen.getByRole("heading", { level: 3, name: "Previsto × realizado" });
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    expect(document.activeElement).toBe(title);
+    expect(title).toBeInTheDocument();
   });
 });

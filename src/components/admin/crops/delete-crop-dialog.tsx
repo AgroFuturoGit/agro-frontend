@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { cropDisplayName, deleteCrop, type Crop } from "@/lib/crops";
 
 type Props = {
@@ -48,9 +48,7 @@ export function DeleteCropDialog({ crop, open, onOpenChange, onDeleted }: Props)
       // Registro já removido: recarrega a lista para refletir o estado real.
       if (err instanceof ApiError && err.status === 404) onDeleted();
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir a cultura.",
+        apiErrorMessage(err, "Não foi possível excluir a cultura."),
       );
     } finally {
       setSubmitting(false);

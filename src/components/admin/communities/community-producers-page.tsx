@@ -31,7 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { userFacingErrorHint, apiDomainMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { getCommunity, type Community } from "@/lib/communities";
 import { formatCpf } from "@/lib/cpf";
@@ -139,9 +139,10 @@ export function CommunityProducersPage({ communityId }: Props) {
         } catch (err) {
           setCommunity(null);
           setProducers([]);
+          const hint = apiDomainMessage(err);
           setError(
-            err instanceof ApiError
-              ? `Não foi possível identificar a sua organização: ${err.message}`
+            hint
+              ? `Não foi possível identificar a sua organização: ${hint}`
               : "Não foi possível identificar a sua organização.",
           );
           return;
@@ -162,11 +163,7 @@ export function CommunityProducersPage({ communityId }: Props) {
     } catch (err) {
       setCommunity(null);
       setProducers([]);
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar os agricultores desta comunidade.",
-      );
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }
@@ -346,10 +343,11 @@ export function CommunityProducersPage({ communityId }: Props) {
       />
 
       <DataTable
+        label="Lista de agricultores da comunidade"
         table={table}
         columns={columns}
         isLoading={loading}
-        hasError={Boolean(error)}
+        hasError={error !== null}
         onRetry={refresh}
         errorHint={userFacingErrorHint(error)}
         hasActiveFilters={Boolean(table.getState().globalFilter)}

@@ -59,17 +59,22 @@ import {
   type TechnicianSummary,
   type TechnicianWarning,
 } from "@/lib/analytics";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
+import { moveFocusTo } from "@/lib/focus";
+import { harvestText } from "@/lib/harvest-label";
 import { listCrops, type Crop } from "@/lib/crops";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { formatNumber, formatPlanDate } from "@/lib/production";
 import { getMyAssignedProducers } from "@/lib/technicians";
 
+/** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
+const FILTER_FOCUS_ID = "tech-harvest";
+/** "Voltar para Todas" muda a Comunidade: o foco vai para esse seletor (UX-L6-05). */
+const COMMUNITY_FOCUS_ID = "tech-community";
 const ALL = "__all__";
 const CURRENT = "__current__";
 
 type Paths = Record<string, { org: string; community: string }>;
-
 
 const LOAD_ERROR = "Não foi possível carregar o resumo da carteira.";
 
@@ -230,6 +235,7 @@ function FarmersTable({ farmers }: { farmers: TechnicianFarmerSummary[] }) {
   return (
     <div className="flex w-full min-w-0 flex-col gap-3 [contain:inline-size]">
       <DataTable
+        label="Lista de agricultores da carteira"
         table={table}
         columns={farmerColumns}
         emptyTitle="Nenhum agricultor com plano neste recorte."
@@ -347,8 +353,7 @@ export function TechnicianDashboard() {
       setSummary(null);
       setError({
         message:
-          (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          LOAD_ERROR,
+          apiErrorMessage(err, LOAD_ERROR),
         status: err instanceof ApiError ? err.status : null,
       });
     } finally {
@@ -367,6 +372,11 @@ export function TechnicianDashboard() {
     setCommunityId(ALL);
     setCropId(ALL);
   };
+  // O botão some com a nova carga: o foco vai para o seletor de safra.
+  const clearFiltersAndFocus = () => {
+    moveFocusTo(FILTER_FOCUS_ID);
+    clearFilters();
+  };
 
   const warnings = useMemo(
     () => sortWarnings(summary?.warnings ?? []),
@@ -376,7 +386,7 @@ export function TechnicianDashboard() {
   const filters = (
     <>
       <FilterSelect
-        id="tech-harvest"
+        id={FILTER_FOCUS_ID}
         label="Safra"
         value={harvestId}
         onChange={setHarvestId}
@@ -386,7 +396,7 @@ export function TechnicianDashboard() {
         ]}
       />
       <FilterSelect
-        id="tech-community"
+        id={COMMUNITY_FOCUS_ID}
         label="Comunidade"
         value={communityId}
         onChange={setCommunityId}
@@ -452,9 +462,23 @@ export function TechnicianDashboard() {
       <InlineAlert
         actions={[
           ...(error.status === 403 && communityId !== ALL
-            ? [{ label: "Voltar para Todas", onClick: () => setCommunityId(ALL) }]
+            ? [
+                {
+                  label: "Voltar para Todas",
+                  onClick: () => {
+                    moveFocusTo(COMMUNITY_FOCUS_ID);
+                    setCommunityId(ALL);
+                  },
+                },
+              ]
             : []),
-          { label: "Tentar novamente", onClick: () => load(harvestId, communityId, cropId) },
+          {
+            label: "Tentar novamente",
+            onClick: () => {
+              moveFocusTo(FILTER_FOCUS_ID);
+              load(harvestId, communityId, cropId);
+            },
+          },
         ]}
       >
         {error.message}
@@ -473,7 +497,7 @@ export function TechnicianDashboard() {
               : "Quando os agricultores assistidos tiverem planos de produção, os indicadores e alertas aparecem aqui."
           }
           action={
-            hasFilters ? { label: "Limpar filtros", onClick: clearFilters } : undefined
+            hasFilters ? { label: "Limpar filtros", onClick: clearFiltersAndFocus } : undefined
           }
         />
       );
@@ -561,7 +585,7 @@ export function TechnicianDashboard() {
         loading={loading && !summary}
         title="Minha carteira"
         description={
-          summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : undefined
+          summary?.currentHarvest ? harvestText(summary.currentHarvest.label) : undefined
         }
       >{filters}</DashboardToolbar>
       {body}

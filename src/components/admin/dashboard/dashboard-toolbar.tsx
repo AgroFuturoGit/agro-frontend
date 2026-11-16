@@ -94,7 +94,12 @@ export function DashboardToolbar({
           <Skeleton aria-hidden="true" className="h-7 w-48" />
         ) : null}
         {description ? (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p
+            data-testid="dashboard-toolbar-description"
+            className="text-sm text-muted-foreground"
+          >
+            {description}
+          </p>
         ) : loading ? (
           <Skeleton aria-hidden="true" className="h-5 w-32" />
         ) : null}

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { formatCpf } from "@/lib/cpf";
 import {
   parseManagerRegisterFieldErrors,
@@ -169,7 +169,7 @@ export function ManagerRegisterDrawer({
         if (Object.keys(apiFieldErrors).length > 0) {
           setFieldErrors(apiFieldErrors);
         }
-        setFormError(err.message);
+        setFormError(apiErrorMessage(err, "Não foi possível cadastrar o gestor."));
       } else {
         setFormError("Não foi possível cadastrar o gestor.");
       }

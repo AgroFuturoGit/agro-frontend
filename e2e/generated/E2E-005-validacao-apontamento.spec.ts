@@ -35,7 +35,7 @@ test.describe('E2E-005 Validação de apontamentos de colheita e correção pelo
     // aguarda o redirecionamento pós-login
     await page.waitForURL(new RegExp(escapeRegExp('/admin')));
     await page.goto(env('E2E_PLAN_PATH'));
-    await page.locator(`tr:has-text('${env('E2E_EXEC_VALIDATE_DATE')}') button[aria-label='Validar apontamento']`).click();
+    await page.locator(`tr:has-text('${env('E2E_EXEC_VALIDATE_DATE')}') button[aria-label^='Validar apontamento']`).click();
     await page.getByRole('button', { name: 'Validar' }).click();
     await expect(page.locator(`tr:has-text('${env('E2E_EXEC_VALIDATE_DATE')}') [data-status='VALIDATED']`)).toBeVisible();
   });
@@ -51,7 +51,7 @@ test.describe('E2E-005 Validação de apontamentos de colheita e correção pelo
     // aguarda o redirecionamento pós-login
     await page.waitForURL(new RegExp(escapeRegExp('/admin')));
     await page.goto(env('E2E_PLAN_PATH'));
-    await page.locator(`tr:has-text('${env('E2E_EXEC_REJECT_DATE')}') button[aria-label='Rejeitar apontamento']`).click();
+    await page.locator(`tr:has-text('${env('E2E_EXEC_REJECT_DATE')}') button[aria-label^='Rejeitar apontamento']`).click();
     await page.getByLabel('Motivo (opcional)').fill(env('E2E_REJECT_REASON'));
     await page.getByRole('button', { name: 'Rejeitar' }).click();
     await expect(page.locator(`tr:has-text('${env('E2E_EXEC_REJECT_DATE')}') [data-status='REJECTED']`)).toBeVisible();
@@ -78,7 +78,7 @@ test.describe('E2E-005 Validação de apontamentos de colheita e correção pelo
     // aguarda o redirecionamento pós-login
     await page.waitForURL(new RegExp(escapeRegExp('/admin')));
     await page.goto(env('E2E_PLAN_PATH'));
-    await page.locator(`tr:has-text('${env('E2E_EXEC_REJECT_DATE')}') button[aria-label='Editar apontamento']`).click();
+    await page.locator(`tr:has-text('${env('E2E_EXEC_REJECT_DATE')}') button[aria-label^='Editar apontamento']`).click();
     await page.getByLabel('Quantidade colhida').fill('7');
     await page.getByRole('button', { name: 'Salvar alterações' }).click();
     await expect(page.locator(`tr:has-text('${env('E2E_EXEC_REJECT_DATE')}') [data-status='PENDING']`)).toBeVisible();
@@ -104,7 +104,7 @@ test.describe('E2E-005 Validação de apontamentos de colheita e correção pelo
     // aguarda o redirecionamento pós-login
     await page.waitForURL(new RegExp(escapeRegExp('/admin')));
     await page.goto(env('E2E_PLAN_PATH'));
-    await expect(page.locator('button[aria-label=\'Validar apontamento\']')).toHaveCount(0);
-    await expect(page.locator('button[aria-label=\'Rejeitar apontamento\']')).toHaveCount(0);
+    await expect(page.locator('button[aria-label^=\'Validar apontamento\']')).toHaveCount(0);
+    await expect(page.locator('button[aria-label^=\'Rejeitar apontamento\']')).toHaveCount(0);
   });
 });

@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ExportFormat } from "@/lib/analytics";
-import { ApiError, type DownloadResult } from "@/lib/api";
+import { type DownloadResult, apiErrorMessage } from "@/lib/api";
 import { saveBlob } from "@/lib/download";
 
 const FALLBACK_ERROR = "Não foi possível gerar o relatório.";
@@ -52,7 +52,7 @@ export function ExportMenu({
       const { blob, filename } = await onExport(format);
       saveBlob(blob, filename);
     } catch (err) {
-      setError(err instanceof ApiError && err.message ? err.message : FALLBACK_ERROR);
+      setError(apiErrorMessage(err, FALLBACK_ERROR));
     } finally {
       running.current = false;
       setBusy(false);

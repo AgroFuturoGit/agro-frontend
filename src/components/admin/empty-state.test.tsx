@@ -33,6 +33,22 @@ describe("EmptyState", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Página não encontrada" })).toBeInTheDocument();
   });
 
+  it("eyebrow aparece antes do título e fora do heading", () => {
+    render(<EmptyState headingLevel="h1" eyebrow="Erro 404" title="Página não encontrada" />);
+
+    const heading = screen.getByRole("heading", { level: 1, name: "Página não encontrada" });
+    const eyebrow = screen.getByText("Erro 404");
+    expect(heading.textContent).not.toContain("Erro 404");
+    expect(eyebrow.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.className).toContain("text-lg");
+  });
+
+  it("sem eyebrow, o título fica em 16px", () => {
+    render(<EmptyState headingLevel="h2" title="Vazio" />);
+
+    expect(screen.getByRole("heading", { level: 2 }).className).toContain("text-base");
+  });
+
   it("ação com onClick vira botão", async () => {
     const onClick = vi.fn();
     render(<EmptyState title="Vazio" action={{ label: "Limpar filtros", onClick }} />);
@@ -48,6 +64,13 @@ describe("EmptyState", () => {
 
     expect(screen.getByRole("link", { name: "Voltar ao início" })).toHaveAttribute("href", "/");
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("role={null} tira a região viva (estado que é a página inteira)", () => {
+    const { container } = render(<EmptyState title="Página não encontrada" role={null} />);
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(container.querySelector('[data-slot="empty-state"]')).not.toHaveAttribute("role");
   });
 
   it("sem ação, nenhum botão", () => {

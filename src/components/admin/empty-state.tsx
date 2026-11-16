@@ -14,14 +14,19 @@ type EmptyStateAction = {
 
 type EmptyStateProps = {
   icon?: LucideIcon;
+  /** Texto curto acima do título (ex.: "Erro 404"). */
+  eyebrow?: React.ReactNode;
   title: React.ReactNode;
   hint?: React.ReactNode;
   action?: EmptyStateAction;
   /**
    * `status` (padrão) é o anúncio educado de vazio; `alert` só para erro ou
-   * "não encontrado". O `role` fica no mesmo nó que contém os textos.
+   * "não encontrado" que aparece no meio de uma tela já carregada. O `role`
+   * fica no mesmo nó que contém os textos. `null` tira a região viva: para o
+   * estado que É a página inteira (ex.: 404), em que o `h1` já orienta e o
+   * anúncio de rota do Next já lê o título (A11Y-L6-2).
    */
-  role?: "status" | "alert";
+  role?: "status" | "alert" | null;
   /** Tag do título. `h1` só fora do shell (ex.: página 404). */
   headingLevel?: "h1" | "h2" | "p";
   /** `plain` (padrão) não desenha superfície: para uso dentro de um card. */
@@ -38,6 +43,7 @@ const variantClasses: Record<NonNullable<EmptyStateProps["variant"]>, string> = 
 /** Estado vazio/erro com ícone, título, dica e uma ação opcional. */
 export function EmptyState({
   icon: Icon,
+  eyebrow,
   title,
   hint,
   action,
@@ -51,7 +57,7 @@ export function EmptyState({
 
   return (
     <div
-      role={role}
+      role={role ?? undefined}
       data-slot="empty-state"
       data-variant={variant}
       className={cn(
@@ -63,7 +69,18 @@ export function EmptyState({
       {Icon ? (
         <Icon aria-hidden="true" className="mb-2 size-8 text-muted-foreground" />
       ) : null}
-      <Title className="text-base font-medium text-foreground">{title}</Title>
+      {eyebrow ? (
+        <p className="text-sm font-medium text-muted-foreground">{eyebrow}</p>
+      ) : null}
+      <Title
+        className={cn(
+          "text-base font-medium text-foreground",
+          // h1 só na página 404: um passo acima (18px) para marcar o título da página.
+          headingLevel === "h1" && "text-lg font-semibold",
+        )}
+      >
+        {title}
+      </Title>
       {hint ? (
         <p className="max-w-sm text-sm text-muted-foreground">{hint}</p>
       ) : null}

@@ -54,16 +54,19 @@ import {
   type ManagementSummary,
   type ManagementOrganizationSummary,
 } from "@/lib/analytics";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
+import { moveFocusTo } from "@/lib/focus";
+import { harvestText } from "@/lib/harvest-label";
 import { listCommunities } from "@/lib/communities";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { listOrganizations, type Organization } from "@/lib/organizations";
 import { formatNumber, formatPlanDate } from "@/lib/production";
 
+/** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
+const FILTER_FOCUS_ID = "mgmt-harvest";
 const ALL = "__all__";
 const CURRENT = "__current__";
 const LOAD_ERROR = "Não foi possível carregar o painel de gestão.";
-
 
 const pct = (value: number) => `${formatNumber(value)}%`;
 
@@ -146,11 +149,14 @@ function MobileCard({
 
 function PagedTable<T>({
   testId,
+  label,
   table,
   columns,
   renderMobileCard,
 }: {
   testId: string;
+  /** Nome da região da tabela (A11Y-L6-3). */
+  label: string;
   table: ReactTableInstance<T>;
   columns: ColumnDef<T>[];
   renderMobileCard: (row: Row<T>) => React.ReactNode;
@@ -159,7 +165,12 @@ function PagedTable<T>({
     <TableBox>
       <div className="flex flex-col gap-3">
         <div data-testid={testId}>
-          <DataTable table={table} columns={columns} renderMobileCard={renderMobileCard} />
+          <DataTable
+            label={label}
+            table={table}
+            columns={columns}
+            renderMobileCard={renderMobileCard}
+          />
         </div>
         <DataTablePagination table={table} />
       </div>
@@ -195,6 +206,7 @@ function CropRankingTable({ summary }: { summary: ManagementSummary }) {
   return (
     <PagedTable
       testId="crop-ranking"
+      label="Ranking de culturas"
       table={table}
       columns={cropColumns}
       renderMobileCard={(row) => {
@@ -253,6 +265,7 @@ function CommunitiesTable({ summary }: { summary: ManagementSummary }) {
   return (
     <PagedTable
       testId="communities-table"
+      label="Lista de comunidades"
       table={table}
       columns={columns}
       renderMobileCard={(row) => {
@@ -300,6 +313,7 @@ function OrganizationsTable({ summary }: { summary: ManagementSummary }) {
   return (
     <PagedTable
       testId="organizations-table"
+      label="Lista de organizações"
       table={table}
       columns={organizationColumns}
       renderMobileCard={(row) => {
@@ -409,8 +423,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
         setSummary(null);
         setError({
           message:
-            (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-            LOAD_ERROR,
+            apiErrorMessage(err, LOAD_ERROR),
           status: err instanceof ApiError ? err.status : null,
         });
       } finally {
@@ -437,11 +450,16 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
     setOrganizationId(ALL);
     setCommunityId(ALL);
   };
+  // O botão some com a nova carga: o foco vai para o seletor de safra.
+  const clearFiltersAndFocus = () => {
+    moveFocusTo(FILTER_FOCUS_ID);
+    clearFilters();
+  };
 
   const filters = (
     <>
       <FilterSelect
-        id="mgmt-harvest"
+        id={FILTER_FOCUS_ID}
         label="Safra"
         value={harvestId}
         onChange={setHarvestId}
@@ -533,10 +551,13 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
     body = (
       <InlineAlert
         actions={[
-          ...(hasFilters ? [{ label: "Limpar filtros", onClick: clearFilters }] : []),
+          ...(hasFilters ? [{ label: "Limpar filtros", onClick: clearFiltersAndFocus }] : []),
           {
             label: "Tentar novamente",
-            onClick: () => load(harvestId, organizationId, communityId),
+            onClick: () => {
+              moveFocusTo(FILTER_FOCUS_ID);
+              load(harvestId, organizationId, communityId);
+            },
           },
         ]}
       >
@@ -557,7 +578,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
               : "Quando houver planos de produção com apontamentos validados, os indicadores aparecem aqui."
           }
           action={
-            hasFilters ? { label: "Limpar filtros", onClick: clearFilters } : undefined
+            hasFilters ? { label: "Limpar filtros", onClick: clearFiltersAndFocus } : undefined
           }
         />
       );
@@ -644,7 +665,7 @@ export function ManagementDashboard({ role }: { role: "MANAGER" | "ADMIN" }) {
         loading={loading && !summary}
         title={title ? <span data-testid="mgmt-scope-title">{title}</span> : undefined}
         description={
-          summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : undefined
+          summary?.currentHarvest ? harvestText(summary.currentHarvest.label) : undefined
         }
       >
         {filters}

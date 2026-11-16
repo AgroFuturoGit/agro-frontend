@@ -35,6 +35,61 @@ export function userFacingErrorHint(
   return message;
 }
 
+/** Próximo passo acrescentado aos fallbacks de `apiErrorMessage` (regra 12.3). */
+export const RETRY_HINT = "Tente novamente em alguns instantes.";
+
+/** O fallback já orienta o usuário (ex.: "… Contate o suporte."): não repete. */
+const HAS_NEXT_STEP = /tente novamente|contate|verifique|recarregue/i;
+
+/**
+ * Fallback com o próximo passo: "Não foi possível excluir a safra." vira
+ * "Não foi possível excluir a safra. Tente novamente em alguns instantes.".
+ * Vazio continua vazio (quem passa `""` monta a frase por conta própria), e
+ * um fallback que já diz o que fazer fica como está.
+ */
+export function withRetryHint(fallback: string): string {
+  const text = fallback.trim();
+  if (!text || HAS_NEXT_STEP.test(text)) return fallback;
+  return `${closeSentence(text)} ${RETRY_HINT}`;
+}
+
+/**
+ * Mensagem de erro para a tela a partir de qualquer exceção: usa a mensagem
+ * de domínio do `ApiError` (via `userFacingErrorHint`) e, para "Erro NNN"
+ * cru, mensagem vazia ou erro que não veio da API, cai em `fallback` com o
+ * próximo passo (`withRetryHint`). Em 4xx (exceto 408/429) o fallback vai
+ * sem o "Tente novamente", porque repetir o mesmo pedido não resolve.
+ */
+export function apiErrorMessage(err: unknown, fallback: string): string {
+  const domain = err instanceof ApiError ? userFacingErrorHint(err.message) : undefined;
+  if (domain !== undefined) return domain;
+  // 4xx (fora 408/429) é erro do pedido: repetir sem mudar nada não resolve,
+  // então o fallback vai sem o "Tente novamente" (UX-L6-R2-3).
+  if (err instanceof ApiError && isClientError(err.status)) return closeSentence(fallback);
+  return withRetryHint(fallback);
+}
+
+/**
+ * Só a mensagem de domínio do back (ex.: "Agricultor não encontrado."), ou
+ * `null` quando não há uma: "Erro NNN" cru, mensagem vazia ou erro que não
+ * veio da API. Para telas que já mostram um texto padrão de erro com o
+ * "Tente novamente" (ex.: o `DataTable`) e só acrescentam a dica do back,
+ * sem repetir "Não foi possível…".
+ */
+export function apiDomainMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError)) return null;
+  return userFacingErrorHint(err.message) ?? null;
+}
+
+function isClientError(status: number): boolean {
+  return status >= 400 && status < 500 && status !== 408 && status !== 429;
+}
+
+function closeSentence(text: string): string {
+  const trimmed = text.trim();
+  return !trimmed || /[.!?…]$/.test(trimmed) ? text : `${trimmed}.`;
+}
+
 /** 409 de edição simultânea: o back devolve o registro atual em `current`. */
 export function isConcurrencyConflict(err: ApiError): boolean {
   const payload = err.payload;

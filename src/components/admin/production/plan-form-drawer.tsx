@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
+import { harvestText } from "@/lib/harvest-label";
 import { listCrops, type Crop } from "@/lib/crops";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import {
@@ -294,9 +295,7 @@ export function PlanFormDrawer({
       onOpenChange(false);
     } catch (err) {
       setFormError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível salvar o plano de produção.",
+        apiErrorMessage(err, "Não foi possível salvar o plano de produção."),
       );
     } finally {
       setSubmitting(false);
@@ -413,7 +412,7 @@ export function PlanFormDrawer({
                     {planCropLabel(plan) || "Cultivo"}
                   </p>
                   <p className="text-muted-foreground">
-                    Safra: {plan.harvest?.label ?? "—"}
+                    {harvestText(plan.harvest?.label)}
                   </p>
                 </div>
               )

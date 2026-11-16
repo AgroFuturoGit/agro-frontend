@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator, userFacingErrorHint } from "@/lib/api";
+import { ApiError, apiDownload, apiRequest, apiUpload, isConcurrencyConflict, parseFieldErrors, sessionNavigator, userFacingErrorHint, apiDomainMessage, apiErrorMessage, withRetryHint } from "@/lib/api";
 import { persistSession, readTokenFromCookie } from "@/lib/auth";
 import { parseOccurrenceFieldErrors } from "@/lib/occurrences";
 import { parseSocialFieldErrors } from "@/lib/farmer-social";
@@ -389,5 +389,87 @@ describe("userFacingErrorHint", () => {
     expect(userFacingErrorHint("Erro 500")).toBeUndefined();
     expect(userFacingErrorHint(null)).toBeUndefined();
     expect(userFacingErrorHint("")).toBeUndefined();
+  });
+});
+
+describe("apiErrorMessage", () => {
+  const FALLBACK = "Falhou. Tente novamente em alguns instantes.";
+
+  it("usa a mensagem de domínio do ApiError, sem acrescentar nada", () => {
+    expect(apiErrorMessage(new ApiError(409, "Safra já existe.", null), "Falhou.")).toBe(
+      "Safra já existe.",
+    );
+  });
+
+  it("cai no fallback com o próximo passo para o 'Erro NNN' cru e mensagem vazia", () => {
+    expect(apiErrorMessage(new ApiError(500, "Erro 500", null), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(502, " Erro 502 ", null), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(503, "", null), "Falhou.")).toBe(FALLBACK);
+  });
+
+  it("UX-L6-R2-3: 4xx sem mensagem de domínio não manda repetir (exceto 408 e 429)", () => {
+    expect(apiErrorMessage(new ApiError(400, "", null), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(422, "Erro 422", null), "Falhou")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(404, "Erro 404", null), "Falhou.")).toBe("Falhou.");
+    expect(apiErrorMessage(new ApiError(408, "Erro 408", null), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(429, "Erro 429", null), "Falhou.")).toBe(FALLBACK);
+  });
+
+  it("cai no fallback com o próximo passo para erro que não veio da API", () => {
+    expect(apiErrorMessage(new Error("Failed to fetch"), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new TypeError("x"), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage("string", "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(null, "Falhou.")).toBe(FALLBACK);
+  });
+
+  it("fallback vazio continua vazio (a tela monta a frase)", () => {
+    expect(apiErrorMessage(new Error("x"), "")).toBe("");
+  });
+
+  it("não duplica a orientação quando o fallback já diz o que fazer", () => {
+    expect(apiErrorMessage(null, "Falhou. Tente novamente mais tarde.")).toBe(
+      "Falhou. Tente novamente mais tarde.",
+    );
+    expect(apiErrorMessage(null, "Falhou. Contate o suporte.")).toBe("Falhou. Contate o suporte.");
+  });
+
+  it("fecha a frase com ponto antes de acrescentar o próximo passo", () => {
+    expect(withRetryHint("Falhou")).toBe(FALLBACK);
+  });
+
+  it.each([400, 401, 403, 404, 422])("%i sem mensagem de domínio: fallback sem 'Tente novamente'", (status) => {
+    expect(apiErrorMessage(new ApiError(status, `Erro ${status}`, null), "Falhou.")).toBe("Falhou.");
+  });
+
+  it.each([500, 502, 503])("%i sem mensagem de domínio: fallback com o próximo passo", (status) => {
+    expect(apiErrorMessage(new ApiError(status, `Erro ${status}`, null), "Falhou.")).toBe(FALLBACK);
+  });
+
+  it("erro de rede (fetch rejeitado ou status 0): fallback com o próximo passo", () => {
+    expect(apiErrorMessage(new TypeError("Failed to fetch"), "Falhou.")).toBe(FALLBACK);
+    expect(apiErrorMessage(new ApiError(0, "", null), "Falhou.")).toBe(FALLBACK);
+  });
+
+  it("fallback vazio continua vazio também em 4xx", () => {
+    expect(apiErrorMessage(new ApiError(404, "Erro 404", null), "")).toBe("");
+  });
+});
+
+describe("apiDomainMessage", () => {
+  it("devolve só a mensagem de domínio do ApiError", () => {
+    expect(apiDomainMessage(new ApiError(404, "Agricultor não encontrado.", null))).toBe(
+      "Agricultor não encontrado.",
+    );
+  });
+
+  it.each([
+    ["'Erro NNN' cru", new ApiError(500, "Erro 500", null)],
+    ["mensagem vazia", new ApiError(503, "", null)],
+    ["4xx sem mensagem", new ApiError(422, "Erro 422", null)],
+    ["erro que não veio da API", new TypeError("Failed to fetch")],
+    ["valor que não é erro", "string"],
+    ["null", null],
+  ])("%s: null (a tela usa o próprio texto padrão)", (_name, err) => {
+    expect(apiDomainMessage(err)).toBeNull();
   });
 });

@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { InlineAlert } from "@/components/ui/inline-alert";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import {
   deleteProductionPlan,
   planDisplayName,
@@ -57,9 +57,7 @@ export function DeletePlanDialog({
       // Registro já removido: recarrega a lista para refletir o estado real.
       if (err instanceof ApiError && err.status === 404) onDeleted();
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir o plano.",
+        apiErrorMessage(err, "Não foi possível excluir o plano."),
       );
     } finally {
       setSubmitting(false);

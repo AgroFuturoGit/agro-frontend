@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import { formatCnpj } from "@/lib/cnpj";
 import {
   ORGANIZATION_TYPE_LABELS,
@@ -195,7 +195,7 @@ export function OrganizationFormDrawer({
         if (Object.keys(apiFieldErrors).length > 0) {
           setFieldErrors(apiFieldErrors);
         }
-        setFormError(err.message);
+        setFormError(apiErrorMessage(err, "Não foi possível salvar a organização."));
       } else {
         setFormError("Não foi possível salvar a organização.");
       }

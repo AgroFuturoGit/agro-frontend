@@ -173,6 +173,22 @@ describe("PlanFormDrawer — janela e status (UNIT-010 / AC-011)", () => {
     expect(updateProductionPlan).not.toHaveBeenCalled();
   });
 
+  it("edição: o resumo mostra a safra sem repetir 'Safra' (UX-L5-R2-01)", async () => {
+    renderForm("edit", PLAN);
+    await screen.findByLabelText("Início previsto da colheita");
+    expect(screen.getByText("Safra 2026", { selector: "p" })).toBeTruthy();
+    expect(screen.queryByText(/Safra: /)).toBeNull();
+  });
+
+  it.each([
+    ["rótulo sem 'Safra'", "2026/27", "Safra 2026/27"],
+    ["safra sem rótulo", "", "Safra —"],
+  ])("G-4 edição, %s: mostra %s como %s", async (_name, label, expected) => {
+    renderForm("edit", { ...PLAN, harvest: { ...PLAN.harvest!, label } });
+    await screen.findByLabelText("Início previsto da colheita");
+    expect(screen.getByText(expected, { selector: "p" })).toBeTruthy();
+  });
+
   it("edição: esvaziar uma data já definida mostra erro e não envia (o PUT trata null como manter)", async () => {
     renderForm("edit", PLAN);
     fireEvent.change(await screen.findByLabelText("Início previsto da colheita"), {

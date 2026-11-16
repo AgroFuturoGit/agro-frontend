@@ -48,7 +48,7 @@ import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiDomainMessage, apiErrorMessage } from "@/lib/api";
 import {
   FINANCING_STATUSES,
   FINANCING_STATUS_LABELS,
@@ -136,11 +136,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
     try {
       setItems(await listFinancings(farmerId));
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar os financiamentos.",
-      );
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }
@@ -204,7 +200,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
         if (Object.keys(fromApi).length > 0) {
           setFieldErrors(fromApi);
         } else {
-          setFormError(err.message);
+          setFormError(apiErrorMessage(err, "Não foi possível salvar o financiamento."));
         }
       } else {
         setFormError("Não foi possível salvar o financiamento.");
@@ -224,9 +220,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
       await refresh();
     } catch (err) {
       setDeleteError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir o financiamento.",
+        apiErrorMessage(err, "Não foi possível excluir o financiamento."),
       );
     } finally {
       setDeleting(false);
@@ -324,7 +318,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
   const total = items
     .filter((item) => item.status !== "REJECTED" && item.status !== "CANCELED")
     .reduce((sum, item) => sum + item.amount, 0);
-  const showTotal = !loading && !error && items.length > 0;
+  const showTotal = !loading && error === null && items.length > 0;
 
   return (
     <section aria-labelledby="financing-title" className="flex flex-col gap-section-sm">
@@ -355,7 +349,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
 
       {/* Carregando, erro (InlineAlert + "Tentar novamente") vêm do DataTable.
           O vazio fica fora da tabela (sem cabeçalhos de coluna vazios). */}
-      {!loading && !error && items.length === 0 ? (
+      {!loading && error === null && items.length === 0 ? (
         <EmptyState
           variant="card"
           icon={Inbox}
@@ -377,10 +371,11 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
         />
       ) : (
         <DataTable
+          label="Lista de financiamentos"
           table={table}
           columns={columns}
           isLoading={loading}
-          hasError={Boolean(error)}
+          hasError={error !== null}
           onRetry={refresh}
           errorHint={userFacingErrorHint(error)}
           renderMobileCard={renderMobileCard}

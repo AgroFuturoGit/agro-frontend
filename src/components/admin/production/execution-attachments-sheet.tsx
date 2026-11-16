@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import { Download, ImageOff, Images, Loader2, Trash2, Upload } from "lucide-react";
 
 import {
@@ -32,7 +32,9 @@ import {
 } from "@/components/ui/sheet";
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { FOCUS_TARGET, moveFocusTo } from "@/lib/focus";
+import { cn } from "@/lib/utils";
+import { ApiError, apiErrorMessage } from "@/lib/api";
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_MAX_COUNT,
@@ -66,11 +68,6 @@ function isRetryable(err: unknown): boolean {
   return !(err instanceof ApiError) || err.status >= 500;
 }
 
-/** Mensagem da API para o usuário; "Erro 500" cru cai no texto padrão. */
-function apiMessage(err: unknown, fallback: string): string {
-  return (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ?? fallback;
-}
-
 /**
  * Fotos de um apontamento de colheita. As imagens exigem o token, então cada
  * miniatura é baixada com `apiDownload` e exibida por Object URL, liberada ao
@@ -94,6 +91,8 @@ export function ExecutionAttachmentsSheet({
     loaded && loaded.executionId === executionId ? loaded.items : NO_ITEMS;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Alvo do foco do "Tentar novamente" (A11Y-L6-5).
+  const titleId = useId();
 
   // id do anexo → Object URL da imagem; "error" quando a prévia falhou.
   const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -135,7 +134,7 @@ export function ExecutionAttachmentsSheet({
     } catch (err) {
       if (seq !== loadSeq.current) return;
       setError(
-        apiMessage(err, "Não foi possível carregar as fotos."),
+        apiErrorMessage(err, "Não foi possível carregar as fotos."),
       );
     } finally {
       if (seq === loadSeq.current) setLoading(false);
@@ -214,7 +213,7 @@ export function ExecutionAttachmentsSheet({
           key: `${file.name}-${failed.length}`,
           name: file.name,
           message: `${file.name}: ${
-            apiMessage(err, "Não foi possível enviar a foto.")
+            apiErrorMessage(err, "Não foi possível enviar a foto.")
           }`,
           file: isRetryable(err) ? file : null,
         });
@@ -253,7 +252,7 @@ export function ExecutionAttachmentsSheet({
       saveBlob(blob, filename);
     } catch (err) {
       setActionError(
-        apiMessage(err, "Não foi possível baixar a foto."),
+        apiErrorMessage(err, "Não foi possível baixar a foto."),
       );
     }
   }
@@ -286,7 +285,7 @@ export function ExecutionAttachmentsSheet({
         await refresh();
       } else {
         setDeleteError(
-          apiMessage(err, "Não foi possível excluir a foto."),
+          apiErrorMessage(err, "Não foi possível excluir a foto."),
         );
       }
     } finally {
@@ -328,7 +327,15 @@ export function ExecutionAttachmentsSheet({
       return (
         <InlineAlert
           variant="destructive"
-          action={{ label: "Tentar novamente", onClick: () => refresh() }}
+          // O alerta desmonta com a nova carga: o foco vai para o título do
+          // sheet, que fica montado (A11Y-L6-5).
+          action={{
+            label: "Tentar novamente",
+            onClick: () => {
+              moveFocusTo(titleId);
+              refresh();
+            },
+          }}
         >
           {error}
         </InlineAlert>
@@ -410,7 +417,9 @@ export function ExecutionAttachmentsSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="data-[side=right]:w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Fotos do apontamento</SheetTitle>
+          <SheetTitle id={titleId} className={cn("rounded-sm", FOCUS_TARGET)}>
+            Fotos do apontamento
+          </SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
 

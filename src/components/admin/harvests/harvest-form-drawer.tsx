@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, isConcurrencyConflict } from "@/lib/api";
+import { ApiError, isConcurrencyConflict, apiErrorMessage } from "@/lib/api";
 import {
   createHarvest,
   harvestVersion,
@@ -191,9 +191,7 @@ export function HarvestFormDrawer({
         return;
       }
       setFormError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível salvar a safra.",
+        apiErrorMessage(err, "Não foi possível salvar a safra."),
       );
     } finally {
       setSubmitting(false);

@@ -1,8 +1,13 @@
 import { cn } from "@/lib/utils"
 
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
+type SkeletonProps = React.HTMLAttributes<HTMLElement> & {
+  /** `span` para caber em conteúdo de frase (ex.: dentro de um h2 ou <p>). */
+  as?: "div" | "span"
+}
+
+function Skeleton({ as: Comp = "div", className, ...props }: SkeletonProps) {
   return (
-    <div
+    <Comp
       data-slot="skeleton"
       className={cn("animate-pulse rounded-md bg-muted", className)}
       {...props}

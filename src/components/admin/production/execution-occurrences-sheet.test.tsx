@@ -154,6 +154,8 @@ describe("ExecutionOccurrencesSheet — leitura (UNIT-006)", () => {
     renderSheet(true);
     expect(await screen.findByText("Sem acesso a este apontamento.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    // A11Y-L6-5: o foco vai ao título do sheet, não ao body.
+    expect(document.activeElement?.textContent).toBe("Ocorrências do apontamento");
     expect(await screen.findByText("Lagarta do cartucho")).toBeInTheDocument();
   });
 });

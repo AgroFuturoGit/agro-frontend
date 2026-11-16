@@ -28,7 +28,7 @@ import {
   type DataTableRowAction,
 } from "@/components/data-table/data-table-row-actions";
 import { DataTableToolbar } from "@/components/data-table/data-table-toolbar";
-import { ApiError } from "@/lib/api";
+import { apiErrorMessage } from "@/lib/api";
 import { readUserFromStorage, type Role } from "@/lib/auth";
 import { formatCpf } from "@/lib/cpf";
 import { listUsers, ROLE_LABELS, ROLES, type User } from "@/lib/users";
@@ -85,9 +85,7 @@ export function UsersPage() {
       setUsers(data);
     } catch (err) {
       setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar os usuários.",
+        apiErrorMessage(err, "Não foi possível carregar os usuários."),
       );
     } finally {
       setLoading(false);
@@ -243,6 +241,7 @@ export function UsersPage() {
       />
 
       <DataTable
+        label="Lista de usuários"
         table={table}
         columns={columns}
         isLoading={loading}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Table as ReactTableInstance } from "@tanstack/react-table";
 import { ChevronDown, Funnel, Search, X } from "lucide-react";
 
@@ -82,6 +82,9 @@ export function DataTableToolbar<TData>({
     if (prevAppliedSearch && !appliedSearch && rawSearch) setRawSearch("");
   }
 
+  const searchRef = useRef<HTMLInputElement>(null);
+  const chipsRef = useRef<HTMLDivElement>(null);
+
   function clearSearch() {
     setRawSearch("");
     table.setGlobalFilter("");
@@ -104,6 +107,24 @@ export function DataTableToolbar<TData>({
     clearSearch();
     filters.forEach((f) => table.getColumn(f.columnId)?.setFilterValue(undefined));
     if (extraFilterActive) extraFilter?.onClear();
+    searchRef.current?.focus();
+  }
+
+  // O chip removido desmonta: antes, o foco vai para o chip seguinte (ou o
+  // anterior, se era o último da linha); sem outro chip, para a busca. Nunca
+  // cai no <body> (A11Y-L2-R2-2, A11Y-L6-4, UX-L6-03). Os vizinhos são
+  // buscados no contêiner dos chips, não no pai direto: um wrapper em volta
+  // de um chip não quebra a ordem.
+  function removeChip(event: React.MouseEvent<HTMLButtonElement>, remove: () => void) {
+    const current = event.currentTarget;
+    const chips = Array.from(
+      chipsRef.current?.querySelectorAll<HTMLButtonElement>("[data-filter-chip]") ?? [],
+    );
+    const index = chips.indexOf(current);
+    const neighbor = chips[index + 1] ?? chips[index - 1];
+    if (neighbor && neighbor !== current) neighbor.focus();
+    else searchRef.current?.focus();
+    remove();
   }
 
   return (
@@ -115,6 +136,7 @@ export function DataTableToolbar<TData>({
             className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
           />
           <Input
+            ref={searchRef}
             type="search"
             value={rawSearch}
             placeholder={searchPlaceholder}
@@ -147,11 +169,12 @@ export function DataTableToolbar<TData>({
       </div>
 
       {hasAnyActiveFilter && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div ref={chipsRef} className="flex flex-wrap items-center gap-2">
           {appliedSearch && (
             <button
               type="button"
-              onClick={clearSearch}
+              data-filter-chip=""
+              onClick={(event) => removeChip(event, clearSearch)}
               // O nome diz a ação (remover) e contém o texto visível do chip.
               aria-label={`Remover filtro Busca: ${appliedSearch}`}
               className={CHIP_CLASS}
@@ -166,7 +189,12 @@ export function DataTableToolbar<TData>({
               <button
                 key={filter.columnId}
                 type="button"
-                onClick={() => table.getColumn(filter.columnId)?.setFilterValue(undefined)}
+                data-filter-chip=""
+                onClick={(event) =>
+                  removeChip(event, () =>
+                    table.getColumn(filter.columnId)?.setFilterValue(undefined),
+                  )
+                }
                 aria-label={`Remover filtro ${filter.label}: ${valueLabel}`}
                 className={CHIP_CLASS}
               >
@@ -178,7 +206,8 @@ export function DataTableToolbar<TData>({
           {extraFilterActive && extraFilter && (
             <button
               type="button"
-              onClick={extraFilter.onClear}
+              data-filter-chip=""
+              onClick={(event) => removeChip(event, extraFilter.onClear)}
               aria-label={`Remover filtro ${extraFilter.label}`}
               className={CHIP_CLASS}
             >

@@ -45,7 +45,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
+import { ApiError, userFacingErrorHint, apiDomainMessage, apiErrorMessage } from "@/lib/api";
 import {
   createFamilyMember,
   deleteFamilyMember,
@@ -112,11 +112,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
     try {
       setMembers(await listFamilyMembers(farmerId));
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível carregar a composição familiar.",
-      );
+      setError(apiDomainMessage(err) ?? "");
     } finally {
       setLoading(false);
     }
@@ -180,7 +176,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
         if (Object.keys(fromApi).length > 0) {
           setFieldErrors(fromApi);
         } else {
-          setFormError(err.message);
+          setFormError(apiErrorMessage(err, "Não foi possível salvar o membro familiar."));
         }
       } else {
         setFormError("Não foi possível salvar o membro familiar.");
@@ -200,9 +196,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
       await refresh();
     } catch (err) {
       setDeleteError(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível excluir o membro familiar.",
+        apiErrorMessage(err, "Não foi possível excluir o membro familiar."),
       );
     } finally {
       setDeleting(false);
@@ -292,7 +286,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
     );
   }
 
-  const showCount = !loading && !error;
+  const showCount = !loading && error === null;
 
   return (
     <section aria-labelledby="family-composition-title" className="flex flex-col gap-section-sm">
@@ -320,7 +314,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
 
       {/* Carregando, erro (InlineAlert + "Tentar novamente") vêm do DataTable.
           O vazio fica fora da tabela (sem cabeçalhos de coluna vazios). */}
-      {!loading && !error && members.length === 0 ? (
+      {!loading && error === null && members.length === 0 ? (
         <EmptyState
           variant="card"
           icon={Inbox}
@@ -342,10 +336,11 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
         />
       ) : (
         <DataTable
+          label="Lista de membros da família"
           table={table}
           columns={columns}
           isLoading={loading}
-          hasError={Boolean(error)}
+          hasError={error !== null}
           onRetry={refresh}
           errorHint={userFacingErrorHint(error)}
           renderMobileCard={renderMobileCard}

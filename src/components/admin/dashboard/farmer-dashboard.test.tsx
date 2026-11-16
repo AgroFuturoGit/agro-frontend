@@ -122,7 +122,31 @@ describe("FarmerDashboard (UNIT-003..006)", () => {
     expect(screen.getByText("Talhões ativos")).toBeTruthy();
     expect(screen.getByText(/apenas apontamentos validados/)).toBeTruthy();
     expect(screen.getByText(/aguardam validação/)).toBeTruthy();
-    expect(screen.getByText("Safra: Safra 2026")).toBeTruthy();
+    // UX-L5-R2-01: o rótulo já começa com "Safra", então não repete o prefixo.
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe("Safra 2026");
+  });
+
+  it("UX-L5-R2-01: rótulo sem 'Safra' ganha o prefixo uma vez só", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({
+      ...SUMMARY,
+      currentHarvest: { ...SUMMARY.currentHarvest!, label: "2026/27" },
+    });
+    render(<FarmerDashboard />);
+
+    await screen.findAllByTestId("farmer-plan-card");
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe("Safra 2026/27");
+    expect(screen.queryByText(/Safra: /)).toBeNull();
+  });
+
+  it("G-4: safra sem rótulo aparece como 'Safra —' na toolbar", async () => {
+    vi.mocked(getFarmerSummary).mockResolvedValue({
+      ...SUMMARY,
+      currentHarvest: { ...SUMMARY.currentHarvest!, label: "" },
+    });
+    render(<FarmerDashboard />);
+
+    await screen.findAllByTestId("farmer-plan-card");
+    expect(screen.getByTestId("dashboard-toolbar-description").textContent).toBe("Safra —");
   });
 
   it("UNIT-004: cartão com barra limitada a 100%, número real, rótulo e cor por status, e link", async () => {
@@ -216,6 +240,19 @@ describe("FarmerDashboard (UNIT-003..006)", () => {
     );
   });
 
+  it("A11Y-L5-R2-1: 'Tentar novamente' leva o foco ao seletor de safra, não ao body", async () => {
+    vi.mocked(getFarmerSummary)
+      .mockRejectedValueOnce(new ApiError(500, "Erro 500", null))
+      .mockResolvedValue(SUMMARY);
+    render(<FarmerDashboard />);
+    const retry = await screen.findByRole("button", { name: "Tentar novamente" });
+    retry.focus();
+    fireEvent.click(retry);
+    expect(await screen.findByText("10,5 ha")).toBeTruthy();
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Safra" }));
+  });
+
   it("UNIT-006: carregando mostra skeleton", () => {
     vi.mocked(getFarmerSummary).mockReturnValue(new Promise(() => {}));
     render(<FarmerDashboard />);
@@ -287,6 +324,8 @@ describe("FarmerDashboard — revisão r1 do lote 5", () => {
     expect(screen.queryByText(/ainda não tem planos de produção/)).toBeNull();
     vi.mocked(getFarmerSummary).mockClear();
     fireEvent.click(screen.getByRole("button", { name: "Voltar para a safra vigente" }));
+    // A11Y-L5-R2-1: o botão desmonta; o foco vai para o seletor de safra.
+    expect(document.activeElement).toBe(screen.getByRole("combobox", { name: "Safra" }));
     await waitFor(() => expect(getFarmerSummary).toHaveBeenLastCalledWith(undefined));
   });
 
@@ -295,7 +334,7 @@ describe("FarmerDashboard — revisão r1 do lote 5", () => {
     await screen.findAllByTestId("farmer-plan-card");
     const bar = screen.getByTestId("dashboard-toolbar");
     expect(bar.textContent).toContain("Minha produção");
-    expect(screen.getByText("Safra: Safra 2026").className).toContain("text-muted-foreground");
+    expect(screen.getByTestId("dashboard-toolbar-description").className).toContain("text-muted-foreground");
   });
 
   it("A11Y-L5-5: o skeleton é uma região nomeada", () => {

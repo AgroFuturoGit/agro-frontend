@@ -44,8 +44,9 @@ import {
   type FarmerSummary,
   type ProgressStatus,
 } from "@/lib/analytics";
-import { ApiError, userFacingErrorHint } from "@/lib/api";
-import { FOCUS_RING_LINK } from "@/lib/focus";
+import { apiErrorMessage } from "@/lib/api";
+import { harvestText } from "@/lib/harvest-label";
+import { FOCUS_RING_LINK, moveFocusTo } from "@/lib/focus";
 import { listHarvests, type Harvest } from "@/lib/harvests";
 import { getMyProducer } from "@/lib/producers";
 import {
@@ -59,6 +60,8 @@ import {
 } from "@/lib/status-variants";
 import { cn } from "@/lib/utils";
 
+/** Alvo do foco quando o CTA de erro/vazio desmonta (A11Y-L5-R2-1). */
+const FILTER_FOCUS_ID = "farmer-harvest";
 const CURRENT = "__current__";
 const LOAD_ERROR = "Não foi possível carregar o resumo da sua safra.";
 
@@ -230,8 +233,7 @@ export function FarmerDashboard() {
       if (seq !== requestSeq.current) return;
       setSummary(null);
       setError(
-        (err instanceof ApiError ? userFacingErrorHint(err.message) : undefined) ??
-          LOAD_ERROR,
+        apiErrorMessage(err, LOAD_ERROR),
       );
     } finally {
       if (seq === requestSeq.current) setLoading(false);
@@ -245,7 +247,7 @@ export function FarmerDashboard() {
 
   const selector = (
     <FilterSelect
-      id="farmer-harvest"
+      id={FILTER_FOCUS_ID}
       label="Safra"
       value={harvestId}
       onChange={setHarvestId}
@@ -290,7 +292,13 @@ export function FarmerDashboard() {
   } else if (error) {
     body = (
       <InlineAlert
-        action={{ label: "Tentar novamente", onClick: () => load(harvestId) }}
+        action={{
+          label: "Tentar novamente",
+          onClick: () => {
+            moveFocusTo(FILTER_FOCUS_ID);
+            load(harvestId);
+          },
+        }}
       >
         {error}
       </InlineAlert>
@@ -310,7 +318,10 @@ export function FarmerDashboard() {
             hint="Escolha outra safra ou volte para a safra vigente."
             action={{
               label: "Voltar para a safra vigente",
-              onClick: () => setHarvestId(CURRENT),
+              onClick: () => {
+                moveFocusTo(FILTER_FOCUS_ID);
+                setHarvestId(CURRENT);
+              },
             }}
           />
         ) : (
@@ -380,7 +391,7 @@ export function FarmerDashboard() {
         loading={loading && !summary}
         title="Minha produção"
         description={
-          summary?.currentHarvest ? `Safra: ${summary.currentHarvest.label}` : undefined
+          summary?.currentHarvest ? harvestText(summary.currentHarvest.label) : undefined
         }
       >
         {selector}

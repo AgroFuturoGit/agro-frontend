@@ -133,6 +133,8 @@ describe("ExecutionAttachmentsSheet — estados (UNIT-003)", () => {
     renderSheet(true);
     expect(await screen.findByText("Falha ao listar")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    // A11Y-L6-5: o foco vai ao título do sheet, não ao body.
+    expect(document.activeElement?.textContent).toBe("Fotos do apontamento");
     expect(await screen.findByAltText("foto-1.png")).toBeInTheDocument();
     expect(listAttachments).toHaveBeenCalledTimes(2);
   });

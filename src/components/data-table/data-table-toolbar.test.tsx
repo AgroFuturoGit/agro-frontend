@@ -278,6 +278,90 @@ describe("DataTableToolbar — chips removiveis e botao Limpar", () => {
   });
 });
 
+describe("DataTableToolbar — foco quando a linha de chips some (A11Y-L2-R2-2)", () => {
+  afterEach(cleanup);
+
+  it("'Limpar' leva o foco para a busca", async () => {
+    render(<TestHost />);
+    await selectCategoryOption("Beta");
+
+    const limpar = await screen.findByRole("button", { name: "Limpar" });
+    limpar.focus();
+    fireEvent.click(limpar);
+
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.activeElement).toBe(screen.getByPlaceholderText("Buscar…"));
+  });
+
+  it("remover o último chip leva o foco para a busca", async () => {
+    render(<TestHost />);
+    await selectCategoryOption("Beta");
+
+    const chip = await screen.findByRole("button", { name: /Categoria: Beta/ });
+    chip.focus();
+    fireEvent.click(chip);
+
+    expect(document.activeElement).toBe(screen.getByPlaceholderText("Buscar…"));
+  });
+
+  // Dois chips: coluna (Categoria) + filtro extra.
+  function TwoChipHost() {
+    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+    const [onlyFlag, setOnlyFlag] = useState(true);
+    // eslint-disable-next-line react-hooks/incompatible-library
+    const table = useReactTable({
+      data: ITEMS,
+      columns,
+      state: { columnFilters },
+      onColumnFiltersChange: setColumnFilters,
+      getCoreRowModel: getCoreRowModel(),
+      getFilteredRowModel: getFilteredRowModel(),
+    });
+    return (
+      <DataTableToolbar
+        table={table}
+        filters={FILTERS}
+        extraFilter={{
+          active: onlyFlag,
+          label: "Somente marcados",
+          onClear: () => setOnlyFlag(false),
+        }}
+      />
+    );
+  }
+
+  it("UX-L6-03: remover um chip que não é o último leva o foco ao chip seguinte", async () => {
+    render(<TwoChipHost />);
+    await selectCategoryOption("Beta");
+
+    const chip = await screen.findByRole("button", { name: /Categoria: Beta/ });
+    chip.focus();
+    fireEvent.click(chip);
+
+    expect(screen.queryByRole("button", { name: /Categoria: Beta/ })).toBeNull();
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Remover filtro Somente marcados" }),
+    );
+  });
+
+  it("UX-L6-03: remover o último chip da linha leva o foco ao chip anterior", async () => {
+    render(<TwoChipHost />);
+    await selectCategoryOption("Beta");
+
+    const last = screen.getByRole("button", { name: "Remover filtro Somente marcados" });
+    last.focus();
+    fireEvent.click(last);
+
+    expect(screen.queryByRole("button", { name: "Remover filtro Somente marcados" })).toBeNull();
+    const previous = screen.getByRole("button", { name: /Categoria: Beta/ });
+    expect(document.activeElement).toBe(previous);
+
+    // Sobrou um só: removê-lo leva o foco para a busca.
+    fireEvent.click(previous);
+    expect(document.activeElement).toBe(screen.getByPlaceholderText("Buscar…"));
+  });
+});
+
 describe("DataTableToolbar — slot extra (Lote 1B)", () => {
   afterEach(cleanup);
 

@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ApiError, isConcurrencyConflict } from "@/lib/api";
+import { ApiError, isConcurrencyConflict, apiErrorMessage } from "@/lib/api";
 import {
   HARVEST_TYPES,
   HARVEST_TYPE_LABELS,
@@ -327,7 +327,7 @@ export function CropFormDrawer({
         if (Object.keys(apiFieldErrors).length > 0) {
           setFieldErrors(apiFieldErrors);
         }
-        setFormError(err.message);
+        setFormError(apiErrorMessage(err, "Não foi possível salvar a cultura."));
       } else {
         setFormError("Não foi possível salvar a cultura.");
       }
