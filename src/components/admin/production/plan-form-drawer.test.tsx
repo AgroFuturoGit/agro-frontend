@@ -366,3 +366,118 @@ describe("PlanFormDrawer — erros ligados aos campos (A11Y-L3-1)", () => {
     }
   });
 });
+
+describe("PlanFormDrawer — validação ao sair do campo (RF1)", () => {
+  const AREA_ERROR = "Informe uma área válida (use vírgula nos decimais; mínimo 0,01)";
+
+  /** Abre o Select e escolhe a opção pelo teclado (o 2º item exige ArrowDown). */
+  async function pickByKeyboard(label: string, steps: number) {
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText(label, { exact: true }));
+    await screen.findByRole("listbox");
+    for (let i = 0; i < steps; i += 1) await user.keyboard("{ArrowDown}");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  }
+
+  it("blur com área 0 mostra o erro de área", async () => {
+    renderForm("create");
+    const area = await screen.findByLabelText("Área plantada (ha)", { exact: true });
+    fireEvent.change(area, { target: { value: "0" } });
+    expect(screen.queryByText(AREA_ERROR)).toBeNull();
+    fireEvent.blur(area);
+    expect(screen.getByText(AREA_ERROR)).toBeTruthy();
+  });
+
+  it("digitar uma área válida tira o erro", async () => {
+    renderForm("create");
+    const area = await screen.findByLabelText("Área plantada (ha)", { exact: true });
+    fireEvent.change(area, { target: { value: "0" } });
+    fireEvent.blur(area);
+    expect(screen.getByText(AREA_ERROR)).toBeTruthy();
+
+    fireEvent.change(area, { target: { value: "0,001" } });
+    expect(screen.getByText(AREA_ERROR)).toBeTruthy();
+
+    fireEvent.change(area, { target: { value: "2" } });
+    expect(screen.queryByText(AREA_ERROR)).toBeNull();
+  });
+
+  it("regra cruzada: corrigir o início tira o erro do fim sem mexer no fim", async () => {
+    renderForm("edit", PLAN);
+    const end = await screen.findByLabelText("Fim previsto da colheita", { exact: true });
+    fireEvent.change(end, { target: { value: "2026-04-01" } });
+    fireEvent.blur(end);
+    expect(
+      screen.getByText("A data final não pode ser anterior à data inicial"),
+    ).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Início previsto da colheita", { exact: true }), {
+      target: { value: "2026-03-01" },
+    });
+    expect(
+      screen.queryByText("A data final não pode ser anterior à data inicial"),
+    ).toBeNull();
+    expect((end as HTMLInputElement).value).toBe("2026-04-01");
+  });
+
+  it("regra cruzada: trocar a safra revalida o plantio com o intervalo novo", async () => {
+    vi.mocked(listHarvests).mockResolvedValue([
+      { id: "h-1", label: "Safra 2026", startDate: "2026-01-01", endDate: "2026-12-31" },
+      { id: "h-2", label: "Safra 2025", startDate: "2025-01-01", endDate: "2025-12-31" },
+    ]);
+    renderForm("create");
+    await screen.findByLabelText("Área plantada (ha)", { exact: true });
+    await pick("Safra", "Safra 2026");
+
+    const planting = screen.getByLabelText("Data prevista de plantio", { exact: true });
+    fireEvent.change(planting, { target: { value: "2025-06-01" } });
+    fireEvent.blur(planting);
+    expect(
+      screen.getByText("O plantio deve estar dentro da safra (01/01/2026 a 31/12/2026)"),
+    ).toBeTruthy();
+
+    await pickByKeyboard("Safra", 1);
+    await waitFor(() =>
+      expect(screen.queryByText(/O plantio deve estar dentro da safra/)).toBeNull(),
+    );
+    expect((planting as HTMLInputElement).value).toBe("2025-06-01");
+  });
+
+  it("edição: apagar uma data já definida e sair do campo mostra que não dá para remover", async () => {
+    renderForm("edit", PLAN);
+    const start = await screen.findByLabelText("Início previsto da colheita", {
+      exact: true,
+    });
+    fireEvent.change(start, { target: { value: "" } });
+    expect(
+      screen.queryByText(
+        "Não é possível remover esta data depois de definida; altere para outra data",
+      ),
+    ).toBeNull();
+    fireEvent.blur(start);
+    expect(
+      screen.getByText(
+        "Não é possível remover esta data depois de definida; altere para outra data",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("aria-invalid e aria-describedby apontam para a mensagem só quando há erro", async () => {
+    renderForm("create");
+    const area = await screen.findByLabelText("Área plantada (ha)", { exact: true });
+    expect(area.getAttribute("aria-invalid")).toBe("false");
+    expect(area.hasAttribute("aria-describedby")).toBe(false);
+
+    fireEvent.change(area, { target: { value: "0" } });
+    fireEvent.blur(area);
+    const message = screen.getByText(AREA_ERROR);
+    expect(area.getAttribute("aria-invalid")).toBe("true");
+    expect(message.id).toBeTruthy();
+    expect(area.getAttribute("aria-describedby")).toBe(message.id);
+
+    fireEvent.change(area, { target: { value: "2" } });
+    expect(area.getAttribute("aria-invalid")).toBe("false");
+    expect(area.hasAttribute("aria-describedby")).toBe(false);
+  });
+});
