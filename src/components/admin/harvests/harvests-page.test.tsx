@@ -189,17 +189,28 @@ describe("HarvestsPage — RBAC", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("role=TECHNICIAN: também gerencia (exibe 'Nova safra' e editar/excluir)", async () => {
+  it("role=TECHNICIAN: só lê (sem 'Nova safra', editar nem excluir), com a lista visível", async () => {
     await mockRole("TECHNICIAN");
     await mockMobile(false);
     await mockHarvestsApi();
 
     await renderHarvestsPage();
 
-    expect(screen.getByRole("button", { name: /Nova safra/ })).toBeTruthy();
-    expect(
-      screen.getAllByRole("button", { name: /^Editar safra/ }).length,
-    ).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /Nova safra/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar safra/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir safra/ })).toBeNull();
+    expect(screen.getAllByRole("row").length).toBeGreaterThan(1);
+  });
+
+  it("role=TECHNICIAN: lista vazia não mostra a ação 'Criar primeira safra'", async () => {
+    await mockRole("TECHNICIAN");
+    await mockMobile(false);
+    await mockHarvestsApi([]);
+
+    render(<HarvestsPage />);
+
+    expect(await screen.findByText("Nenhuma safra cadastrada.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Criar primeira safra" })).toBeNull();
   });
 
   it("role=FARMER: nenhuma ação de escrita aparece, mesmo com linhas na lista", async () => {

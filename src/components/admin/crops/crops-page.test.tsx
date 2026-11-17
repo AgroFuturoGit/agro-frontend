@@ -257,17 +257,28 @@ describe("CropsPage — RBAC", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("role=TECHNICIAN: também gerencia (exibe 'Nova cultura' e editar)", async () => {
+  it("role=TECHNICIAN: só lê (sem 'Nova cultura', editar nem excluir), com a lista visível", async () => {
     await mockRole("TECHNICIAN");
     await mockMobile(false);
     await mockCropsApi();
 
     await renderCropsPage();
 
-    expect(screen.getByRole("button", { name: /Nova cultura/ })).toBeTruthy();
-    expect(
-      screen.getAllByRole("button", { name: /Editar/ }).length,
-    ).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /Nova cultura/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Editar/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Excluir cultura/ })).toBeNull();
+    expect(screen.getAllByRole("row").length).toBeGreaterThan(1);
+  });
+
+  it("role=TECHNICIAN: lista vazia não mostra a ação 'Criar primeira cultura'", async () => {
+    await mockRole("TECHNICIAN");
+    await mockMobile(false);
+    await mockCropsApi([]);
+
+    render(<CropsPage />);
+
+    expect(await screen.findByText("Nenhuma cultura cadastrada.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Criar primeira cultura" })).toBeNull();
   });
 
   it("role=FARMER: nenhuma ação de escrita aparece, mesmo com linhas na lista", async () => {

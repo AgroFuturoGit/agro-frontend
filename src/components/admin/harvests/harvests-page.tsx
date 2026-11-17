@@ -72,7 +72,8 @@ export function HarvestsPage() {
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
-  const canManage = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
+  // Só o ADMIN gerencia (cria/edita/exclui); os demais papéis só leem a lista.
+  const canManage = currentRole === "ADMIN";
 
   const refresh = useCallback(async () => {
     setLoading(true);
