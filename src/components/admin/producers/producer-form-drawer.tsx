@@ -24,6 +24,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError, apiErrorMessage } from "@/lib/api";
+import {
+  GeolocationError,
+  geolocationErrorMessage,
+  getCurrentCoordinates,
+  isGeolocationSupported,
+} from "@/lib/geolocation";
 import { cn } from "@/lib/utils";
 import { formatCpf, isValidCpf } from "@/lib/cpf";
 import {
@@ -283,12 +289,16 @@ export function ProducerFormDrawer({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFieldErrors({});
     setFormError(null);
+    setGeoError(null);
+    setLocating(false);
     if (mode === "edit" && producer) {
       const next: FormValues = {
         ...EMPTY,
@@ -340,6 +350,38 @@ export function ProducerFormDrawer({
       });
     }
     if (formError) setFormError(null);
+  }
+
+  async function handleUseLocation() {
+    setGeoError(null);
+    setLocating(true);
+    try {
+      const { latitude, longitude } = await getCurrentCoordinates();
+      const next = {
+        ...values,
+        latitude: String(latitude),
+        longitude: String(longitude),
+      };
+      setValues(next);
+      // Mesma validação dos campos (faixa e par obrigatório).
+      setFieldErrors((prev) => {
+        const errors = { ...prev };
+        for (const field of ["latitude", "longitude"] as const) {
+          const error = validateField(field, next, mode, producer);
+          if (error) errors[field] = error;
+          else delete errors[field];
+        }
+        return errors;
+      });
+    } catch (err) {
+      setGeoError(
+        err instanceof GeolocationError
+          ? geolocationErrorMessage(err.reason)
+          : geolocationErrorMessage("unavailable"),
+      );
+    } finally {
+      setLocating(false);
+    }
   }
 
   function handleBlur(field: keyof FormValues) {
@@ -614,7 +656,7 @@ export function ProducerFormDrawer({
                 />
               </Field>
 
-              <Field id="producer-origin" label="Origem" className={FULL_ROW}>
+              <Field id="producer-origin" label="Naturalidade" className={FULL_ROW}>
                 <Input
                   id="producer-origin"
                   maxLength={LIMITS.ORIGIN}
@@ -765,7 +807,10 @@ export function ProducerFormDrawer({
                 <Input
                   id="producer-latitude"
                   value={values.latitude}
-                  onChange={(e) => update("latitude", e.target.value)}
+                  onChange={(e) => {
+                    setGeoError(null);
+                    update("latitude", e.target.value);
+                  }}
                   onBlur={() => handleBlur("latitude")}
                   inputMode="decimal"
                   placeholder="-9.665"
@@ -783,7 +828,10 @@ export function ProducerFormDrawer({
                 <Input
                   id="producer-longitude"
                   value={values.longitude}
-                  onChange={(e) => update("longitude", e.target.value)}
+                  onChange={(e) => {
+                    setGeoError(null);
+                    update("longitude", e.target.value);
+                  }}
                   onBlur={() => handleBlur("longitude")}
                   inputMode="decimal"
                   placeholder="-35.735"
@@ -792,6 +840,35 @@ export function ProducerFormDrawer({
                   aria-describedby={fieldErrors.longitude ? "producer-longitude-error" : undefined}
                 />
               </Field>
+
+              {isGeolocationSupported() && (
+                <div className={cn(FULL_ROW, "flex flex-col items-start gap-2")}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleUseLocation}
+                    disabled={locating || submitting}
+                    aria-busy={locating ? "true" : undefined}
+                  >
+                    {locating ? (
+                      <>
+                        <Loader2
+                          aria-hidden="true"
+                          className="animate-spin motion-reduce:animate-none"
+                        />
+                        Obtendo localização…
+                      </>
+                    ) : (
+                      "Usar minha localização"
+                    )}
+                  </Button>
+                  {geoError && (
+                    <InlineAlert variant="destructive" className="w-full">
+                      {geoError}
+                    </InlineAlert>
+                  )}
+                </div>
+              )}
 
               {!isCreate && (
                 <div className={cn(FULL_ROW, "flex items-center gap-2")}>
