@@ -240,7 +240,7 @@ describe("OrganizationsPage — agricultores atendidos (TÉCNICO)", () => {
       "/admin/organizacoes/org-c/comunidades/c-1/produtores/p-1",
     );
     expect(
-      screen.getByRole("heading", { level: 2, name: "Meus agricultores atendidos" }),
+      screen.getByRole("heading", { level: 2, name: "Minhas Assistências" }),
     ).toBeTruthy();
     expect(bodyNames()).toEqual(["Ana Lima", "Zélia Souza"]);
     // Cabeçalho sem uppercase (Figma 135:898) e sem ações nem CTA.
@@ -262,6 +262,21 @@ describe("OrganizationsPage — agricultores atendidos (TÉCNICO)", () => {
     expect(await screen.findByText("Ana Lima")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Ana Lima" })).toBeNull();
     expect(screen.getAllByText("sem dados")).toHaveLength(2);
+    expect(listOrganizations).not.toHaveBeenCalled();
+  });
+
+  it("mostra as colunas Comunidade e Organização com os nomes", async () => {
+    loginAs("TECHNICIAN");
+    vi.mocked(getMyAssignedProducers).mockResolvedValue([
+      producer("p-1", "Ana Lima", { id: "c-1", name: "Baixa Grande", organization: ORG }),
+    ]);
+
+    render(<OrganizationsPage />);
+
+    expect(await screen.findByRole("columnheader", { name: "Comunidade" })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: "Organização" })).toBeTruthy();
+    expect(screen.getByRole("cell", { name: "Baixa Grande" })).toBeTruthy();
+    expect(screen.getByRole("cell", { name: ORG.name })).toBeTruthy();
   });
 
   it("vazio com dica, sem CTA de criação", async () => {
@@ -386,6 +401,7 @@ describe("OrganizationsPage — redirecionamento (espera e destino)", () => {
     render(<OrganizationsPage />);
 
     expect(await screen.findByText("Abrindo os seus planos de produção…")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Meus Planos" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Nova organização" })).toBeNull();
     expect(listOrganizations).not.toHaveBeenCalled();
 
