@@ -45,6 +45,7 @@ import {
 import { InlineAlert } from "@/components/ui/inline-alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { ApiError, userFacingErrorHint, apiDomainMessage, apiErrorMessage } from "@/lib/api";
 import {
   createFamilyMember,
@@ -66,6 +67,17 @@ type Props = {
 type FormValues = { name: string; kinship: string; age: string };
 
 const EMPTY: FormValues = { name: "", kinship: "", age: "" };
+export const KINSHIP_OPTIONS = [
+  "Cônjuge",
+  "Filho(a)",
+  "Pai/Mãe",
+  "Irmão(ã)",
+  "Avô/Avó",
+  "Neto(a)",
+  "Sogro(a)",
+  "Genro/Nora",
+  "Outro",
+] as const;
 const MAX_KINSHIP = LIMITS.KINSHIP;
 const MAX_NAME = LIMITS.FULL_NAME;
 
@@ -393,17 +405,31 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="family-kinship">Parentesco</Label>
-                  <Input
+                  {/* Valor antigo fora da lista entra como opção extra, para
+                      um <select> controlado não perdê-lo na edição. */}
+                  <NativeSelect
                     id="family-kinship"
-                    maxLength={MAX_KINSHIP}
+                    className="w-full"
                     value={values.kinship}
                     onChange={(e) => update("kinship", e.target.value)}
                     onBlur={() => onBlur("kinship", values)}
                     disabled={submitting}
-                    placeholder="Ex.: Esposa, Filho"
                     aria-invalid={Boolean(fieldErrors.kinship)}
                     aria-describedby={fieldErrors.kinship ? "family-kinship-error" : undefined}
-                  />
+                  >
+                    <NativeSelectOption value="">Selecione…</NativeSelectOption>
+                    {values.kinship !== "" &&
+                      !(KINSHIP_OPTIONS as readonly string[]).includes(values.kinship) && (
+                        <NativeSelectOption value={values.kinship}>
+                          {values.kinship}
+                        </NativeSelectOption>
+                      )}
+                    {KINSHIP_OPTIONS.map((option) => (
+                      <NativeSelectOption key={option} value={option}>
+                        {option}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
                   {fieldErrors.kinship && (
                     <p id="family-kinship-error" className="text-sm text-destructive">
                       {fieldErrors.kinship}

@@ -380,3 +380,124 @@ test.describe("Produtores — cadastro escopado por comunidade (navegação em c
     ).toBeHidden();
   });
 });
+
+test.describe("Produtores — localização e parentesco (itens G)", () => {
+  test("botão Usar minha localização preenche latitude e longitude no cadastro", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["geolocation"]);
+    await context.setGeolocation({ latitude: -9.123456, longitude: -35.654321 });
+
+    await loginAs(page, "MANAGER", MANAGER_USER);
+    await mockMyManager(page);
+    await mockSocialData(page);
+    await page.route(`**/communities/${COMMUNITY_A.id}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(COMMUNITY_A),
+      }),
+    );
+    await page.route("**/farmers*", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    });
+
+    await page.goto(`/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}`);
+    await page.getByRole("button", { name: "Novo agricultor" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Usar minha localização" }).click();
+
+    await expect(dialog.getByLabel("Latitude")).toHaveValue("-9.123456");
+    await expect(dialog.getByLabel("Longitude")).toHaveValue("-35.654321");
+  });
+
+  test("escolher o parentesco no select e salvar envia o valor no POST", async ({ page }) => {
+    const technicianUser: FakeUser = {
+      id: "cccccccc-1111-0000-0000-000000000001",
+      fullName: "Tereza Técnica",
+      email: "tereza.tech@example.com",
+      cpf: "55566677788",
+      role: "TECHNICIAN",
+      dateOfBirth: "1992-07-11",
+    };
+    const producer = {
+      id: "eeeeeeee-1111-0000-0000-00000000000a",
+      fullName: "Ana Serrana",
+      isCompliant: true,
+      user: {
+        id: "ffffffff-1111-0000-0000-00000000000a",
+        fullName: "Ana Serrana",
+        email: "ana@example.com",
+        cpf: "12345678909",
+      },
+      community: COMMUNITY_A,
+    };
+
+    await loginAs(page, "TECHNICIAN", technicianUser);
+    await mockSocialData(page);
+    await page.route(`**/communities/${COMMUNITY_A.id}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(COMMUNITY_A),
+      }),
+    );
+    await page.route("**/farmers*", async (route) => {
+      if (route.request().method() !== "GET") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([producer]),
+      });
+    });
+    await page.route("**/farmers/*/production-plans*", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+    );
+
+    let postBody: Record<string, unknown> | null = null;
+    await page.route("**/farmers/*/family-compositions", async (route) => {
+      const request = route.request();
+      if (request.method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      postBody = request.postDataJSON() as Record<string, unknown>;
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: "ffffffff-0000-0000-0000-000000000009",
+          farmerId: producer.id,
+          ...postBody,
+          createdAt: "2026-08-01T10:00:00Z",
+          updatedAt: "2026-08-01T10:00:00Z",
+        }),
+      });
+    });
+
+    await page.goto(
+      `/admin/organizacoes/${ORGANIZATION.id}/comunidades/${COMMUNITY_A.id}/produtores/${producer.id}`,
+    );
+    await page.getByRole("button", { name: "Adicionar membro" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByLabel("Nome", { exact: true }).fill("Pedro Serrano");
+    await dialog.getByLabel("Parentesco").selectOption("Filho(a)");
+    await dialog.getByLabel("Idade").fill("12");
+    await dialog.getByRole("button", { name: "Salvar" }).click();
+    await expect(dialog).toBeHidden();
+
+    expect(postBody).toMatchObject({ name: "Pedro Serrano", kinship: "Filho(a)", age: 12 });
+  });
+});

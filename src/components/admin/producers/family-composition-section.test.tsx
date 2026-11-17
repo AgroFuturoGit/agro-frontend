@@ -9,7 +9,10 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-import { FamilyCompositionSection } from "@/components/admin/producers/family-composition-section";
+import {
+  FamilyCompositionSection,
+  KINSHIP_OPTIONS,
+} from "@/components/admin/producers/family-composition-section";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ApiError } from "@/lib/api";
 import {
@@ -53,6 +56,10 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+
+function pick(label: string, value: string) {
+  fireEvent.change(screen.getByLabelText(label), { target: { value } });
+}
 
 function type(label: string, value: string) {
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -128,7 +135,7 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
     expect(screen.getByText("A idade é obrigatória")).toBeInTheDocument();
 
     type("Nome", "Ana");
-    type("Parentesco", "Filha");
+    pick("Parentesco", "Filho(a)");
     type("Idade", "-1");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText(/número inteiro/)).toBeInTheDocument();
@@ -142,13 +149,13 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
     vi.mocked(createFamilyMember).mockResolvedValue(MARIA);
     await openCreate();
     type("Nome", "  Ana Souza ");
-    type("Parentesco", "Filha");
+    pick("Parentesco", "Filho(a)");
     type("Idade", "0");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     await waitFor(() =>
       expect(createFamilyMember).toHaveBeenCalledWith("f-1", {
         name: "Ana Souza",
-        kinship: "Filha",
+        kinship: "Filho(a)",
         age: 0,
       }),
     );
@@ -182,7 +189,7 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
     );
     await openCreate();
     type("Nome", "Ana");
-    type("Parentesco", "x");
+    pick("Parentesco", "Outro");
     type("Idade", "5");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("O parentesco é obrigatório")).toBeInTheDocument();
@@ -195,7 +202,7 @@ describe("FamilyCompositionSection — formulário (UNIT-005)", () => {
     );
     await openCreate();
     type("Nome", "Ana");
-    type("Parentesco", "Filha");
+    pick("Parentesco", "Filho(a)");
     type("Idade", "5");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     const alert = await screen.findByRole("alert");
@@ -393,11 +400,79 @@ describe("FamilyCompositionSection — validação ao sair do campo", () => {
     );
     await openCreate();
     type("Nome", "Ana");
-    type("Parentesco", "x");
+    pick("Parentesco", "Outro");
     type("Idade", "5");
     fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
     expect(await screen.findByText("O parentesco é obrigatório")).toBeInTheDocument();
-    type("Parentesco", "filha");
+    pick("Parentesco", "Filho(a)");
     expect(screen.queryByText("O parentesco é obrigatório")).not.toBeInTheDocument();
+  });
+});
+
+describe("FamilyCompositionSection — parentesco em select (RG5)", () => {
+  async function openCreate() {
+    render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+    await screen.findByText("Maria da Silva");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar membro" }));
+    await screen.findByRole("dialog");
+  }
+
+  it("lista a opção vazia e as opções na ordem definida", async () => {
+    await openCreate();
+    const select = screen.getByLabelText("Parentesco");
+    expect(select.tagName).toBe("SELECT");
+    const options = within(select).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(["Selecione…", ...KINSHIP_OPTIONS]);
+    expect(select).toHaveValue("");
+  });
+
+  it("o blur sem seleção mostra o erro e marca aria-invalid", async () => {
+    await openCreate();
+    const select = screen.getByLabelText("Parentesco");
+    expect(select.getAttribute("aria-invalid")).toBe("false");
+    fireEvent.blur(select);
+    const error = await screen.findByText("O parentesco é obrigatório");
+    expect(select.getAttribute("aria-invalid")).toBe("true");
+    expect(select.getAttribute("aria-describedby")).toBe(error.id);
+    await userEvent.selectOptions(select, "Cônjuge");
+    expect(screen.queryByText("O parentesco é obrigatório")).not.toBeInTheDocument();
+    expect(select.getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it('escolher "Outro" envia "Outro"', async () => {
+    vi.mocked(createFamilyMember).mockResolvedValue(MARIA);
+    await openCreate();
+    type("Nome", "Ana");
+    await userEvent.selectOptions(screen.getByLabelText("Parentesco"), "Outro");
+    type("Idade", "5");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() =>
+      expect(createFamilyMember).toHaveBeenCalledWith("f-1", {
+        name: "Ana",
+        kinship: "Outro",
+        age: 5,
+      }),
+    );
+  });
+
+  it("na edição, parentesco fora da lista aparece selecionado e é enviado inalterado", async () => {
+    const tio: FamilyMember = { ...MARIA, id: "m-3", name: "Zé Tio", kinship: "Tio" };
+    vi.mocked(listFamilyMembers).mockResolvedValue([tio]);
+    vi.mocked(updateFamilyMember).mockResolvedValue(tio);
+    render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+    await screen.findByText("Zé Tio");
+    fireEvent.click(screen.getByRole("button", { name: "Editar Zé Tio" }));
+    await screen.findByRole("dialog");
+    const select = screen.getByLabelText("Parentesco");
+    expect(select).toHaveValue("Tio");
+    expect(within(select).getByRole("option", { name: "Tio" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    await waitFor(() =>
+      expect(updateFamilyMember).toHaveBeenCalledWith("m-3", {
+        name: "Zé Tio",
+        kinship: "Tio",
+        age: 42,
+      }),
+    );
   });
 });
