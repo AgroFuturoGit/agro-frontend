@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -17,6 +18,7 @@ import {
 import { updateProducer, type Producer } from "@/lib/producers";
 import {
   GeolocationError,
+  geolocationErrorMessage,
   getCurrentCoordinates,
   isGeolocationSupported,
 } from "@/lib/geolocation";
@@ -118,6 +120,33 @@ function renderDialog(
       loadingCommunities={false}
     />,
   );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+function drawerElement(open: boolean) {
+  return (
+    <ProducerFormDrawer
+      mode="create"
+      open={open}
+      onOpenChange={() => {}}
+      onSaved={() => {}}
+      communities={COMMUNITIES}
+      loadingCommunities={false}
+    />
+  );
+}
+
+function renderDrawerOpen(open: boolean) {
+  return render(drawerElement(open));
 }
 
 function change(label: string, value: string) {
@@ -760,6 +789,156 @@ describe("ProducerFormDrawer — localização, naturalidade e nome da mãe (ite
 
     submitForm();
     await waitFor(() => expect(registerProducer).toHaveBeenCalledTimes(1));
+  });
+
+  it.each(["unavailable", "timeout"] as const)(
+    "no erro %s mostra a mensagem própria e não bloqueia o envio",
+    async (reason) => {
+      vi.mocked(isGeolocationSupported).mockReturnValue(true);
+      vi.mocked(getCurrentCoordinates).mockRejectedValue(
+        new GeolocationError(reason),
+      );
+      vi.mocked(registerProducer).mockResolvedValue(REGISTERED_PRODUCER);
+      renderDialog();
+      await screen.findByLabelText("Nome completo");
+      fillRequiredFields();
+      await selectCommunity("Comunidade Alfa");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Usar minha localização" }),
+      );
+
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent(geolocationErrorMessage(reason));
+      expect(screen.getByLabelText("Latitude")).toHaveValue("");
+
+      submitForm();
+      await waitFor(() => expect(registerProducer).toHaveBeenCalledTimes(1));
+    },
+  );
+
+  it("o que é digitado durante a espera do GPS é mantido e as coordenadas são preenchidas", async () => {
+    vi.mocked(isGeolocationSupported).mockReturnValue(true);
+    const gps = deferred<{ latitude: number; longitude: number }>();
+    vi.mocked(getCurrentCoordinates).mockReturnValue(gps.promise);
+    renderDialog();
+    await screen.findByLabelText("Nome completo");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Usar minha localização" }),
+    );
+    await screen.findByRole("button", { name: "Obtendo localização…" });
+    change("Rua", "Rua das Flores");
+    change("Nome completo", "Ana Souza");
+
+    await act(async () => {
+      gps.resolve({ latitude: -9.665123, longitude: -35.735456 });
+    });
+
+    expect(screen.getByLabelText("Latitude")).toHaveValue("-9.665123");
+    expect(screen.getByLabelText("Longitude")).toHaveValue("-35.735456");
+    expect(screen.getByLabelText("Rua")).toHaveValue("Rua das Flores");
+    expect(screen.getByLabelText("Nome completo")).toHaveValue("Ana Souza");
+    expect(
+      screen.getByRole("button", { name: "Usar minha localização" }),
+    ).toBeEnabled();
+  });
+
+  it("fechar o drawer durante a espera: ao reabrir, a resposta antiga não preenche nada nem deixa o botão carregando", async () => {
+    vi.mocked(isGeolocationSupported).mockReturnValue(true);
+    const gps = deferred<{ latitude: number; longitude: number }>();
+    vi.mocked(getCurrentCoordinates).mockReturnValue(gps.promise);
+    const view = renderDrawerOpen(true);
+    await screen.findByLabelText("Nome completo");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Usar minha localização" }),
+    );
+    await screen.findByRole("button", { name: "Obtendo localização…" });
+
+    view.rerender(drawerElement(false));
+    view.rerender(drawerElement(true));
+    await screen.findByLabelText("Nome completo");
+
+    await act(async () => {
+      gps.resolve({ latitude: -9.665123, longitude: -35.735456 });
+    });
+
+    expect(screen.getByLabelText("Latitude")).toHaveValue("");
+    expect(screen.getByLabelText("Longitude")).toHaveValue("");
+    const button = screen.getByRole("button", {
+      name: "Usar minha localização",
+    });
+    expect(button).toBeEnabled();
+    expect(button).not.toHaveAttribute("aria-busy");
+  });
+
+  it("fechar o drawer durante a espera: um erro antigo não mostra alerta ao reabrir", async () => {
+    vi.mocked(isGeolocationSupported).mockReturnValue(true);
+    const gps = deferred<{ latitude: number; longitude: number }>();
+    vi.mocked(getCurrentCoordinates).mockReturnValue(gps.promise);
+    const view = renderDrawerOpen(true);
+    await screen.findByLabelText("Nome completo");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Usar minha localização" }),
+    );
+    await screen.findByRole("button", { name: "Obtendo localização…" });
+
+    view.rerender(drawerElement(false));
+    view.rerender(drawerElement(true));
+    await screen.findByLabelText("Nome completo");
+
+    await act(async () => {
+      gps.reject(new GeolocationError("timeout"));
+    });
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("a resposta de uma requisição antiga não sobrescreve nem libera o botão da nova", async () => {
+    vi.mocked(isGeolocationSupported).mockReturnValue(true);
+    const first = deferred<{ latitude: number; longitude: number }>();
+    const second = deferred<{ latitude: number; longitude: number }>();
+    vi.mocked(getCurrentCoordinates)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const view = renderDrawerOpen(true);
+    await screen.findByLabelText("Nome completo");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Usar minha localização" }),
+    );
+    await screen.findByRole("button", { name: "Obtendo localização…" });
+
+    // Fechar e reabrir libera o botão para uma nova busca com a primeira em voo.
+    view.rerender(drawerElement(false));
+    view.rerender(drawerElement(true));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Usar minha localização" }),
+    );
+    await screen.findByRole("button", { name: "Obtendo localização…" });
+    expect(getCurrentCoordinates).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      first.resolve({ latitude: 1.5, longitude: 2.5 });
+    });
+
+    expect(screen.getByLabelText("Latitude")).toHaveValue("");
+    expect(screen.getByLabelText("Longitude")).toHaveValue("");
+    const busy = screen.getByRole("button", { name: "Obtendo localização…" });
+    expect(busy).toBeDisabled();
+    expect(busy).toHaveAttribute("aria-busy", "true");
+
+    await act(async () => {
+      second.resolve({ latitude: -9.665123, longitude: -35.735456 });
+    });
+
+    expect(screen.getByLabelText("Latitude")).toHaveValue("-9.665123");
+    expect(screen.getByLabelText("Longitude")).toHaveValue("-35.735456");
+    expect(
+      screen.getByRole("button", { name: "Usar minha localização" }),
+    ).toBeEnabled();
   });
 
   it("o endereço vem antes da latitude no DOM", async () => {

@@ -6,6 +6,12 @@ import {
   isGeolocationSupported,
 } from "./geolocation";
 
+type GetCurrentPosition = (
+  success: (p: unknown) => void,
+  error?: unknown,
+  options?: PositionOptions,
+) => void;
+
 const original = Object.getOwnPropertyDescriptor(navigator, "geolocation");
 
 function mockGeolocation(value: unknown) {
@@ -37,7 +43,7 @@ describe("isGeolocationSupported", () => {
 
 describe("getCurrentCoordinates", () => {
   it("resolve com valores arredondados para 6 casas", async () => {
-    const getCurrentPosition = vi.fn((success: (p: unknown) => void, _e?: unknown, _o?: PositionOptions) =>
+    const getCurrentPosition = vi.fn<GetCurrentPosition>((success) =>
       success({ coords: { latitude: -9.123456789, longitude: -35.9876544 } }),
     );
     mockGeolocation({ getCurrentPosition });
@@ -48,7 +54,7 @@ describe("getCurrentCoordinates", () => {
   });
 
   it("usa timeout padrão de 10000 e as opções esperadas", async () => {
-    const getCurrentPosition = vi.fn((success: (p: unknown) => void, _e?: unknown, _o?: PositionOptions) =>
+    const getCurrentPosition = vi.fn<GetCurrentPosition>((success) =>
       success({ coords: { latitude: 1, longitude: 2 } }),
     );
     mockGeolocation({ getCurrentPosition });
@@ -61,7 +67,7 @@ describe("getCurrentCoordinates", () => {
   });
 
   it("aceita timeout customizado", async () => {
-    const getCurrentPosition = vi.fn((success: (p: unknown) => void, _e?: unknown, _o?: PositionOptions) =>
+    const getCurrentPosition = vi.fn<GetCurrentPosition>((success) =>
       success({ coords: { latitude: 1, longitude: 2 } }),
     );
     mockGeolocation({ getCurrentPosition });

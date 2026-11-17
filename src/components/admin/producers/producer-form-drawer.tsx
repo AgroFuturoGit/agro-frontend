@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -291,8 +291,12 @@ export function ProducerFormDrawer({
   const [submitting, setSubmitting] = useState(false);
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  // Identifica a busca de localização em andamento; respostas com outro id são ignoradas.
+  const locationRequestRef = useRef(0);
 
   useEffect(() => {
+    // Abrir, fechar ou trocar o registro invalida uma busca de localização em voo.
+    locationRequestRef.current += 1;
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFieldErrors({});
@@ -331,6 +335,13 @@ export function ProducerFormDrawer({
     }
   }, [open, mode, producer]);
 
+  useEffect(() => {
+    const requests = locationRequestRef;
+    return () => {
+      requests.current += 1;
+    };
+  }, []);
+
   // Na edição, "Salvar alterações" só habilita quando algo mudou.
   const isDirty = useMemo(() => {
     if (mode !== "edit") return true;
@@ -353,34 +364,37 @@ export function ProducerFormDrawer({
   }
 
   async function handleUseLocation() {
+    const requestId = ++locationRequestRef.current;
+    const isCurrent = () => locationRequestRef.current === requestId;
     setGeoError(null);
     setLocating(true);
     try {
-      const { latitude, longitude } = await getCurrentCoordinates();
-      const next = {
-        ...values,
-        latitude: String(latitude),
-        longitude: String(longitude),
-      };
-      setValues(next);
-      // Mesma validação dos campos (faixa e par obrigatório).
+      const coords = await getCurrentCoordinates();
+      if (!isCurrent()) return;
+      const latitude = String(coords.latitude);
+      const longitude = String(coords.longitude);
+      // Só as coordenadas mudam: o que foi digitado durante a espera é mantido.
+      setValues((prev) => ({ ...prev, latitude, longitude }));
+      // A validação de latitude/longitude depende só desses dois campos.
+      const filled: FormValues = { ...EMPTY, latitude, longitude };
       setFieldErrors((prev) => {
         const errors = { ...prev };
         for (const field of ["latitude", "longitude"] as const) {
-          const error = validateField(field, next, mode, producer);
+          const error = validateField(field, filled, mode, producer);
           if (error) errors[field] = error;
           else delete errors[field];
         }
         return errors;
       });
     } catch (err) {
+      if (!isCurrent()) return;
       setGeoError(
         err instanceof GeolocationError
           ? geolocationErrorMessage(err.reason)
           : geolocationErrorMessage("unavailable"),
       );
     } finally {
-      setLocating(false);
+      if (isCurrent()) setLocating(false);
     }
   }
 
