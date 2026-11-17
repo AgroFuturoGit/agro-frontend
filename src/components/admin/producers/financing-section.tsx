@@ -63,6 +63,7 @@ import {
   type FinancingStatus,
 } from "@/lib/farmer-social";
 import { FINANCING_STATUS_VARIANT } from "@/lib/status-variants";
+import { useFieldValidation } from "@/lib/use-field-validation";
 import { DIGITS, LIMITS, digitsMessage, exceedsDigits } from "@/lib/validation";
 
 type Props = {
@@ -76,8 +77,11 @@ type FormValues = { description: string; status: string; amount: string };
 const EMPTY: FormValues = { description: "", status: "", amount: "" };
 const MAX_DESCRIPTION = LIMITS.FINANCING_DESCRIPTION;
 
-function validate(values: FormValues): Record<string, string> {
-  const errors: Record<string, string> = {};
+type Field = keyof FormValues;
+type FieldErrors = Partial<Record<Field, string>>;
+
+function validate(values: FormValues): FieldErrors {
+  const errors: FieldErrors = {};
   if (!values.description.trim()) errors.description = "A descrição é obrigatória";
   else if (values.description.trim().length > MAX_DESCRIPTION)
     errors.description = `A descrição deve ter no máximo ${MAX_DESCRIPTION} caracteres`;
@@ -118,7 +122,15 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<Financing | null>(null);
 
   const [values, setValues] = useState<FormValues>(EMPTY);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const {
+    errors: fieldErrors,
+    onBlur,
+    onChange,
+    setErrors,
+    reset,
+  } = useFieldValidation<Field, FormValues>(
+    (field, current) => validate(current)[field],
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -149,7 +161,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
   function openCreate() {
     setEditTarget(null);
     setValues(EMPTY);
-    setFieldErrors({});
+    reset();
     setFormError(null);
     setFormOpen(true);
   }
@@ -161,26 +173,22 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
       status: item.status ?? "",
       amount: amountToInput(item.amount),
     });
-    setFieldErrors({});
+    reset();
     setFormError(null);
     setFormOpen(true);
   }
 
-  function update(field: keyof FormValues, value: string) {
-    setValues((prev) => ({ ...prev, [field]: value }));
-    setFieldErrors((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
+  function update(field: Field, value: string) {
+    const next = { ...values, [field]: value };
+    setValues(next);
+    onChange(field, next);
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setFormError(null);
     const errors = validate(values);
-    setFieldErrors(errors);
+    setErrors(errors, "client");
     if (Object.keys(errors).length > 0) return;
 
     const payload = {
@@ -198,7 +206,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
       if (err instanceof ApiError) {
         const fromApi = err.status === 400 ? parseSocialFieldErrors(err.payload) : {};
         if (Object.keys(fromApi).length > 0) {
-          setFieldErrors(fromApi);
+          setErrors(fromApi as FieldErrors, "server");
         } else {
           setFormError(apiErrorMessage(err, "Não foi possível salvar o financiamento."));
         }
@@ -407,6 +415,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                     maxLength={MAX_DESCRIPTION}
                     value={values.description}
                     onChange={(e) => update("description", e.target.value)}
+                    onBlur={() => onBlur("description", values)}
                     disabled={submitting}
                     placeholder="Ex.: PRONAF Custeio 2026"
                     aria-invalid={Boolean(fieldErrors.description)}
@@ -427,6 +436,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                     className="w-full"
                     value={values.status}
                     onChange={(e) => update("status", e.target.value)}
+                    onBlur={() => onBlur("status", values)}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.status)}
                     aria-describedby={
@@ -453,6 +463,7 @@ export function FinancingSection({ farmerId, canWrite }: Props) {
                     inputMode="decimal"
                     value={values.amount}
                     onChange={(e) => update("amount", e.target.value)}
+                    onBlur={() => onBlur("amount", values)}
                     disabled={submitting}
                     placeholder="Ex.: 25.000,00"
                     aria-invalid={Boolean(fieldErrors.amount)}

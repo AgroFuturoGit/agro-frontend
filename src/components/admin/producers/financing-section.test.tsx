@@ -365,3 +365,60 @@ describe("FinancingSection — erros ligados aos campos (A11Y-L3-1)", () => {
   });
 });
 
+
+describe("FinancingSection — validação ao sair do campo", () => {
+  async function openCreate() {
+    render(<FinancingSection farmerId="f-1" canWrite />);
+    await screen.findByText("PRONAF Custeio");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar financiamento" }));
+    await screen.findByRole("dialog");
+  }
+
+  it("o blur num valor inválido mostra o erro e liga aria-invalid/aria-describedby", async () => {
+    await openCreate();
+    type("Valor (R$)", "0");
+    expect(screen.queryByText("O valor deve ser maior que zero")).not.toBeInTheDocument();
+    fireEvent.blur(screen.getByLabelText("Valor (R$)"));
+    const error = await screen.findByText("O valor deve ser maior que zero");
+    const input = screen.getByLabelText("Valor (R$)");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(error.id);
+  });
+
+  it("o blur da descrição vazia e da situação mostra o erro", async () => {
+    await openCreate();
+    fireEvent.blur(screen.getByLabelText("Descrição"));
+    expect(await screen.findByText("A descrição é obrigatória")).toBeInTheDocument();
+    fireEvent.blur(screen.getByLabelText("Situação"));
+    expect(await screen.findByText("A situação é obrigatória")).toBeInTheDocument();
+  });
+
+  it("digitar um valor válido tira o erro; um ainda inválido o mantém", async () => {
+    await openCreate();
+    fireEvent.blur(screen.getByLabelText("Valor (R$)"));
+    expect(await screen.findByText("O valor é obrigatório")).toBeInTheDocument();
+    type("Valor (R$)", "0");
+    expect(screen.getByText("O valor deve ser maior que zero")).toBeInTheDocument();
+    type("Valor (R$)", "10");
+    expect(screen.queryByText("O valor deve ser maior que zero")).not.toBeInTheDocument();
+    const input = screen.getByLabelText("Valor (R$)");
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+    expect(input.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("o erro do back some ao digitar no campo", async () => {
+    vi.mocked(createFinancing).mockRejectedValue(
+      new ApiError(400, "amount: O valor deve ser maior que zero", {
+        message: "amount: O valor deve ser maior que zero",
+      }),
+    );
+    await openCreate();
+    type("Descrição", "X");
+    type("Situação", "PENDING");
+    type("Valor (R$)", "5");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByText("O valor deve ser maior que zero")).toBeInTheDocument();
+    type("Valor (R$)", "6");
+    expect(screen.queryByText("O valor deve ser maior que zero")).not.toBeInTheDocument();
+  });
+});

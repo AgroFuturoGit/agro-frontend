@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UserFormDrawer } from "@/components/admin/users/user-form-drawer";
+import { ApiError } from "@/lib/api";
 import { createTechnician } from "@/lib/technicians";
 import { adminUpdateUser, registerUser, type User } from "@/lib/users";
 
@@ -502,5 +503,125 @@ describe("UserFormDrawer — QA (UNIT-001/002/003/006/009)", () => {
     expect((save as HTMLButtonElement).disabled).toBe(true);
     await user.type(screen.getByLabelText("Nome completo"), "x");
     expect((save as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("UserFormDrawer — validação ao sair do campo (RF1)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function renderCreate() {
+    render(
+      <UserFormDrawer mode="create" open onOpenChange={() => {}} onSaved={() => {}} />,
+    );
+  }
+
+  it("blur com e-mail inválido mostra o erro", () => {
+    renderCreate();
+    const email = screen.getByLabelText("E-mail", { exact: true });
+    fireEvent.change(email, { target: { value: "x@x" } });
+    expect(screen.queryByText("Informe um e-mail válido")).toBeNull();
+    fireEvent.blur(email);
+    expect(screen.getByText("Informe um e-mail válido")).toBeTruthy();
+  });
+
+  it("digitar um e-mail ainda inválido mantém o erro, e um válido o tira", () => {
+    renderCreate();
+    const email = screen.getByLabelText("E-mail", { exact: true });
+    fireEvent.change(email, { target: { value: "x@x" } });
+    fireEvent.blur(email);
+    expect(screen.getByText("Informe um e-mail válido")).toBeTruthy();
+
+    fireEvent.change(email, { target: { value: "x@xy" } });
+    expect(screen.getByText("Informe um e-mail válido")).toBeTruthy();
+
+    fireEvent.change(email, { target: { value: "x@xy.com" } });
+    expect(screen.queryByText("Informe um e-mail válido")).toBeNull();
+    expect(email.getAttribute("aria-invalid")).toBe("false");
+  });
+
+  it("regra cruzada: com papel Técnico, o blur no CPF vazio pede o CPF", async () => {
+    renderCreate();
+    fireEvent.blur(screen.getByLabelText("CPF (opcional)", { exact: true }));
+    expect(screen.queryByText("Informe o CPF")).toBeNull();
+
+    await pickRole("Técnico");
+    const cpf = await screen.findByLabelText("CPF", { exact: true });
+    fireEvent.blur(cpf);
+    expect(screen.getByText("Informe o CPF")).toBeTruthy();
+
+    // Voltar para Administrador recalcula o erro com o papel atual.
+    await selectOption("Papel", "Administrador");
+    await waitFor(() => expect(screen.queryByText("Informe o CPF")).toBeNull());
+  });
+
+  it("erro 400 do back num campo some ao digitar nele", async () => {
+    vi.mocked(registerUser).mockRejectedValue(
+      new ApiError(400, "email: E-mail já cadastrado", {
+        message: "email: E-mail já cadastrado",
+      }),
+    );
+    renderCreate();
+    await pickRole("Administrador");
+    fillBase();
+    submit();
+
+    const email = screen.getByLabelText("E-mail", { exact: true });
+    expect(await screen.findByText("E-mail já cadastrado")).toBeTruthy();
+    expect(email.getAttribute("aria-invalid")).toBe("true");
+
+    // Digitar em outro campo não tira o erro do back.
+    fireEvent.change(screen.getByLabelText("Nome completo", { exact: true }), {
+      target: { value: "Tânia T." },
+    });
+    expect(screen.getByText("E-mail já cadastrado")).toBeTruthy();
+
+    fireEvent.change(email, { target: { value: "outra@agro.com" } });
+    expect(screen.queryByText("E-mail já cadastrado")).toBeNull();
+  });
+
+  it("erro 400 do back: a mensagem geral fica visível junto do erro do campo, e o blur sem editar não o tira", async () => {
+    vi.mocked(registerUser).mockRejectedValue(
+      new ApiError(400, "email: E-mail já cadastrado", {
+        message: "email: E-mail já cadastrado",
+      }),
+    );
+    renderCreate();
+    await pickRole("Administrador");
+    fillBase();
+    submit();
+
+    const email = screen.getByLabelText("E-mail", { exact: true });
+    expect(await screen.findByText("E-mail já cadastrado")).toBeTruthy();
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("email: E-mail já cadastrado");
+
+    // Sair do campo sem alterar nada mantém o erro do back e a mensagem geral.
+    fireEvent.focus(email);
+    fireEvent.blur(email);
+    expect(screen.getByText("E-mail já cadastrado")).toBeTruthy();
+    expect(email.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("alert").textContent).toContain("email: E-mail já cadastrado");
+  });
+
+  it("aria-invalid e aria-describedby apontam para a mensagem de erro", () => {
+    renderCreate();
+    const name = screen.getByLabelText("Nome completo", { exact: true });
+    expect(name.getAttribute("aria-invalid")).toBe("false");
+    expect(name.hasAttribute("aria-describedby")).toBe(false);
+
+    fireEvent.change(name, { target: { value: "A" } });
+    fireEvent.blur(name);
+
+    const message = screen.getByText("O nome deve ter pelo menos 2 caracteres.");
+    expect(name.getAttribute("aria-invalid")).toBe("true");
+    expect(message.id).toBeTruthy();
+    expect(name.getAttribute("aria-describedby")).toBe(message.id);
+
+    fireEvent.change(name, { target: { value: "Ana" } });
+    expect(name.getAttribute("aria-invalid")).toBe("false");
+    expect(name.hasAttribute("aria-describedby")).toBe(false);
   });
 });

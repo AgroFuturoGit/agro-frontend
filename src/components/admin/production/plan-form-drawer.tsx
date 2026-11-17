@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiErrorMessage } from "@/lib/api";
+import { ApiError, apiErrorMessage, parseFieldErrors } from "@/lib/api";
 import { harvestText } from "@/lib/harvest-label";
 import { listCrops, type Crop } from "@/lib/crops";
 import { listHarvests, type Harvest } from "@/lib/harvests";
@@ -37,6 +37,7 @@ import {
   type PlanStatus,
   type ProductionPlan,
 } from "@/lib/production";
+import { useFieldValidation } from "@/lib/use-field-validation";
 import {
   DIGITS,
   MIN_POSITIVE_AMOUNT,
@@ -67,6 +68,10 @@ type FormValues = {
   plannedPlantingDate: string;
 };
 
+type Field = keyof FormValues;
+type FieldErrors = Partial<Record<Field, string>>;
+type HarvestRange = { startDate: string | null; endDate: string | null };
+
 const EMPTY: FormValues = {
   harvestId: "",
   cropId: "",
@@ -76,6 +81,8 @@ const EMPTY: FormValues = {
   expectedHarvestEnd: "",
   plannedPlantingDate: "",
 };
+
+const FIELDS = Object.keys(EMPTY) as Field[];
 
 function parseStatus(value: string): PlanStatus | null {
   return PLAN_STATUSES.includes(value as PlanStatus) ? (value as PlanStatus) : null;
@@ -99,9 +106,9 @@ function validate(
   values: FormValues,
   isCreate: boolean,
   original: ProductionPlan | null,
-  harvestRange: { startDate: string | null; endDate: string | null } | null,
-): Record<string, string> {
-  const errors: Record<string, string> = {};
+  harvestRange: HarvestRange | null,
+): FieldErrors {
+  const errors: FieldErrors = {};
   // No PUT, data null = "manter valor atual": esvaziar o campo não apagaria
   // nada e o valor antigo voltaria após salvar (CR-002).
   if (!isCreate && original) {
@@ -149,6 +156,16 @@ function validate(
   return errors;
 }
 
+/** Erros por campo do 400 do back, só dos campos deste formulário. */
+function serverFieldErrors(payload: unknown): FieldErrors {
+  const parsed = parseFieldErrors(payload);
+  const errors: FieldErrors = {};
+  for (const field of FIELDS) {
+    if (parsed[field]) errors[field] = parsed[field];
+  }
+  return errors;
+}
+
 export function PlanFormDrawer({
   mode,
   producerId,
@@ -159,7 +176,6 @@ export function PlanFormDrawer({
 }: Props) {
   const isCreate = mode === "create";
   const [values, setValues] = useState<FormValues>(EMPTY);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -167,11 +183,33 @@ export function PlanFormDrawer({
   const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [loadingOptions, setLoadingOptions] = useState(false);
 
+  /**
+   * Intervalo da safra escolhida (criação, a partir de `values.harvestId`) ou
+   * já vinculada ao plano (edição). Sai dos valores recebidos, para o blur e a
+   * digitação usarem a safra atual.
+   */
+  function rangeFor(current: FormValues): HarvestRange | null {
+    return isCreate
+      ? (harvests.find((h) => h.id === current.harvestId) ?? null)
+      : (plan?.harvest ?? null);
+  }
+
+  const {
+    errors: fieldErrors,
+    onBlur,
+    onChange,
+    setErrors,
+    reset,
+  } = useFieldValidation<Field, FormValues>(
+    (field, current) =>
+      validate(current, isCreate, plan ?? null, rangeFor(current))[field],
+  );
+
   useEffect(() => {
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormError(null);
-    setFieldErrors({});
+    reset();
     if (mode === "edit" && plan) {
       setValues({
         harvestId: plan.harvest?.id ?? "",
@@ -185,7 +223,7 @@ export function PlanFormDrawer({
     } else {
       setValues(EMPTY);
     }
-  }, [open, mode, plan]);
+  }, [open, mode, plan, reset]);
 
   useEffect(() => {
     if (!open || !isCreate) return;
@@ -236,31 +274,31 @@ export function PlanFormDrawer({
     selectedCrop !== null &&
     (selectedCrop.expectedProductivity ?? 0) <= 0;
 
-  // Intervalo da safra escolhida (criação) ou já vinculada ao plano (edição).
-  const harvestRange = isCreate
-    ? (harvests.find((h) => h.id === values.harvestId) ?? null)
-    : (plan?.harvest ?? null);
-
-  function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
-    setValues((prev) => ({ ...prev, [key]: value }));
-    if (fieldErrors[key]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
+  function update<K extends Field>(key: K, value: FormValues[K]) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onChange(key, next);
     if (formError) setFormError(null);
+  }
+
+  /**
+   * Select: o blur do trigger dispara ao abrir a lista, antes da escolha,
+   * então o campo é validado ao escolher (os outros erros locais também são
+   * recalculados, como na digitação).
+   */
+  function choose<K extends Field>(key: K, value: FormValues[K]) {
+    update(key, value);
+    onBlur(key, { ...values, [key]: value });
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError(null);
 
-    const errors = validate(values, isCreate, plan ?? null, harvestRange);
+    const errors = validate(values, isCreate, plan ?? null, rangeFor(values));
     if (cropWithoutProductivity) return;
     if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+      setErrors(errors, "client");
       return;
     }
 
@@ -294,6 +332,12 @@ export function PlanFormDrawer({
       onSaved();
       onOpenChange(false);
     } catch (err) {
+      if (err instanceof ApiError) {
+        const apiFieldErrors = serverFieldErrors(err.payload);
+        if (Object.keys(apiFieldErrors).length > 0) {
+          setErrors(apiFieldErrors, "server");
+        }
+      }
       setFormError(
         apiErrorMessage(err, "Não foi possível salvar o plano de produção."),
       );
@@ -331,7 +375,7 @@ export function PlanFormDrawer({
                   <Label htmlFor="plan-harvest">Safra</Label>
                   <Select
                     value={values.harvestId}
-                    onValueChange={(v) => update("harvestId", v ?? "")}
+                    onValueChange={(v) => choose("harvestId", v ?? "")}
                     disabled={submitting || loadingOptions}
                   >
                     <SelectTrigger
@@ -370,7 +414,7 @@ export function PlanFormDrawer({
                   <Label htmlFor="plan-crop">Cultivo</Label>
                   <Select
                     value={values.cropId}
-                    onValueChange={(v) => update("cropId", v ?? "")}
+                    onValueChange={(v) => choose("cropId", v ?? "")}
                     disabled={submitting || loadingOptions}
                   >
                     <SelectTrigger
@@ -427,6 +471,7 @@ export function PlanFormDrawer({
                   inputMode="decimal"
                   value={values.plantedArea}
                   onChange={(e) => update("plantedArea", e.target.value)}
+                  onBlur={() => onBlur("plantedArea", values)}
                   required
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.plantedArea)}
@@ -500,6 +545,7 @@ export function PlanFormDrawer({
                   type="date"
                   value={values.expectedHarvestStart}
                   onChange={(e) => update("expectedHarvestStart", e.target.value)}
+                  onBlur={() => onBlur("expectedHarvestStart", values)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.expectedHarvestStart)}
                   aria-describedby={fieldErrors.expectedHarvestStart ? "plan-harvest-start-error" : undefined}
@@ -517,6 +563,7 @@ export function PlanFormDrawer({
                   type="date"
                   value={values.expectedHarvestEnd}
                   onChange={(e) => update("expectedHarvestEnd", e.target.value)}
+                  onBlur={() => onBlur("expectedHarvestEnd", values)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.expectedHarvestEnd)}
                   aria-describedby={fieldErrors.expectedHarvestEnd ? "plan-harvest-end-error" : undefined}
@@ -536,6 +583,7 @@ export function PlanFormDrawer({
                 type="date"
                 value={values.plannedPlantingDate}
                 onChange={(e) => update("plannedPlantingDate", e.target.value)}
+                onBlur={() => onBlur("plannedPlantingDate", values)}
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.plannedPlantingDate)}
                 aria-describedby={fieldErrors.plannedPlantingDate ? "plan-planting-date-error" : undefined}

@@ -49,6 +49,7 @@ import {
 } from "@/lib/occurrences";
 import { formatPlanDate, type ProductionExecution } from "@/lib/production";
 import { OCCURRENCE_TYPE_VARIANT } from "@/lib/status-variants";
+import { useFieldValidation } from "@/lib/use-field-validation";
 import { LIMITS } from "@/lib/validation";
 
 type Props = {
@@ -76,8 +77,11 @@ const MAX_DESCRIPTION = LIMITS.OCCURRENCE_DESCRIPTION;
 const MAX_WEATHER = LIMITS.OCCURRENCE_WEATHER;
 const MAX_URL = LIMITS.OCCURRENCE_EVIDENCE_URL;
 
-function validate(values: FormValues): Record<string, string> {
-  const errors: Record<string, string> = {};
+type Field = keyof FormValues;
+type FieldErrors = Partial<Record<Field, string>>;
+
+function validate(values: FormValues): FieldErrors {
+  const errors: FieldErrors = {};
   if (!values.logType) errors.logType = "O tipo de ocorrência é obrigatório";
   if (!values.description.trim()) errors.description = "A descrição é obrigatória";
   else if (values.description.trim().length > MAX_DESCRIPTION)
@@ -117,7 +121,15 @@ export function ExecutionOccurrencesSheet({
   const [deleteTarget, setDeleteTarget] = useState<FieldOccurrence | null>(null);
 
   const [values, setValues] = useState<FormValues>(EMPTY);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const {
+    errors: fieldErrors,
+    onBlur,
+    onChange,
+    setErrors,
+    reset,
+  } = useFieldValidation<Field, FormValues>(
+    (field, current) => validate(current)[field],
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -183,20 +195,16 @@ export function ExecutionOccurrencesSheet({
           }
         : EMPTY,
     );
-    setFieldErrors({});
+    reset();
     setFormError(null);
     focusAfterToggle.current = "form";
     setFormVisible(true);
   }
 
-  function update(field: keyof FormValues, value: string) {
-    setValues((prev) => ({ ...prev, [field]: value }));
-    setFieldErrors((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
+  function update(field: Field, value: string) {
+    const next = { ...values, [field]: value };
+    setValues(next);
+    onChange(field, next);
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -204,7 +212,7 @@ export function ExecutionOccurrencesSheet({
     if (!executionId) return;
     setFormError(null);
     const errors = validate(values);
-    setFieldErrors(errors);
+    setErrors(errors, "client");
     if (Object.keys(errors).length > 0) return;
 
     // Edição envia todos os campos atuais. Opcional esvaziado vai como texto
@@ -229,7 +237,7 @@ export function ExecutionOccurrencesSheet({
       if (err instanceof ApiError) {
         const fromApi = err.status === 400 ? parseOccurrenceFieldErrors(err.payload) : {};
         if (Object.keys(fromApi).length > 0) {
-          setFieldErrors(fromApi);
+          setErrors(fromApi, "server");
         } else {
           setFormError(
             apiErrorMessage(err, "Não foi possível salvar a ocorrência."),
@@ -410,6 +418,7 @@ export function ExecutionOccurrencesSheet({
                   className="w-full"
                   value={values.logType}
                   onChange={(e) => update("logType", e.target.value)}
+                  onBlur={() => onBlur("logType", values)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.logType)}
                   aria-describedby={fieldErrors.logType ? "occurrence-type-error" : undefined}
@@ -433,6 +442,7 @@ export function ExecutionOccurrencesSheet({
                   maxLength={MAX_DESCRIPTION}
                   value={values.description}
                   onChange={(e) => update("description", e.target.value)}
+                  onBlur={() => onBlur("description", values)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.description)}
                   aria-describedby={fieldErrors.description ? "occurrence-description-error" : undefined}
@@ -449,6 +459,7 @@ export function ExecutionOccurrencesSheet({
                   maxLength={MAX_WEATHER}
                   value={values.weatherObservation}
                   onChange={(e) => update("weatherObservation", e.target.value)}
+                  onBlur={() => onBlur("weatherObservation", values)}
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.weatherObservation)}
                   aria-describedby={fieldErrors.weatherObservation ? "occurrence-weather-error" : undefined}
@@ -467,6 +478,7 @@ export function ExecutionOccurrencesSheet({
                   inputMode="url"
                   value={values.evidenceUrl}
                   onChange={(e) => update("evidenceUrl", e.target.value)}
+                  onBlur={() => onBlur("evidenceUrl", values)}
                   disabled={submitting}
                   placeholder="https://…"
                   aria-invalid={Boolean(fieldErrors.evidenceUrl)}

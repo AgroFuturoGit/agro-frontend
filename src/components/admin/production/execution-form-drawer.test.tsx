@@ -381,3 +381,96 @@ describe("ExecutionFormDrawer — erros (lote 4)", () => {
     expect(quantity.getAttribute("aria-describedby")).toBe("execution-quantity-error");
   });
 });
+
+describe("ExecutionFormDrawer — validação ao sair do campo (RF1)", () => {
+  const QUANTITY_ERROR =
+    "Informe uma quantidade válida (use vírgula nos decimais; mínimo 0,01)";
+  const FUTURE_ERROR = "A data da colheita não pode ser futura";
+
+  it("blur com quantidade '0' mostra o erro", async () => {
+    renderForm("create", BOX);
+    const quantity = await screen.findByLabelText("Quantidade colhida (caixas)");
+    fireEvent.change(quantity, { target: { value: "0" } });
+    expect(screen.queryByText(QUANTITY_ERROR)).toBeNull();
+    fireEvent.blur(quantity);
+    expect(await screen.findByText(QUANTITY_ERROR)).toBeTruthy();
+    expect(createProductionExecution).not.toHaveBeenCalled();
+  });
+
+  it("digitar um valor ainda inválido mantém o erro, e um válido o tira", async () => {
+    renderForm("create", BOX);
+    const quantity = await screen.findByLabelText("Quantidade colhida (caixas)");
+    fireEvent.change(quantity, { target: { value: "0" } });
+    fireEvent.blur(quantity);
+    expect(await screen.findByText(QUANTITY_ERROR)).toBeTruthy();
+
+    fireEvent.change(quantity, { target: { value: "0,001" } });
+    expect(screen.getByText(QUANTITY_ERROR)).toBeTruthy();
+
+    fireEvent.change(quantity, { target: { value: "12" } });
+    await waitFor(() => expect(screen.queryByText(QUANTITY_ERROR)).toBeNull());
+  });
+
+  it("na criação, o blur com data futura mostra o erro", async () => {
+    renderForm("create", BOX);
+    const date = await screen.findByLabelText("Data da colheita");
+    fireEvent.change(date, { target: { value: "2999-01-01" } });
+    expect(screen.queryByText(FUTURE_ERROR)).toBeNull();
+    fireEvent.blur(date);
+    expect(await screen.findByText(FUTURE_ERROR)).toBeTruthy();
+  });
+
+  it("na edição, o blur na data futura já gravada, sem mudá-la, não mostra erro", async () => {
+    renderForm("edit", BOX, { ...EXECUTION, harvestedAt: "2999-01-01" });
+    const date = await screen.findByLabelText("Data da colheita");
+    expect((date as HTMLInputElement).value).toBe("2999-01-01");
+    fireEvent.blur(date);
+    expect(screen.queryByText(FUTURE_ERROR)).toBeNull();
+    expect(date.getAttribute("aria-invalid")).toBe("false");
+    expect(date.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("aria-invalid e aria-describedby acompanham o erro do blur", async () => {
+    renderForm("create", BOX);
+    const quantity = await screen.findByLabelText("Quantidade colhida (caixas)");
+    expect(quantity.getAttribute("aria-invalid")).toBe("false");
+    expect(quantity.getAttribute("aria-describedby")).toBeNull();
+
+    fireEvent.blur(quantity);
+    const message = await screen.findByText(QUANTITY_ERROR);
+    expect(quantity.getAttribute("aria-invalid")).toBe("true");
+    expect(message.id).toBe("execution-quantity-error");
+    expect(quantity.getAttribute("aria-describedby")).toBe(message.id);
+
+    fireEvent.change(quantity, { target: { value: "5" } });
+    await waitFor(() => expect(quantity.getAttribute("aria-invalid")).toBe("false"));
+    expect(quantity.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("erro por campo do back some ao digitar no campo", async () => {
+    vi.mocked(createProductionExecution).mockRejectedValue(
+      new ApiError(400, "Erro de validação", {
+        message: "quantity: A quantidade produzida deve ser maior que zero",
+      }),
+    );
+    renderForm("create", BOX);
+    const quantity = await screen.findByLabelText("Quantidade colhida (caixas)");
+    fireEvent.change(quantity, { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("Data da colheita"), {
+      target: { value: "2026-05-10" },
+    });
+    submit();
+    const message = await waitFor(() => {
+      const el = document.getElementById("execution-quantity-error");
+      expect(el).not.toBeNull();
+      return el as HTMLElement;
+    });
+    expect(message.textContent).toBe("A quantidade produzida deve ser maior que zero");
+    expect(quantity.getAttribute("aria-describedby")).toBe("execution-quantity-error");
+
+    fireEvent.change(quantity, { target: { value: "6" } });
+    await waitFor(() =>
+      expect(document.getElementById("execution-quantity-error")).toBeNull(),
+    );
+  });
+});

@@ -54,6 +54,7 @@ import {
   updateFamilyMember,
   type FamilyMember,
 } from "@/lib/farmer-social";
+import { useFieldValidation } from "@/lib/use-field-validation";
 import { LIMITS } from "@/lib/validation";
 
 type Props = {
@@ -68,8 +69,11 @@ const EMPTY: FormValues = { name: "", kinship: "", age: "" };
 const MAX_KINSHIP = LIMITS.KINSHIP;
 const MAX_NAME = LIMITS.FULL_NAME;
 
-function validate(values: FormValues): Record<string, string> {
-  const errors: Record<string, string> = {};
+type Field = keyof FormValues;
+type FieldErrors = Partial<Record<Field, string>>;
+
+function validate(values: FormValues): FieldErrors {
+  const errors: FieldErrors = {};
   if (!values.name.trim()) errors.name = "O nome é obrigatório";
   else if (values.name.trim().length > MAX_NAME)
     errors.name = `O nome deve ter no máximo ${MAX_NAME} caracteres`;
@@ -94,7 +98,15 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
   const [deleteTarget, setDeleteTarget] = useState<FamilyMember | null>(null);
 
   const [values, setValues] = useState<FormValues>(EMPTY);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const {
+    errors: fieldErrors,
+    onBlur,
+    onChange,
+    setErrors,
+    reset,
+  } = useFieldValidation<Field, FormValues>(
+    (field, current) => validate(current)[field],
+  );
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -125,7 +137,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
   function openCreate() {
     setEditTarget(null);
     setValues(EMPTY);
-    setFieldErrors({});
+    reset();
     setFormError(null);
     setFormOpen(true);
   }
@@ -137,26 +149,22 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
       kinship: member.kinship,
       age: String(member.age),
     });
-    setFieldErrors({});
+    reset();
     setFormError(null);
     setFormOpen(true);
   }
 
-  function update(field: keyof FormValues, value: string) {
-    setValues((prev) => ({ ...prev, [field]: value }));
-    setFieldErrors((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
+  function update(field: Field, value: string) {
+    const next = { ...values, [field]: value };
+    setValues(next);
+    onChange(field, next);
   }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setFormError(null);
     const errors = validate(values);
-    setFieldErrors(errors);
+    setErrors(errors, "client");
     if (Object.keys(errors).length > 0) return;
 
     const payload = {
@@ -174,7 +182,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
       if (err instanceof ApiError) {
         const fromApi = err.status === 400 ? parseSocialFieldErrors(err.payload) : {};
         if (Object.keys(fromApi).length > 0) {
-          setFieldErrors(fromApi);
+          setErrors(fromApi as FieldErrors, "server");
         } else {
           setFormError(apiErrorMessage(err, "Não foi possível salvar o membro familiar."));
         }
@@ -372,6 +380,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                     maxLength={MAX_NAME}
                     value={values.name}
                     onChange={(e) => update("name", e.target.value)}
+                    onBlur={() => onBlur("name", values)}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.name)}
                     aria-describedby={fieldErrors.name ? "family-name-error" : undefined}
@@ -389,6 +398,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                     maxLength={MAX_KINSHIP}
                     value={values.kinship}
                     onChange={(e) => update("kinship", e.target.value)}
+                    onBlur={() => onBlur("kinship", values)}
                     disabled={submitting}
                     placeholder="Ex.: Esposa, Filho"
                     aria-invalid={Boolean(fieldErrors.kinship)}
@@ -411,6 +421,7 @@ export function FamilyCompositionSection({ farmerId, canWrite }: Props) {
                     step="1"
                     value={values.age}
                     onChange={(e) => update("age", e.target.value)}
+                    onBlur={() => onBlur("age", values)}
                     disabled={submitting}
                     aria-invalid={Boolean(fieldErrors.age)}
                     aria-describedby={fieldErrors.age ? "family-age-error" : undefined}

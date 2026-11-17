@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, apiErrorMessage } from "@/lib/api";
+import { ApiError, apiErrorMessage, parseFieldErrors } from "@/lib/api";
 import { unitFactorKg, unitLabel, type Crop } from "@/lib/crops";
 import {
   createProductionExecution,
@@ -23,6 +23,7 @@ import {
   updateProductionExecution,
   type ProductionExecution,
 } from "@/lib/production";
+import { useFieldValidation } from "@/lib/use-field-validation";
 import {
   DIGITS,
   LIMITS,
@@ -60,17 +61,23 @@ type FormValues = {
   notes: string;
 };
 
+type Field = keyof FormValues;
+type FieldErrors = Partial<Record<Field, string>>;
+
 const EMPTY: FormValues = {
   quantity: "",
   harvestedAt: "",
   notes: "",
 };
 
+/** Campos que mostram erro no formulário. */
+const ERROR_FIELDS: Field[] = ["quantity", "harvestedAt"];
+
 function validate(
   values: FormValues,
   original: ProductionExecution | null,
-): Record<string, string> {
-  const errors: Record<string, string> = {};
+): FieldErrors {
+  const errors: FieldErrors = {};
   const value = parseDecimalBr(values.quantity);
   if (!Number.isFinite(value) || value < MIN_POSITIVE_AMOUNT) {
     errors.quantity =
@@ -85,6 +92,16 @@ function validate(
     values.harvestedAt !== (original?.harvestedAt ?? "")
   ) {
     errors.harvestedAt = "A data da colheita não pode ser futura";
+  }
+  return errors;
+}
+
+/** Erros por campo do 400 do back, só dos campos deste formulário. */
+function serverFieldErrors(payload: unknown): FieldErrors {
+  const parsed = parseFieldErrors(payload);
+  const errors: FieldErrors = {};
+  for (const field of ERROR_FIELDS) {
+    if (parsed[field]) errors[field] = parsed[field];
   }
   return errors;
 }
@@ -105,15 +122,26 @@ export function ExecutionFormDrawer({
 }: Props) {
   const isCreate = mode === "create";
   const [values, setValues] = useState<FormValues>(EMPTY);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // A exceção do `original` (data futura já gravada) vale também no blur.
+  const original = isCreate ? null : (execution ?? null);
+  const {
+    errors: fieldErrors,
+    onBlur,
+    onChange,
+    setErrors,
+    reset,
+  } = useFieldValidation<Field, FormValues>(
+    (field, current) => validate(current, original)[field],
+  );
 
   useEffect(() => {
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setFormError(null);
-    setFieldErrors({});
+    reset();
     if (mode === "edit" && execution) {
       setValues({
         quantity: formatDecimalInput(execution.quantity),
@@ -123,7 +151,7 @@ export function ExecutionFormDrawer({
     } else {
       setValues(EMPTY);
     }
-  }, [open, mode, execution]);
+  }, [open, mode, execution, reset]);
 
   const isDirty = useMemo(() => {
     if (isCreate) return true;
@@ -144,15 +172,10 @@ export function ExecutionFormDrawer({
       : null;
   const unitText = unitLabel(crop?.unit ?? null, 2);
 
-  function update<K extends keyof FormValues>(key: K, value: FormValues[K]) {
-    setValues((prev) => ({ ...prev, [key]: value }));
-    if (fieldErrors[key]) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[key];
-        return next;
-      });
-    }
+  function update<K extends Field>(key: K, value: FormValues[K]) {
+    const next = { ...values, [key]: value };
+    setValues(next);
+    onChange(key, next);
     if (formError) setFormError(null);
   }
 
@@ -162,9 +185,9 @@ export function ExecutionFormDrawer({
 
     if (factor === null) return;
 
-    const errors = validate(values, isCreate ? null : (execution ?? null));
+    const errors = validate(values, original);
     if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
+      setErrors(errors, "client");
       return;
     }
 
@@ -205,6 +228,12 @@ export function ExecutionFormDrawer({
           "Este apontamento foi alterado por outra pessoa enquanto você editava. Os dados foram atualizados; feche e abra a edição novamente para continuar.",
         );
         return;
+      }
+      if (err instanceof ApiError) {
+        const apiFieldErrors = serverFieldErrors(err.payload);
+        if (Object.keys(apiFieldErrors).length > 0) {
+          setErrors(apiFieldErrors, "server");
+        }
       }
       setFormError(
         apiErrorMessage(err, "Não foi possível salvar o apontamento."),
@@ -264,6 +293,7 @@ export function ExecutionFormDrawer({
                   inputMode="decimal"
                   value={values.quantity}
                   onChange={(e) => update("quantity", e.target.value)}
+                  onBlur={() => onBlur("quantity", values)}
                   required
                   disabled={submitting}
                   aria-invalid={Boolean(fieldErrors.quantity)}
@@ -294,6 +324,7 @@ export function ExecutionFormDrawer({
                 value={values.harvestedAt}
                 max={todayIso()}
                 onChange={(e) => update("harvestedAt", e.target.value)}
+                onBlur={() => onBlur("harvestedAt", values)}
                 required
                 disabled={submitting}
                 aria-invalid={Boolean(fieldErrors.harvestedAt)}

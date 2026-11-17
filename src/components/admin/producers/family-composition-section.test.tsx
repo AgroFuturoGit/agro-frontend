@@ -337,3 +337,67 @@ describe("FamilyCompositionSection — paginação e erro (UX-L3-05/06)", () => 
   });
 });
 
+
+describe("FamilyCompositionSection — validação ao sair do campo", () => {
+  async function openCreate() {
+    render(<FamilyCompositionSection farmerId="f-1" canWrite />);
+    await screen.findByText("Maria da Silva");
+    fireEvent.click(screen.getByRole("button", { name: "Adicionar membro" }));
+    await screen.findByRole("dialog");
+  }
+
+  it("o blur numa idade inválida mostra o erro e liga aria-invalid/aria-describedby", async () => {
+    await openCreate();
+    type("Idade", "-1");
+    expect(
+      screen.queryByText("A idade deve ser um número inteiro, sem negativos"),
+    ).not.toBeInTheDocument();
+    fireEvent.blur(screen.getByLabelText("Idade"));
+    const error = await screen.findByText("A idade deve ser um número inteiro, sem negativos");
+    const input = screen.getByLabelText("Idade");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.getAttribute("aria-describedby")).toBe(error.id);
+  });
+
+  it("o blur de nome e parentesco vazios mostra os erros", async () => {
+    await openCreate();
+    fireEvent.blur(screen.getByLabelText("Nome"));
+    expect(await screen.findByText("O nome é obrigatório")).toBeInTheDocument();
+    fireEvent.blur(screen.getByLabelText("Parentesco"));
+    expect(await screen.findByText("O parentesco é obrigatório")).toBeInTheDocument();
+  });
+
+  it("digitar um valor válido tira o erro; um ainda inválido o mantém", async () => {
+    await openCreate();
+    type("Idade", "-1");
+    fireEvent.blur(screen.getByLabelText("Idade"));
+    await screen.findByText("A idade deve ser um número inteiro, sem negativos");
+    type("Idade", "-2");
+    expect(
+      screen.getByText("A idade deve ser um número inteiro, sem negativos"),
+    ).toBeInTheDocument();
+    type("Idade", "12");
+    expect(
+      screen.queryByText("A idade deve ser um número inteiro, sem negativos"),
+    ).not.toBeInTheDocument();
+    const input = screen.getByLabelText("Idade");
+    expect(input.getAttribute("aria-invalid")).toBe("false");
+    expect(input.getAttribute("aria-describedby")).toBeNull();
+  });
+
+  it("o erro do back some ao digitar no campo", async () => {
+    vi.mocked(createFamilyMember).mockRejectedValue(
+      new ApiError(400, "kinship: O parentesco é obrigatório", {
+        message: "kinship: O parentesco é obrigatório",
+      }),
+    );
+    await openCreate();
+    type("Nome", "Ana");
+    type("Parentesco", "x");
+    type("Idade", "5");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByText("O parentesco é obrigatório")).toBeInTheDocument();
+    type("Parentesco", "filha");
+    expect(screen.queryByText("O parentesco é obrigatório")).not.toBeInTheDocument();
+  });
+});
