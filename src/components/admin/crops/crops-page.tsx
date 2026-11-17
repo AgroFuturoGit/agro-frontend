@@ -302,7 +302,7 @@ export function CropsPage() {
         emptyHint={
           canManage
             ? "Cadastre as culturas (nome e variedade) que vão compor os planos de produção."
-            : "As culturas aparecem aqui quando um administrador ou técnico as cadastra."
+            : "As culturas aparecem aqui quando um administrador as cadastra."
         }
         emptyActionLabel={canManage ? "Criar primeira cultura" : undefined}
         onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}

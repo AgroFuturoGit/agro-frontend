@@ -526,7 +526,10 @@ describe("CropsPage — ajustes da revisão (lote 2)", () => {
     render(<CropsPage />);
 
     const status = await emptyStatus("Nenhuma cultura cadastrada.");
-    expect(status).toHaveTextContent(/administrador ou técnico/);
+    expect(status).toHaveTextContent(
+      "As culturas aparecem aqui quando um administrador as cadastra.",
+    );
+    expect(status).not.toHaveTextContent(/técnico/);
     expect(screen.queryByRole("button", { name: "Criar primeira cultura" })).toBeNull();
   });
 
@@ -683,4 +686,58 @@ describe("CropsPage — lacunas do QA e M1 (lote 2)", () => {
       });
     },
   );
+});
+
+describe("CropsPage — ações por papel (RG4)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it.each(["FARMER", "MANAGER", "TECHNICIAN"] as const)(
+    "role=%s: desktop sem Nova/Editar/Excluir e com linhas",
+    async (role) => {
+      await mockRole(role);
+      await mockMobile(false);
+      await mockCropsApi();
+
+      await renderCropsPage();
+
+      expect(screen.queryByRole("button", { name: /Nova cultura/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Editar/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Excluir cultura/ })).toBeNull();
+      expect(screen.getAllByRole("row").length).toBe(CROPS.length + 1);
+    },
+  );
+
+  it.each(["FARMER", "MANAGER", "TECHNICIAN"] as const)(
+    "role=%s: vazio sem CTA, com a dica do administrador",
+    async (role) => {
+      await mockRole(role);
+      await mockMobile(false);
+      await mockCropsApi([]);
+
+      render(<CropsPage />);
+
+      const status = await emptyStatus("Nenhuma cultura cadastrada.");
+      expect(status).toHaveTextContent(
+        "As culturas aparecem aqui quando um administrador as cadastra.",
+      );
+      expect(screen.queryByRole("button", { name: "Criar primeira cultura" })).toBeNull();
+    },
+  );
+
+  it("role=TECHNICIAN mobile: cards sem Editar/Excluir", async () => {
+    await mockRole("TECHNICIAN");
+    await mockMobile(true);
+    await mockCropsApi();
+
+    await renderCropsPage();
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Soja — Convencional", { exact: true })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Nova cultura/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Editar/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Excluir cultura/ })).toBeNull();
+  });
 });

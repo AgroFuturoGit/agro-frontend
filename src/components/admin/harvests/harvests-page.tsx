@@ -228,7 +228,7 @@ export function HarvestsPage() {
         emptyHint={
           canManage
             ? "Cadastre a primeira safra para organizar os planos de produção por período."
-            : "As safras aparecem aqui quando um administrador ou técnico as cadastra."
+            : "As safras aparecem aqui quando um administrador as cadastra."
         }
         emptyActionLabel={canManage ? "Criar primeira safra" : undefined}
         onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}

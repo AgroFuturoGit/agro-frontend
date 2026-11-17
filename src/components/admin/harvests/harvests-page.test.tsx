@@ -385,7 +385,11 @@ describe("HarvestsPage — ajustes da revisão (lote 2)", () => {
 
     render(<HarvestsPage />);
 
-    expect(await emptyStatus("Nenhuma safra cadastrada.")).toHaveTextContent(/administrador ou técnico/);
+    const status = await emptyStatus("Nenhuma safra cadastrada.");
+    expect(status).toHaveTextContent(
+      "As safras aparecem aqui quando um administrador as cadastra.",
+    );
+    expect(status).not.toHaveTextContent(/técnico/);
     expect(screen.queryByRole("button", { name: "Criar primeira safra" })).toBeNull();
   });
 
@@ -398,5 +402,59 @@ describe("HarvestsPage — ajustes da revisão (lote 2)", () => {
 
     expect(screen.getByRole("button", { name: "Editar safra Safra 2023/2024" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Excluir safra Safra 2023/2024" })).toBeTruthy();
+  });
+});
+
+describe("HarvestsPage — ações por papel (RG4)", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it.each(["FARMER", "MANAGER", "TECHNICIAN"] as const)(
+    "role=%s: desktop sem Nova/Editar/Excluir e com linhas",
+    async (role) => {
+      await mockRole(role);
+      await mockMobile(false);
+      await mockHarvestsApi();
+
+      await renderHarvestsPage();
+
+      expect(screen.queryByRole("button", { name: /Nova safra/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Editar safra/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /^Excluir safra/ })).toBeNull();
+      expect(screen.getAllByRole("row").length).toBe(HARVESTS.length + 1);
+    },
+  );
+
+  it.each(["FARMER", "MANAGER", "TECHNICIAN"] as const)(
+    "role=%s: vazio sem CTA, com a dica do administrador",
+    async (role) => {
+      await mockRole(role);
+      await mockMobile(false);
+      await mockHarvestsApi([]);
+
+      render(<HarvestsPage />);
+
+      const status = await emptyStatus("Nenhuma safra cadastrada.");
+      expect(status).toHaveTextContent(
+        "As safras aparecem aqui quando um administrador as cadastra.",
+      );
+      expect(screen.queryByRole("button", { name: "Criar primeira safra" })).toBeNull();
+    },
+  );
+
+  it("role=TECHNICIAN mobile: cards sem Editar/Excluir", async () => {
+    await mockRole("TECHNICIAN");
+    await mockMobile(true);
+    await mockHarvestsApi();
+
+    await renderHarvestsPage();
+
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Safrinha 2025", { exact: true })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Nova safra/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Editar safra/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Excluir safra/ })).toBeNull();
   });
 });
