@@ -270,6 +270,64 @@ describe("ExecutionOccurrencesSheet — formulário (UNIT-005)", () => {
     expect(screen.getByText("Nova ocorrência")).toBeInTheDocument();
   });
 
+  it("blur com a descrição vazia mostra o erro e digitar o tira", async () => {
+    await openCreate();
+    const description = screen.getByLabelText("Descrição");
+    fireEvent.blur(description);
+    expect(await screen.findByText("A descrição é obrigatória")).toBeInTheDocument();
+    type("Descrição", "Lagarta");
+    expect(screen.queryByText("A descrição é obrigatória")).not.toBeInTheDocument();
+  });
+
+  it("blur com link inválido mostra o erro e corrigir para https o tira", async () => {
+    await openCreate();
+    const link = screen.getByLabelText("Link da evidência (opcional)");
+    type("Link da evidência (opcional)", "javascript:alert(1)");
+    expect(screen.queryByText("Informe um link http:// ou https:// válido")).not.toBeInTheDocument();
+    fireEvent.blur(link);
+    expect(await screen.findByText("Informe um link http:// ou https:// válido")).toBeInTheDocument();
+    type("Link da evidência (opcional)", "https://exemplo.test/a.jpg");
+    expect(screen.queryByText("Informe um link http:// ou https:// válido")).not.toBeInTheDocument();
+  });
+
+  it("o erro do back no link some ao digitar nele", async () => {
+    vi.mocked(createOccurrence).mockRejectedValue(
+      new ApiError(400, "evidenceUrl: Link recusado", {
+        message: "evidenceUrl: Link recusado",
+      }),
+    );
+    await openCreate();
+    type("Tipo", "PEST");
+    type("Descrição", "Lagarta");
+    type("Link da evidência (opcional)", "https://exemplo.test/a.jpg");
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    expect(await screen.findByText("Link recusado")).toBeInTheDocument();
+    type("Link da evidência (opcional)", "https://exemplo.test/b.jpg");
+    expect(screen.queryByText("Link recusado")).not.toBeInTheDocument();
+  });
+
+  it("aria-invalid e aria-describedby acompanham o erro do blur", async () => {
+    await openCreate();
+    const description = screen.getByLabelText("Descrição");
+    expect(description).not.toHaveAttribute("aria-invalid", "true");
+    expect(description).not.toHaveAttribute("aria-describedby");
+    fireEvent.blur(description);
+    const error = await screen.findByText("A descrição é obrigatória");
+    expect(description).toHaveAttribute("aria-invalid", "true");
+    expect(description.getAttribute("aria-describedby")).toBe(error.id);
+    type("Descrição", "Lagarta");
+    expect(description).not.toHaveAttribute("aria-invalid", "true");
+    expect(description).not.toHaveAttribute("aria-describedby");
+  });
+
+  it("blur no tipo vazio mostra o erro e escolher um tipo o tira", async () => {
+    await openCreate();
+    fireEvent.blur(screen.getByLabelText("Tipo"));
+    expect(await screen.findByText("O tipo de ocorrência é obrigatório")).toBeInTheDocument();
+    type("Tipo", "PEST");
+    expect(screen.queryByText("O tipo de ocorrência é obrigatório")).not.toBeInTheDocument();
+  });
+
   it("mostra a mensagem do 403 no formulário", async () => {
     vi.mocked(createOccurrence).mockRejectedValue(
       new ApiError(403, "O técnico não tem assistência nesta comunidade.", null),
