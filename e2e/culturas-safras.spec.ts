@@ -50,6 +50,15 @@ const ADMIN_USER: FakeUser = {
   dateOfBirth: null,
 };
 
+const TECHNICIAN_USER: FakeUser = {
+  id: "tech-user-1",
+  fullName: "Tânia Técnica",
+  email: "tania@example.com",
+  cpf: "00011122244",
+  role: "TECHNICIAN",
+  dateOfBirth: null,
+};
+
 type FakeCrop = {
   id: string;
   name: string;
@@ -336,5 +345,31 @@ test.describe("/admin/safras — DataTable genérico", () => {
       await expect(card.getByRole("button", { name: "Editar safra" })).toBeVisible();
       await expect(card.getByRole("button", { name: "Excluir safra" })).toBeVisible();
     });
+  });
+});
+
+test.describe("TECHNICIAN — culturas e safras só em leitura", () => {
+  test("/admin/culturas lista sem 'Nova cultura' nem ações de linha", async ({ page }) => {
+    await loginAs(page, "TECHNICIAN", TECHNICIAN_USER);
+    await mockCropsList(page);
+
+    await page.goto("/admin/culturas");
+    await expect(page.getByText("Abacaxi")).toBeVisible();
+
+    await expect(page.getByRole("button", { name: "Nova cultura" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Editar" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Excluir cultura" })).toHaveCount(0);
+  });
+
+  test("/admin/safras lista sem 'Nova safra' nem ações de linha", async ({ page }) => {
+    await loginAs(page, "TECHNICIAN", TECHNICIAN_USER);
+    await mockHarvestsList(page);
+
+    await page.goto("/admin/safras");
+    await expect(page.getByText("Safra 2015/2016")).toBeVisible();
+
+    await expect(page.getByRole("button", { name: "Nova safra" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Editar safra" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Excluir safra" })).toHaveCount(0);
   });
 });

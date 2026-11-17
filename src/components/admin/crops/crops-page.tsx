@@ -82,7 +82,8 @@ export function CropsPage() {
     setCurrentRole(readUserFromStorage()?.role ?? null);
   }, []);
 
-  const canManage = currentRole === "ADMIN" || currentRole === "TECHNICIAN";
+  // Só o ADMIN gerencia (cria/edita/exclui); os demais papéis só leem a lista.
+  const canManage = currentRole === "ADMIN";
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -301,7 +302,7 @@ export function CropsPage() {
         emptyHint={
           canManage
             ? "Cadastre as culturas (nome e variedade) que vão compor os planos de produção."
-            : "As culturas aparecem aqui quando um administrador ou técnico as cadastra."
+            : "As culturas aparecem aqui quando um administrador as cadastra."
         }
         emptyActionLabel={canManage ? "Criar primeira cultura" : undefined}
         onEmptyAction={canManage ? () => setCreateOpen(true) : undefined}
