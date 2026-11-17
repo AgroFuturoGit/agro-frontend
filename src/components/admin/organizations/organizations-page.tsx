@@ -440,7 +440,7 @@ export function OrganizationsPage() {
     return (
       <div className="flex flex-col gap-section-sm">
         <PageHeader
-          title="Organizações"
+          title={currentRole === "FARMER" ? "Meus Planos" : "Organizações"}
           titleId={REDIRECT_TITLE_ID}
           description={redirectError ? undefined : redirectDescription}
         />
@@ -470,7 +470,7 @@ export function OrganizationsPage() {
     return (
       <div className="flex flex-col gap-section-sm">
         <PageHeader
-          title="Meus agricultores atendidos"
+          title="Minhas Assistências"
           description="Agricultores sob sua assistência técnica."
         />
 
