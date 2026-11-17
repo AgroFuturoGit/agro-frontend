@@ -27,6 +27,7 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   roles?: Role[];
+  labelByRole?: Partial<Record<Role, string>>;
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -48,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/organizacoes",
     label: "Organizações",
     icon: Building2,
+    labelByRole: { TECHNICIAN: "Minhas Assistências", FARMER: "Meus Planos" },
     // Ponto de entrada único da navegação em cascata (Organização →
     // Comunidade → Produtor → Planos): visível às 4 roles. Cada role pousa
     // no nível certo dentro de `organizations-page.tsx` — MANAGER e
@@ -81,14 +83,15 @@ export function SidebarNav() {
 
   return (
     <SidebarMenu className="gap-1">
-      {visibleItems.map(({ href, label, icon: Icon }) => {
+      {visibleItems.map(({ href, label, labelByRole, icon: Icon }) => {
+        const text = (role && labelByRole?.[role]) ?? label;
         const active =
           href === "/admin" ? pathname === href : pathname.startsWith(href);
         return (
           <SidebarMenuItem key={href}>
             <SidebarMenuButton
               isActive={active}
-              tooltip={label}
+              tooltip={text}
               className="gap-5 px-3 text-base"
               render={
                 <Link
@@ -97,7 +100,7 @@ export function SidebarNav() {
                   onClick={() => setOpenMobile(false)}
                 >
                   <Icon aria-hidden="true" />
-                  <span>{label}</span>
+                  <span>{text}</span>
                 </Link>
               }
             />

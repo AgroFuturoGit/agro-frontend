@@ -63,13 +63,19 @@ describe("SidebarNav — RBAC de navegação", () => {
     vi.restoreAllMocks();
   });
 
-  it.each(["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"] as const)(
-    "exibe 'Organizações' para role=%s (ponto de entrada único da hierarquia)",
-    async (role) => {
+  it.each([
+    ["ADMIN", "Organizações"],
+    ["MANAGER", "Organizações"],
+    ["TECHNICIAN", "Minhas Assistências"],
+    ["FARMER", "Meus Planos"],
+  ] as const)(
+    "role=%s vê o rótulo '%s' apontando para /admin/organizacoes",
+    async (role, label) => {
       mockRole(role);
       renderSidebarNav();
 
-      expect(await screen.findByText("Organizações")).toBeTruthy();
+      const link = await screen.findByRole("link", { name: label });
+      expect(link.getAttribute("href")).toBe("/admin/organizacoes");
     },
   );
 
@@ -88,7 +94,7 @@ describe("SidebarNav — RBAC de navegação", () => {
       mockRole(role);
       renderSidebarNav();
 
-      await screen.findByText("Organizações");
+      await screen.findByText("Visão geral");
       expect(screen.queryByText("Relatórios")).toBeNull();
     },
   );
@@ -99,7 +105,7 @@ describe("SidebarNav — RBAC de navegação", () => {
       mockRole(role);
       renderSidebarNav();
 
-      await screen.findByText("Organizações");
+      await screen.findByText("Visão geral");
       expect(screen.queryByText("Comunidades")).toBeNull();
       expect(screen.queryByText("Produtores")).toBeNull();
       expect(screen.queryByText("Planos de Produção")).toBeNull();
@@ -118,7 +124,7 @@ describe("SidebarNav — RBAC de navegação", () => {
     mockRole("FARMER");
     renderSidebarNav();
 
-    await screen.findByText("Organizações");
+    await screen.findByText("Visão geral");
     expect(screen.queryByText("Perfis")).toBeNull();
   });
 
@@ -145,7 +151,7 @@ describe("SidebarNav — RBAC de navegação", () => {
       mockRole(role);
       renderSidebarNav();
 
-      await screen.findByText("Organizações");
+      await screen.findByText("Visão geral");
       expect(screen.queryByText("Usuários")).toBeNull();
     },
   );
