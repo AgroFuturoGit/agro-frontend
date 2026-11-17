@@ -124,6 +124,12 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   // carregar.
   const [names, setNames] = useState<BreadcrumbNames | null>(null);
 
+  // Descrição do cabeçalho do FARMER: sai do `getMyProducer()` da guarda
+  // (sem chamada extra), só com as partes que existirem.
+  const [farmerAffiliation, setFarmerAffiliation] = useState<string | null>(
+    null,
+  );
+
   const [plans, setPlans] = useState<ProductionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -185,6 +191,8 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
   // própria porque é o gate citado nos testes desta tela.
   const canDelete = canWrite;
 
+  const pageTitle = currentRole === "FARMER" ? "Meus Planos" : "Planos de produção";
+
   const runGuard = useCallback(async () => {
     if (!roleResolved) return;
 
@@ -204,6 +212,13 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         router.replace("/admin/organizacoes");
         return;
       }
+      const affiliation = [
+        producer.community?.name ? `Comunidade ${producer.community.name}` : null,
+        producer.community?.organization?.name
+          ? `Organização ${producer.community.organization.name}`
+          : null,
+      ].filter(Boolean);
+      setFarmerAffiliation(affiliation.length ? affiliation.join(" · ") : null);
       setNames({
         organizationName: producer.community?.organization?.name ?? "Organização",
         communityName: producer.community?.name ?? "Comunidade",
@@ -479,7 +494,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         {/* Texto de espera visível (sem role=status permanente), como em
             organizations-page. */}
         <PageHeader
-          title="Planos de produção"
+          title={pageTitle}
           description="Abrindo os seus planos de produção…"
         />
         <div aria-busy="true">
@@ -501,7 +516,7 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
           {currentRole === null ? (
             <div aria-hidden="true" className="h-5" />
           ) : null}
-          <PageHeader title="Planos de produção" titleId={PLANS_TITLE_ID} />
+          <PageHeader title={pageTitle} titleId={PLANS_TITLE_ID} />
           <InlineAlert
             variant="destructive"
             action={{
@@ -539,9 +554,13 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
               producer: names.producerLabel,
             },
           })}
-          title="Planos de produção"
+          title={pageTitle}
           titleId={PLANS_TITLE_ID}
-          description={`Planos de ${names?.producerLabel ?? "produção"}.`}
+          description={
+            currentRole === "FARMER"
+              ? (farmerAffiliation ?? undefined)
+              : `Planos de ${names?.producerLabel ?? "produção"}.`
+          }
           // Até os nomes chegarem, skeleton no lugar do título e da descrição
           // (nada de "Planos de produção." provisório).
           loading={names === null}

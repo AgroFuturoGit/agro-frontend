@@ -276,7 +276,7 @@ describe("ProducerPlansPage — producerId escopado pela rota (sem seletor)", ()
     await screen.findByText("Milho — BRS 1010");
     expect(document.activeElement?.id).toBe("producer-plans-title");
     expect(document.activeElement).toBe(
-      screen.getByRole("heading", { level: 2, name: "Planos de produção" }),
+      screen.getByRole("heading", { level: 2, name: "Meus Planos" }),
     );
   });
 
@@ -599,7 +599,6 @@ describe("ProducerPlansPage — breadcrumb por papel (RF2)", () => {
     renderPage();
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
-    expect(screen.getByText("Planos de José da Silva.")).toBeTruthy();
     expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
     expect(getMyAssignedProducers).not.toHaveBeenCalled();
     expect(getCommunity).not.toHaveBeenCalled();
@@ -665,4 +664,57 @@ describe("ProducerPlansPage — breadcrumb por papel (RF2)", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("navigation", { name: "Breadcrumb" })).toBeNull();
   });
+});
+
+describe("ProducerPlansPage — cabeçalho por papel (RG3)", () => {
+  it("FARMER: título 'Meus Planos' e descrição 'Comunidade X · Organização Y' em texto, sem links", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Meus Planos" }),
+    ).toBeTruthy();
+    const description = screen.getByText(
+      "Comunidade Comunidade Alto da Serra · Organização Cooperativa Serra Azul",
+    );
+    expect(description.closest("a")).toBeNull();
+    expect(within(description).queryAllByRole("link")).toHaveLength(0);
+    expect(screen.queryByRole("link", { name: /organiza|comunidade/i })).toBeNull();
+    expect(getMyProducer).toHaveBeenCalledTimes(1);
+  });
+
+  it("FARMER: sem organização, mostra só a comunidade", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(getMyProducer).mockResolvedValue({
+      ...MY_PRODUCER,
+      community: { ...COMMUNITY, organization: undefined as unknown as Organization },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(screen.getByText("Comunidade Comunidade Alto da Serra")).toBeTruthy();
+    expect(screen.queryByText(/Organização Cooperativa/)).toBeNull();
+    expect(getMyProducer).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["ADMIN", "TECHNICIAN"] as const)(
+    "%s: continua com 'Planos de produção'",
+    async (role) => {
+      loginAs(role);
+      vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+
+      renderPage();
+
+      expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+      expect(
+        screen.getByRole("heading", { level: 2, name: "Planos de produção" }),
+      ).toBeTruthy();
+      expect(screen.queryByText("Meus Planos")).toBeNull();
+    },
+  );
 });

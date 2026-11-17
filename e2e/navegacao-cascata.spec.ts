@@ -374,6 +374,12 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
 
     await page.goto("/admin/organizacoes");
     await expect(page.getByRole("link", { name: ORGANIZATION.name })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Organizações", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.locator('[data-slot="sidebar"]').getByRole("link", { name: "Organizações" }),
+    ).toBeVisible();
 
     await page.getByRole("link", { name: ORGANIZATION.name }).click();
     await expect(page).toHaveURL(new RegExp(`/admin/organizacoes/${ORGANIZATION.id}$`));
@@ -480,7 +486,12 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     // `GET /technicians/me/farmers` (issues-fix-back.pdf itens 7/8).
     await expect(page).toHaveURL(/\/admin\/organizacoes$/);
     await expect(
-      page.getByRole("heading", { name: "Meus agricultores atendidos" }),
+      page.getByRole("heading", { name: "Minhas Assistências", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('[data-slot="sidebar"]')
+        .getByRole("link", { name: "Minhas Assistências" }),
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: PRODUCER.user.fullName }),
@@ -603,7 +614,16 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     // aparece depois de a role ser lida e a guarda passar: a asserção
     // negativa abaixo não passa antes da hora.
     await expect(
-      page.getByRole("heading", { name: "Planos de produção", exact: true }),
+      page.getByRole("heading", { name: "Meus Planos", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .locator('[data-slot="sidebar"]')
+        .getByRole("link", { name: "Meus Planos" }),
+    ).toBeVisible();
+    // RG3: descrição em texto, com comunidade e organização do /farmers/me.
+    await expect(
+      page.getByText(`Comunidade ${COMMUNITY.name} · Organização ${ORGANIZATION.name}`),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Novo plano", exact: true }),
@@ -655,6 +675,13 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
     await expect(page.getByText(/Não foi possível/)).toHaveCount(0);
   });
 
+  const SIDEBAR_LABEL: Record<string, string> = {
+    ADMIN: "Organizações",
+    MANAGER: "Organizações",
+    TECHNICIAN: "Minhas Assistências",
+    FARMER: "Meus Planos",
+  };
+
   test.describe("Sidebar — itens antigos não existem mais para nenhuma role", () => {
     for (const role of ["ADMIN", "MANAGER", "TECHNICIAN", "FARMER"]) {
       test(`role=${role}: 'Comunidades', 'Produtores' e 'Planos de Produção' não aparecem na sidebar`, async ({
@@ -683,7 +710,7 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
         // então uma busca ampla por texto seria ambígua (dois elementos).
         const sidebar = page.locator('[data-slot="sidebar"]');
         await expect(
-          sidebar.getByRole("link", { name: "Organizações" }),
+          sidebar.getByRole("link", { name: SIDEBAR_LABEL[role] }),
         ).toBeVisible();
         await expect(sidebar.getByText("Comunidades", { exact: true })).toHaveCount(0);
         await expect(sidebar.getByText("Produtores", { exact: true })).toHaveCount(0);
