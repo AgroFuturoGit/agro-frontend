@@ -582,6 +582,30 @@ describe("UserFormDrawer — validação ao sair do campo (RF1)", () => {
     expect(screen.queryByText("E-mail já cadastrado")).toBeNull();
   });
 
+  it("erro 400 do back: a mensagem geral fica visível junto do erro do campo, e o blur sem editar não o tira", async () => {
+    vi.mocked(registerUser).mockRejectedValue(
+      new ApiError(400, "email: E-mail já cadastrado", {
+        message: "email: E-mail já cadastrado",
+      }),
+    );
+    renderCreate();
+    await pickRole("Administrador");
+    fillBase();
+    submit();
+
+    const email = screen.getByLabelText("E-mail", { exact: true });
+    expect(await screen.findByText("E-mail já cadastrado")).toBeTruthy();
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toContain("email: E-mail já cadastrado");
+
+    // Sair do campo sem alterar nada mantém o erro do back e a mensagem geral.
+    fireEvent.focus(email);
+    fireEvent.blur(email);
+    expect(screen.getByText("E-mail já cadastrado")).toBeTruthy();
+    expect(email.getAttribute("aria-invalid")).toBe("true");
+    expect(screen.getByRole("alert").textContent).toContain("email: E-mail já cadastrado");
+  });
+
   it("aria-invalid e aria-describedby apontam para a mensagem de erro", () => {
     renderCreate();
     const name = screen.getByLabelText("Nome completo", { exact: true });

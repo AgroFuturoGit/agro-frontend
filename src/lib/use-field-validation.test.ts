@@ -90,6 +90,68 @@ describe("useFieldValidation", () => {
     expect(result.current.errors).toEqual({});
   });
 
+  it("blur com valor válido não remove o erro do back no campo", () => {
+    const { result } = setup();
+
+    act(() => result.current.setErrors({ name: "Nome já cadastrado" }, "server"));
+    act(() => result.current.onBlur("name", values({ name: "Ana" })));
+    expect(result.current.errors).toEqual({ name: "Nome já cadastrado" });
+
+    // O erro do back continua sumindo quando o usuário digita no campo.
+    act(() => result.current.onChange("name", values({ name: "Outro nome" })));
+    expect(result.current.errors).toEqual({});
+  });
+
+  it("blur com valor inválido troca o erro do back pelo erro local", () => {
+    const { result } = setup();
+
+    act(() => result.current.setErrors({ name: "Nome já cadastrado" }, "server"));
+    act(() => result.current.onBlur("name", values({ name: "" })));
+    expect(result.current.errors).toEqual({ name: "Informe o nome" });
+
+    // Agora é local: o blur com valor válido o remove.
+    act(() => result.current.onBlur("name", values({ name: "Ana" })));
+    expect(result.current.errors).toEqual({});
+  });
+
+  it("erro do back em B, ao digitar em B ainda inválido, passa a local e é revalidado por A", () => {
+    const { result } = setup();
+
+    act(() => result.current.setErrors({ end: "Fim já usado" }, "server"));
+    act(() => result.current.onChange("end", values({ start: 10, end: 5 })));
+    expect(result.current.errors).toEqual({ end: "Fim antes do início" });
+
+    // Agora é local: corrigir A deve tirá-lo.
+    act(() => result.current.onChange("start", values({ start: 2, end: 5 })));
+    expect(result.current.errors).toEqual({});
+  });
+
+  it("erro do back que passou a local é removido pelo blur com valor válido", () => {
+    const { result } = setup();
+
+    act(() => result.current.setErrors({ name: "Nome já cadastrado" }, "server"));
+    act(() => result.current.onChange("name", values({ name: "A" })));
+    expect(result.current.errors).toEqual({ name: "Nome muito curto" });
+
+    act(() => result.current.onBlur("name", values({ name: "Ana" })));
+    expect(result.current.errors).toEqual({});
+  });
+
+  it("setErrors(client) substitui o mapa inteiro e as funções mantêm identidade", () => {
+    const { result, rerender } = setup();
+    const { onBlur, onChange, reset, setErrors } = result.current;
+
+    act(() => result.current.setErrors({ name: "Nome já cadastrado" }, "server"));
+    act(() => result.current.setErrors({ start: "Início inválido" }, "client"));
+    expect(result.current.errors).toEqual({ start: "Início inválido" });
+
+    rerender();
+    expect(result.current.onBlur).toBe(onBlur);
+    expect(result.current.onChange).toBe(onChange);
+    expect(result.current.reset).toBe(reset);
+    expect(result.current.setErrors).toBe(setErrors);
+  });
+
   it("reset() limpa tudo", () => {
     const { result } = setup();
 

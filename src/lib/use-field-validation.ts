@@ -8,7 +8,10 @@ type StoredError = { message: string; origin: FieldErrorOrigin };
 export type FieldValidation<F extends string, V> = {
   /** Erros por campo, prontos para a UI. */
   errors: Partial<Record<F, string>>;
-  /** Ao sair do campo: grava o erro local do campo ou o limpa. */
+  /**
+   * Ao sair do campo: grava o erro local do campo ou o limpa. Um erro do back
+   * no campo é mantido se o valor passa na validação local.
+   */
   onBlur: (field: F, values: V) => void;
   /**
    * Ao digitar: revalida o próprio campo (se tinha erro) e os outros campos
@@ -43,6 +46,10 @@ export function useFieldValidation<F extends string, V>(
     const message = validateRef.current(field, values);
     setStored((prev) => {
       if (!message && !prev[field]) return prev;
+      // Erro do back só some quando o usuário digita no campo (regra 1 do
+      // onChange); o blur com valor válido localmente não o remove. Se o valor
+      // for inválido localmente, o erro local o substitui.
+      if (!message && prev[field]?.origin === "server") return prev;
       const next = { ...prev };
       if (message) next[field] = { message, origin: "client" };
       else delete next[field];

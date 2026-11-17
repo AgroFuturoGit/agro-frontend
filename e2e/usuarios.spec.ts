@@ -370,4 +370,33 @@ test.describe("/admin/usuarios — DataTable genérico", () => {
       specialty: "Agronomia",
     });
   });
+
+  test("RF1: e-mail obrigatório vazio mostra o erro ao sair do campo e digitar um válido o tira", async ({
+    page,
+  }) => {
+    await loginAs(page, "ADMIN", ADMIN_USER);
+    await mockUsersList(page);
+
+    await page.goto("/admin/usuarios");
+    await expect(page.getByText("Ana Beatriz Costa")).toBeVisible();
+    await page.getByRole("button", { name: "Novo usuário" }).click();
+
+    const drawer = page.locator('[data-slot="sheet-content"]');
+    await expect(drawer).toBeVisible();
+
+    const email = drawer.getByLabel("E-mail", { exact: true });
+    const error = drawer.getByText("Informe um e-mail válido");
+
+    // Entrar e sair do campo vazio: o erro aparece sem submeter.
+    await email.focus();
+    await expect(error).toHaveCount(0);
+    await email.blur();
+    await expect(error).toBeVisible();
+    await expect(email).toHaveAttribute("aria-invalid", "true");
+
+    // Digitar um valor válido tira o erro sem precisar sair do campo.
+    await email.fill("novo.usuario@example.com");
+    await expect(error).toHaveCount(0);
+    await expect(email).toHaveAttribute("aria-invalid", "false");
+  });
 });
