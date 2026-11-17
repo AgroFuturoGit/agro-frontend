@@ -622,8 +622,10 @@ test.describe("Navegação em cascata — Organização → Comunidade → Produ
         .getByRole("link", { name: "Meus Planos" }),
     ).toBeVisible();
     // RG3: descrição em texto, com comunidade e organização do /farmers/me.
+    // O nome do mock já começa com "Comunidade", então o prefixo não se
+    // repete (D3).
     await expect(
-      page.getByText(`Comunidade ${COMMUNITY.name} · Organização ${ORGANIZATION.name}`),
+      page.getByText(`${COMMUNITY.name} · Organização ${ORGANIZATION.name}`, { exact: true }),
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Novo plano", exact: true }),

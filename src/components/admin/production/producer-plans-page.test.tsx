@@ -677,8 +677,9 @@ describe("ProducerPlansPage — cabeçalho por papel (RG3)", () => {
     expect(
       screen.getByRole("heading", { level: 2, name: "Meus Planos" }),
     ).toBeTruthy();
+    // O nome do mock já começa com "Comunidade": o prefixo não se repete.
     const description = screen.getByText(
-      "Comunidade Comunidade Alto da Serra · Organização Cooperativa Serra Azul",
+      "Comunidade Alto da Serra · Organização Cooperativa Serra Azul",
     );
     expect(description.closest("a")).toBeNull();
     expect(within(description).queryAllByRole("link")).toHaveLength(0);
@@ -697,12 +698,84 @@ describe("ProducerPlansPage — cabeçalho por papel (RG3)", () => {
     renderPage();
 
     expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
-    expect(screen.getByText("Comunidade Comunidade Alto da Serra")).toBeTruthy();
+    expect(screen.getByText("Comunidade Alto da Serra")).toBeTruthy();
     expect(screen.queryByText(/Organização Cooperativa/)).toBeNull();
+    expect(screen.queryByText(/Comunidade Comunidade/)).toBeNull();
     expect(getMyProducer).toHaveBeenCalledTimes(1);
   });
 
-  it.each(["ADMIN", "TECHNICIAN"] as const)(
+  it("FARMER: nome da comunidade sem prefixo ganha 'Comunidade '", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(getMyProducer).mockResolvedValue({
+      ...MY_PRODUCER,
+      community: { ...COMMUNITY, name: "Alto da Serra" },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(
+      screen.getByText("Comunidade Alto da Serra · Organização Cooperativa Serra Azul"),
+    ).toBeTruthy();
+    expect(getMyProducer).toHaveBeenCalledTimes(1);
+  });
+
+  it("FARMER: nome da organização que já começa com 'Organização' não duplica o prefixo", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(getMyProducer).mockResolvedValue({
+      ...MY_PRODUCER,
+      community: {
+        ...COMMUNITY,
+        organization: { ...ORGANIZATION, name: "Organização Rural X" },
+      },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(
+      screen.getByText("Comunidade Alto da Serra · Organização Rural X"),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Organização Organização/)).toBeNull();
+  });
+
+  it("FARMER: sem nome de comunidade, mostra só a organização", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(getMyProducer).mockResolvedValue({
+      ...MY_PRODUCER,
+      community: { ...COMMUNITY, name: "" },
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(screen.getByText("Organização Cooperativa Serra Azul")).toBeTruthy();
+    expect(screen.queryByText(/Comunidade /)).toBeNull();
+    expect(getMyProducer).toHaveBeenCalledTimes(1);
+  });
+
+  it("FARMER: sem comunidade, não renderiza descrição", async () => {
+    loginAs("FARMER");
+    vi.mocked(listProductionPlans).mockResolvedValue(PLANS);
+    vi.mocked(getMyProducer).mockResolvedValue({
+      ...MY_PRODUCER,
+      community: null as never,
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Milho — BRS 1010")).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "Meus Planos" }),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Comunidade|Organização/)).toBeNull();
+    expect(getMyProducer).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["ADMIN", "TECHNICIAN", "MANAGER"] as const)(
     "%s: continua com 'Planos de produção'",
     async (role) => {
       loginAs(role);

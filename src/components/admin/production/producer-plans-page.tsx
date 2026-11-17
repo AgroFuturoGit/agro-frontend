@@ -101,6 +101,15 @@ function plansGlobalFilter(
   );
 }
 
+// Prefixa o nome com o rótulo ("Comunidade X"), a menos que o nome já comece
+// com essa palavra, para não exibir "Comunidade Comunidade X" (D3).
+function withPrefix(prefix: string, name: string): string {
+  const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^${escaped}\\b`, "i").test(name.trim())
+    ? name
+    : `${prefix} ${name}`;
+}
+
 const columnHelper = createColumnHelper<ProductionPlan>();
 
 export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
@@ -213,9 +222,11 @@ export function ProducerPlansPage({ orgId, communityId, producerId }: Props) {
         return;
       }
       const affiliation = [
-        producer.community?.name ? `Comunidade ${producer.community.name}` : null,
+        producer.community?.name
+          ? withPrefix("Comunidade", producer.community.name)
+          : null,
         producer.community?.organization?.name
-          ? `Organização ${producer.community.organization.name}`
+          ? withPrefix("Organização", producer.community.organization.name)
           : null,
       ].filter(Boolean);
       setFarmerAffiliation(affiliation.length ? affiliation.join(" · ") : null);
